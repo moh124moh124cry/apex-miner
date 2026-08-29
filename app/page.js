@@ -3,21 +3,43 @@ import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 
 export default function Home() {
-  const [balance, setBalance] = useState(28.0000);
-  const [miningDelta, setMiningDelta] = useState(0.0188);
-  const [activeTab, setActiveTab] = useState('mine'); // Tabs: mine, tasks, boosts
+  // 1. تعيين نقطة البداية على الصفر للمستخدمين الجدد
+  const [balance, setBalance] = useState(0);
+  const [miningDelta, setMiningDelta] = useState(0);
+  const [activeTab, setActiveTab] = useState('mine');
   const userAddress = useTonAddress();
 
+  // 2. استرجاع البيانات المحفوظة عند فتح التطبيق
+  useEffect(() => {
+    const savedBalance = localStorage.getItem('apex_balance');
+    const savedDelta = localStorage.getItem('apex_delta');
+    
+    if (savedBalance) setBalance(parseFloat(savedBalance));
+    if (savedDelta) setMiningDelta(parseFloat(savedDelta));
+  }, []);
+
+  // 3. عداد التعدين والحفظ التلقائي لنقاط التعدين
   useEffect(() => {
     const interval = setInterval(() => {
-      setMiningDelta(prev => prev + 0.0001);
+      setMiningDelta(prev => {
+        const newDelta = prev + 0.0001;
+        localStorage.setItem('apex_delta', newDelta.toString()); // حفظ مباشر
+        return newDelta;
+      });
     }, 1000);
+    
     return () => clearInterval(interval);
   }, []);
+
+  // 4. حفظ الرصيد الإجمالي عند المطالبة (Claim)
+  useEffect(() => {
+    localStorage.setItem('apex_balance', balance.toString());
+  }, [balance]);
 
   const handleClaim = () => {
      setBalance(prev => prev + miningDelta);
      setMiningDelta(0);
+     localStorage.setItem('apex_delta', '0'); // تصفير العداد المحفوظ بعد المطالبة
   };
 
   return (
@@ -29,7 +51,7 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
-      {/* Main Content Area based on Active Tab */}
+      {/* Main Content Area */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -70,30 +92,17 @@ export default function Home() {
         </div>
       )}
 
-      {/* Boosts Store Tab */}
+      {/* Boosts Tab */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <h2 className="text-2xl font-bold text-white mb-6">Mining Boosts</h2>
-          
           <div className="flex flex-col gap-4">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Speed Reactor</h3>
                 <p className="text-gray-400 text-xs">Increase mining speed by 2x</p>
               </div>
-              <button className="bg-blue-600 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">
-                500 APX
-              </button>
-            </div>
-
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-white text-lg">Storage Battery</h3>
-                <p className="text-gray-400 text-xs">Mine offline for 12 hours</p>
-              </div>
-              <button className="bg-purple-600 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1 active:scale-95">
-                0.5 TON
-              </button>
+              <button className="bg-blue-600 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">500 APX</button>
             </div>
           </div>
         </div>
@@ -108,38 +117,23 @@ export default function Home() {
               <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
               <p className="text-gray-400 text-xs">+100 APX Reward</p>
             </div>
-            <button className="bg-slate-700 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">
-              GO
-            </button>
+            <button className="bg-slate-700 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">GO</button>
           </div>
         </div>
       )}
 
       {/* Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-md border-t border-slate-800 p-4 flex justify-around items-center z-50">
-        <button 
-          onClick={() => setActiveTab('mine')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'mine' ? 'text-blue-400' : 'text-gray-500'}`}
-        >
-          <span className="text-2xl">⛏️</span>
-          <span className="text-xs font-bold">Mine</span>
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 ${activeTab === 'mine' ? 'text-blue-400' : 'text-gray-500'}`}>
+          <span className="text-2xl">⛏️</span><span className="text-xs font-bold">Mine</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('tasks')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'tasks' ? 'text-blue-400' : 'text-gray-500'}`}
-        >
-          <span className="text-2xl">📋</span>
-          <span className="text-xs font-bold">Tasks</span>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 ${activeTab === 'tasks' ? 'text-blue-400' : 'text-gray-500'}`}>
+          <span className="text-2xl">📋</span><span className="text-xs font-bold">Tasks</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('boosts')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'boosts' ? 'text-purple-400' : 'text-gray-500'}`}
-        >
-          <span className="text-2xl">🚀</span>
-          <span className="text-xs font-bold">Boosts</span>
+        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 ${activeTab === 'boosts' ? 'text-purple-400' : 'text-gray-500'}`}>
+          <span className="text-2xl">🚀</span><span className="text-xs font-bold">Boosts</span>
         </button>
       </div>
-
     </main>
   );
 }
