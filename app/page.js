@@ -1,8 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
-// استدعاء ملف الاتصال بقاعدة البيانات الذي أنشأته للتو
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase'; 
 
 export default function Home() {
   const [balance, setBalance] = useState(0);
@@ -12,47 +11,80 @@ export default function Home() {
   const [friendsCount, setFriendsCount] = useState(0); 
   const [miningRate, setMiningRate] = useState(0.0001);
   const [boostActive, setBoostActive] = useState(false);
+  
   const [userId, setUserId] = useState(null);
+  // متغير جديد لكشف الأخطاء وعرضها على الشاشة
+  const [dbStatus, setDbStatus] = useState('Connecting...'); 
 
   const userAddress = useTonAddress();
 
-  // 1. جلب معرف المستخدم الحقيقي من تليجرام
+  // 1. جلب معرف تليجرام بطريقة متكررة وآمنة
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-      setUserId(window.Telegram.WebApp.initDataUnsafe.user.id.toString());
-    } else {
-      // معرف تجريبي في حال فتحت التطبيق من المتصفح العادي للبرمجة
-      setUserId('test_user_123');
-    }
+    let attempts = 0;
+    const getTelegramUser = () => {
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        window.Telegram.WebApp.ready();
+        const user = window.Telegram.WebApp.initDataUnsafe?.user;
+        if (user) {
+          setUserId(user.id.toString());
+          setDbStatus('TG User Found');
+        } else {
+          setUserId('test_user');
+          setDbStatus('Browser User');
+        }
+      } else {
+        attempts++;
+        if (attempts < 10) {
+          setTimeout(getTelegramUser, 500);
+        } else {
+          setUserId('test_user');
+          setDbStatus('TG Script Failed');
+        }
+      }
+    };
+    getTelegramUser();
   }, []);
 
-  // 2. جلب رصيد المستخدم من قاعدة البيانات السحابية
+  // 2. تحميل البيانات وكشف أي أخطاء في الجدول
   useEffect(() => {
     async function fetchUserData() {
       if (!userId) return;
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('telegram_id', userId)
-        .single();
-
-      if (data) {
-        setBalance(parseFloat(data.balance || 0));
-        setBoostActive(data.boost_active || false);
-        if (data.boost_active) setMiningRate(0.0002);
-      } else {
-        // إذا كان المستخدم جديداً، ننشئ له حساباً برصيد 0
-        await supabase
+      try {
+        const { data, error } = await supabase
           .from('users')
-          .insert([{ telegram_id: userId, balance: 0, boost_active: false }]);
+          .select('*')
+          .eq('telegram_id', userId)
+          .single();
+
+        if (data) {
+          setBalance(Number(data.balance || 0));
+          setBoostActive(data.boost_active || false);
+          if (data.boost_active) setMiningRate(0.0002);
+          setDbStatus('Data Loaded ✅');
+        } else if (error && error.code === 'PGRST116') {
+          // الحساب غير موجود، نقوم بإنشائه
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert([{ telegram_id: userId, balance: 0, boost_active: false }]);
+          
+          if (insertError) {
+            setDbStatus('Insert Error: ' + insertError.message);
+          } else {
+            setDbStatus('New User Saved ✅');
+          }
+        } else {
+          setDbStatus('Fetch Error: ' + error.message);
+        }
+      } catch (err) {
+        setDbStatus('Sys Error: ' + err.message);
       }
     }
 
     fetchUserData();
   }, [userId]);
 
-  // 3. عداد التعدين الحي
+  // عداد التعدين الديناميكي
   useEffect(() => {
     const interval = setInterval(() => {
       setMiningDelta(prev => prev + miningRate);
@@ -60,17 +92,25 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [miningRate]);
 
-  // 4. حفظ الرصيد في السحابة عند الضغط على Claim
+  // زر الجمع
   const handleClaim = async () => {
     const newTotalBalance = balance + miningDelta;
     setBalance(newTotalBalance);
     setMiningDelta(0);
 
-    // الحفظ المباشر في Supabase
-    await supabase
-      .from('users')
-      .update({ balance: newTotalBalance })
-      .eq('telegram_id', userId);
+    if (userId) {
+      setDbStatus('Saving...');
+      const { error } = await supabase
+        .from('users')
+        .update({ balance: newTotalBalance })
+        .eq('telegram_id', userId);
+        
+      if (error) {
+        setDbStatus('Save Error: ' + error.message);
+      } else {
+        setDbStatus('Saved ✅');
+      }
+    }
   };
 
   // نظام المهام
@@ -82,10 +122,9 @@ export default function Home() {
     setBalance(newBalance);
     setTaskCompleted(true);
 
-    await supabase
-      .from('users')
-      .update({ balance: newBalance })
-      .eq('telegram_id', userId);
+    if (userId) {
+      await supabase.from('users').update({ balance: newBalance }).eq('telegram_id', userId);
+    }
   };
 
   // نظام الإحالة
@@ -99,10 +138,10 @@ export default function Home() {
   const handleCopyLink = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
     navigator.clipboard.writeText(inviteLink);
-    alert("✅ Invite link copied! Send it to your friends now.");
+    alert("✅ Invite link copied!");
   };
 
-  // نظام شراء الترقيات
+  // نظام الترقيات
   const handleBuyBoost = async () => {
     if (boostActive) return;
     
@@ -113,18 +152,22 @@ export default function Home() {
       setBoostActive(true);
       setMiningRate(0.0002);
       
-      await supabase
-        .from('users')
-        .update({ balance: newBalance, boost_active: true })
-        .eq('telegram_id', userId);
+      if (userId) {
+        await supabase.from('users').update({ balance: newBalance, boost_active: true }).eq('telegram_id', userId);
+      }
     } else {
-      alert("❌ Not enough APX balance! Claim more from mining first.");
+      alert("❌ Not enough APX balance!");
     }
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-24">
       
+      {/* شريط حالة السيرفر (سيكشف لنا الخطأ فوراً) */}
+      <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono">
+        Status: {dbStatus}
+      </div>
+
       <div className="w-full flex justify-between items-center p-4">
         <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
         <TonConnectButton />
@@ -251,4 +294,3 @@ export default function Home() {
     </main>
   );
 }
-
