@@ -1,19 +1,12 @@
 import './globals.css';
-import { Providers } from './providers';
-
-export const metadata = {
-  title: 'ApexMiner',
-  description: 'Mine APEX directly inside Telegram',
-}
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="bg-slate-950 text-white select-none">
-        <Providers>
-          {children}
-        </Providers>
-      </body>
+      <head>
+        <script src="https://telegram.org/js/telegram-web-app.js" async></script>
+      </head>
+      <body>{children}</body>
     </html>
-  )
+  );
 }
