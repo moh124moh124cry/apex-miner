@@ -56,6 +56,7 @@ export default function Home() {
         if (data) {
           setBalance(Number(data.balance || 0));
           if (data.mining_rate) setMiningRate(Number(data.mining_rate)); 
+          if (data.channel_joined) setTaskCompleted(data.channel_joined); // قراءة حالة المهمة من قاعدة البيانات
           setDbStatus('Data Loaded ✅');
           
           if (data.username !== userName || data.first_name !== firstName) {
@@ -67,7 +68,7 @@ export default function Home() {
           if (referrerId) initialBalance = 10;
           const { error: insertError } = await supabase.from('users').insert([{ 
               telegram_id: userId, first_name: firstName, username: userName,
-              balance: initialBalance, mining_rate: 0.0001, referred_by: referrerId
+              balance: initialBalance, mining_rate: 0.0001, referred_by: referrerId, channel_joined: false
           }]);
           if (!insertError) {
             setDbStatus('New User Saved ✅');
@@ -112,7 +113,8 @@ export default function Home() {
     setBalance(newBalance);
     setTaskCompleted(true);
     if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({ balance: newBalance }).eq('telegram_id', userId);
+      // حفظ اكتمال المهمة بشكل دائم في قاعدة البيانات
+      await supabase.from('users').update({ balance: newBalance, channel_joined: true }).eq('telegram_id', userId);
     }
   };
 
@@ -299,7 +301,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم الورقة البيضاء الجديد (Whitepaper) */}
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
@@ -410,7 +411,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* شريط التنقل السفلي المحدث بـ 5 أزرار */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-3 flex justify-around items-center z-50">
         <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
