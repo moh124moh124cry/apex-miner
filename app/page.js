@@ -56,17 +56,20 @@ export default function Home() {
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         if (data) {
           setBalance(Number(data.balance || 0));
-          const currentRate = Number(data.mining_rate || 0.0001);
-          setMiningRate(currentRate); 
+          
+          // قراءة السرعة بشكل صارم
+          if (data.mining_rate !== undefined && data.mining_rate !== null) {
+            setMiningRate(Number(data.mining_rate)); 
+          }
+          
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           
-          // حساب أرباح التعدين أثناء إغلاق التطبيق (Offline Mining)
           if (data.last_claim) {
             const lastTime = new Date(data.last_claim).getTime();
             const now = new Date().getTime();
             const diffSeconds = (now - lastTime) / 1000;
             if (diffSeconds > 0) {
-              setMiningDelta(diffSeconds * currentRate);
+              setMiningDelta(diffSeconds * Number(data.mining_rate || 0.0001));
             }
           }
 
@@ -155,12 +158,20 @@ export default function Home() {
     if (costType === 'APX') {
       if (autoClaimedBalance >= costValue) {
         const newBalance = autoClaimedBalance - costValue;
+        
+        if (userId && userId !== 'test_user') {
+          // تحديث قاعدة البيانات أولاً للتأكد
+          const { error } = await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
+          
+          if (error) {
+            alert(`❌ Database Error: ${error.message}`);
+            return;
+          }
+        }
+        
         setBalance(newBalance);
         setMiningDelta(0);
         setMiningRate(newRateSpeed);
-        if (userId && userId !== 'test_user') {
-          await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
-        }
         alert("✅ Upgrade purchased successfully with APX!");
       } else {
         alert("❌ Not enough APX balance!");
@@ -180,13 +191,22 @@ export default function Home() {
         setDbStatus('Awaiting Payment...');
         const result = await tonConnectUI.sendTransaction(transaction);
         if (result) {
+          
+          if (userId && userId !== 'test_user') {
+             // إجبار قاعدة البيانات على الحفظ وإظهار الخطأ إن وُجد
+            const { error } = await supabase.from('users').update({ balance: autoClaimedBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
+            
+            if (error) {
+              alert(`❌ DB Error: ${error.message}. Please check Supabase columns.`);
+              setDbStatus('DB Save Error');
+              return;
+            }
+          }
+
           setBalance(autoClaimedBalance);
           setMiningDelta(0);
           setMiningRate(newRateSpeed);
-          if (userId && userId !== 'test_user') {
-            await supabase.from('users').update({ balance: autoClaimedBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
-          }
-          alert("✅ Premium Upgrade activated!");
+          alert("✅ Premium Upgrade activated and saved!");
           setDbStatus('Upgrade Saved ✅');
         }
       } catch (error) {
