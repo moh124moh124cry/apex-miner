@@ -13,12 +13,13 @@ export default function Home() {
   const [boostActive, setBoostActive] = useState(false);
   
   const [userId, setUserId] = useState(null);
-  // متغير جديد لكشف الأخطاء وعرضها على الشاشة
+  const [firstName, setFirstName] = useState('');
+  const [userName, setUserName] = useState('');
   const [dbStatus, setDbStatus] = useState('Connecting...'); 
 
   const userAddress = useTonAddress();
 
-  // 1. جلب معرف تليجرام بطريقة متكررة وآمنة
+  // 1. جلب معرف تليجرام والأسماء
   useEffect(() => {
     let attempts = 0;
     const getTelegramUser = () => {
@@ -27,6 +28,8 @@ export default function Home() {
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
         if (user) {
           setUserId(user.id.toString());
+          setFirstName(user.first_name || 'Unknown');
+          setUserName(user.username || 'No Username');
           setDbStatus('TG User Found');
         } else {
           setUserId('test_user');
@@ -45,10 +48,10 @@ export default function Home() {
     getTelegramUser();
   }, []);
 
-  // 2. تحميل البيانات وكشف أي أخطاء في الجدول
+  // 2. تحميل البيانات وتحديث الأسماء في الجدول
   useEffect(() => {
     async function fetchUserData() {
-      if (!userId) return;
+      if (!userId || userId === 'test_user') return;
 
       try {
         const { data, error } = await supabase
@@ -62,11 +65,26 @@ export default function Home() {
           setBoostActive(data.boost_active || false);
           if (data.boost_active) setMiningRate(0.0002);
           setDbStatus('Data Loaded ✅');
+
+          // تحديث اسم المستخدم إذا قام بتغييره في تليجرام
+          if (data.username !== userName || data.first_name !== firstName) {
+            await supabase
+              .from('users')
+              .update({ first_name: firstName, username: userName })
+              .eq('telegram_id', userId);
+          }
+          
         } else if (error && error.code === 'PGRST116') {
-          // الحساب غير موجود، نقوم بإنشائه
+          // حساب جديد: نقوم بإنشائه مع الأسماء
           const { error: insertError } = await supabase
             .from('users')
-            .insert([{ telegram_id: userId, balance: 0, boost_active: false }]);
+            .insert([{ 
+              telegram_id: userId, 
+              first_name: firstName,
+              username: userName,
+              balance: 0, 
+              boost_active: false 
+            }]);
           
           if (insertError) {
             setDbStatus('Insert Error: ' + insertError.message);
@@ -81,10 +99,11 @@ export default function Home() {
       }
     }
 
-    fetchUserData();
-  }, [userId]);
+    if (firstName || userName) {
+      fetchUserData();
+    }
+  }, [userId, firstName, userName]);
 
-  // عداد التعدين الديناميكي
   useEffect(() => {
     const interval = setInterval(() => {
       setMiningDelta(prev => prev + miningRate);
@@ -92,13 +111,12 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [miningRate]);
 
-  // زر الجمع
   const handleClaim = async () => {
     const newTotalBalance = balance + miningDelta;
     setBalance(newTotalBalance);
     setMiningDelta(0);
 
-    if (userId) {
+    if (userId && userId !== 'test_user') {
       setDbStatus('Saving...');
       const { error } = await supabase
         .from('users')
@@ -106,14 +124,13 @@ export default function Home() {
         .eq('telegram_id', userId);
         
       if (error) {
-        setDbStatus('Save Error: ' + error.message);
+        setDbStatus('Save Error');
       } else {
         setDbStatus('Saved ✅');
       }
     }
   };
 
-  // نظام المهام
   const handleJoinChannel = async () => {
     if (taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank');
@@ -122,12 +139,11 @@ export default function Home() {
     setBalance(newBalance);
     setTaskCompleted(true);
 
-    if (userId) {
+    if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newBalance }).eq('telegram_id', userId);
     }
   };
 
-  // نظام الإحالة
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
     const shareText = "🚀 Come mine APX with me for free on Telegram! Get a 10 APX welcome bonus when you join through my link:";
@@ -141,7 +157,6 @@ export default function Home() {
     alert("✅ Invite link copied!");
   };
 
-  // نظام الترقيات
   const handleBuyBoost = async () => {
     if (boostActive) return;
     
@@ -152,7 +167,7 @@ export default function Home() {
       setBoostActive(true);
       setMiningRate(0.0002);
       
-      if (userId) {
+      if (userId && userId !== 'test_user') {
         await supabase.from('users').update({ balance: newBalance, boost_active: true }).eq('telegram_id', userId);
       }
     } else {
@@ -163,7 +178,6 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-24">
       
-      {/* شريط حالة السيرفر (سيكشف لنا الخطأ فوراً) */}
       <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono">
         Status: {dbStatus}
       </div>
