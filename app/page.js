@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { supabase } from '../lib/supabase'; 
+import Image from 'next/image';
 
 export default function Home() {
   const [balance, setBalance] = useState(0); 
@@ -56,7 +57,7 @@ export default function Home() {
         if (data) {
           setBalance(Number(data.balance || 0));
           if (data.mining_rate) setMiningRate(Number(data.mining_rate)); 
-          if (data.channel_joined) setTaskCompleted(data.channel_joined); // قراءة حالة المهمة من قاعدة البيانات
+          if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           setDbStatus('Data Loaded ✅');
           
           if (data.username !== userName || data.first_name !== firstName) {
@@ -113,7 +114,6 @@ export default function Home() {
     setBalance(newBalance);
     setTaskCompleted(true);
     if (userId && userId !== 'test_user') {
-      // حفظ اكتمال المهمة بشكل دائم في قاعدة البيانات
       await supabase.from('users').update({ balance: newBalance, channel_joined: true }).eq('telegram_id', userId);
     }
   };
@@ -184,7 +184,11 @@ export default function Home() {
       </div>
 
       <div className="w-full flex justify-between items-center p-4">
-        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
+        {/* تعديل مسار الصورة إلى logo2.png */}
+        <div className="flex items-center gap-2">
+          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
+          <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
+        </div>
         <TonConnectButton />
       </div>
 
@@ -212,8 +216,9 @@ export default function Home() {
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
             <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full"></div>
-            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10">
-               <span className="text-6xl font-black tracking-tighter text-white drop-shadow-md">APX</span>
+            {/* تعديل مسار الصورة إلى logo2.png */}
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10 overflow-hidden">
+               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
           <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-lg font-bold shadow-[0_4px_20px_rgba(79,70,229,0.4)] active:scale-95 transition-all">
