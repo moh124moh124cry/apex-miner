@@ -3,35 +3,36 @@ import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 
 export default function Home() {
-  // 1. تعيين نقطة البداية على الصفر للمستخدمين الجدد
   const [balance, setBalance] = useState(0);
   const [miningDelta, setMiningDelta] = useState(0);
   const [activeTab, setActiveTab] = useState('mine');
+  const [taskCompleted, setTaskCompleted] = useState(false);
   const userAddress = useTonAddress();
 
-  // 2. استرجاع البيانات المحفوظة عند فتح التطبيق
+  // 1. استرجاع البيانات المحفوظة عند فتح التطبيق
   useEffect(() => {
     const savedBalance = localStorage.getItem('apex_balance');
     const savedDelta = localStorage.getItem('apex_delta');
+    const savedTask = localStorage.getItem('apex_task_1');
     
     if (savedBalance) setBalance(parseFloat(savedBalance));
     if (savedDelta) setMiningDelta(parseFloat(savedDelta));
+    if (savedTask === 'completed') setTaskCompleted(true);
   }, []);
 
-  // 3. عداد التعدين والحفظ التلقائي لنقاط التعدين
+  // 2. عداد التعدين والحفظ التلقائي لنقاط التعدين
   useEffect(() => {
     const interval = setInterval(() => {
       setMiningDelta(prev => {
         const newDelta = prev + 0.0001;
-        localStorage.setItem('apex_delta', newDelta.toString()); // حفظ مباشر
+        localStorage.setItem('apex_delta', newDelta.toString());
         return newDelta;
       });
     }, 1000);
-    
     return () => clearInterval(interval);
   }, []);
 
-  // 4. حفظ الرصيد الإجمالي عند المطالبة (Claim)
+  // 3. حفظ الرصيد الإجمالي عند المطالبة (Claim)
   useEffect(() => {
     localStorage.setItem('apex_balance', balance.toString());
   }, [balance]);
@@ -39,7 +40,24 @@ export default function Home() {
   const handleClaim = () => {
      setBalance(prev => prev + miningDelta);
      setMiningDelta(0);
-     localStorage.setItem('apex_delta', '0'); // تصفير العداد المحفوظ بعد المطالبة
+     localStorage.setItem('apex_delta', '0');
+  };
+
+  // 4. وظيفة مهمة الانضمام لقناة تليجرام
+  const handleJoinChannel = () => {
+    if (taskCompleted) return;
+    
+    // فتح القناة الرسمية
+    window.open('https://t.me/ApexMiner_Official', '_blank');
+    
+    // إضافة المكافأة وتحديث الرصيد
+    const newBalance = balance + 100;
+    setBalance(newBalance);
+    localStorage.setItem('apex_balance', newBalance.toString());
+    
+    // حفظ اكتمال المهمة
+    setTaskCompleted(true);
+    localStorage.setItem('apex_task_1', 'completed');
   };
 
   return (
@@ -51,7 +69,7 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Mine */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -96,14 +114,12 @@ export default function Home() {
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <h2 className="text-2xl font-bold text-white mb-6">Mining Boosts</h2>
-          <div className="flex flex-col gap-4">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-white text-lg">Speed Reactor</h3>
-                <p className="text-gray-400 text-xs">Increase mining speed by 2x</p>
-              </div>
-              <button className="bg-blue-600 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">500 APX</button>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-white text-lg">Speed Reactor</h3>
+              <p className="text-gray-400 text-xs">Increase mining speed by 2x</p>
             </div>
+            <button className="bg-blue-600 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">500 APX</button>
           </div>
         </div>
       )}
@@ -117,7 +133,13 @@ export default function Home() {
               <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
               <p className="text-gray-400 text-xs">+100 APX Reward</p>
             </div>
-            <button className="bg-slate-700 px-4 py-2 rounded-xl text-sm font-bold active:scale-95">GO</button>
+            <button 
+              onClick={handleJoinChannel}
+              disabled={taskCompleted}
+              className={`${taskCompleted ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors`}
+            >
+              {taskCompleted ? 'Completed ✓' : 'GO'}
+            </button>
           </div>
         </div>
       )}
