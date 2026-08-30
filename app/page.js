@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
+// استدعاء ملف الاتصال بقاعدة البيانات الذي أنشأته للتو
+import { supabase } from '../lib/supabase';
 
 export default function Home() {
   const [balance, setBalance] = useState(0);
@@ -8,80 +10,100 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('mine');
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0); 
-  
-  // حالات الترقيات الجديدة
   const [miningRate, setMiningRate] = useState(0.0001);
   const [boostActive, setBoostActive] = useState(false);
+  const [userId, setUserId] = useState(null);
 
   const userAddress = useTonAddress();
 
+  // 1. جلب معرف المستخدم الحقيقي من تليجرام
   useEffect(() => {
-    const savedBalance = localStorage.getItem('apex_balance');
-    const savedDelta = localStorage.getItem('apex_delta');
-    const savedTask = localStorage.getItem('apex_task_1');
-    const savedFriends = localStorage.getItem('apex_friends_count');
-    const savedBoost = localStorage.getItem('apex_boost_active');
-    
-    if (savedBalance) setBalance(parseFloat(savedBalance));
-    if (savedDelta) setMiningDelta(parseFloat(savedDelta));
-    if (savedTask === 'completed') setTaskCompleted(true);
-    if (savedFriends) setFriendsCount(parseInt(savedFriends));
-    
-    if (savedBoost === 'true') {
-      setBoostActive(true);
-      setMiningRate(0.0002); // تفعيل السرعة المضاعفة عند فتح التطبيق
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+      setUserId(window.Telegram.WebApp.initDataUnsafe.user.id.toString());
+    } else {
+      // معرف تجريبي في حال فتحت التطبيق من المتصفح العادي للبرمجة
+      setUserId('test_user_123');
     }
   }, []);
 
-  // عداد التعدين الديناميكي
+  // 2. جلب رصيد المستخدم من قاعدة البيانات السحابية
+  useEffect(() => {
+    async function fetchUserData() {
+      if (!userId) return;
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('telegram_id', userId)
+        .single();
+
+      if (data) {
+        setBalance(parseFloat(data.balance || 0));
+        setBoostActive(data.boost_active || false);
+        if (data.boost_active) setMiningRate(0.0002);
+      } else {
+        // إذا كان المستخدم جديداً، ننشئ له حساباً برصيد 0
+        await supabase
+          .from('users')
+          .insert([{ telegram_id: userId, balance: 0, boost_active: false }]);
+      }
+    }
+
+    fetchUserData();
+  }, [userId]);
+
+  // 3. عداد التعدين الحي
   useEffect(() => {
     const interval = setInterval(() => {
-      setMiningDelta(prev => {
-        const newDelta = prev + miningRate;
-        localStorage.setItem('apex_delta', newDelta.toString());
-        return newDelta;
-      });
+      setMiningDelta(prev => prev + miningRate);
     }, 1000);
     return () => clearInterval(interval);
   }, [miningRate]);
 
-  useEffect(() => {
-    localStorage.setItem('apex_balance', balance.toString());
-  }, [balance]);
+  // 4. حفظ الرصيد في السحابة عند الضغط على Claim
+  const handleClaim = async () => {
+    const newTotalBalance = balance + miningDelta;
+    setBalance(newTotalBalance);
+    setMiningDelta(0);
 
-  const handleClaim = () => {
-     setBalance(prev => prev + miningDelta);
-     setMiningDelta(0);
-     localStorage.setItem('apex_delta', '0');
+    // الحفظ المباشر في Supabase
+    await supabase
+      .from('users')
+      .update({ balance: newTotalBalance })
+      .eq('telegram_id', userId);
   };
 
-  // نظام المهام الواقعي (5 APX)
-  const handleJoinChannel = () => {
+  // نظام المهام
+  const handleJoinChannel = async () => {
     if (taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank');
+    
     const newBalance = balance + 5;
     setBalance(newBalance);
-    localStorage.setItem('apex_balance', newBalance.toString());
     setTaskCompleted(true);
-    localStorage.setItem('apex_task_1', 'completed');
+
+    await supabase
+      .from('users')
+      .update({ balance: newBalance })
+      .eq('telegram_id', userId);
   };
 
-  // نظام الإحالة الواقعي (10 APX)
+  // نظام الإحالة
   const handleInviteFriend = () => {
-    const inviteLink = "https://t.me/ApxMinerBot/app?startapp=invite";
+    const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
     const shareText = "🚀 Come mine APX with me for free on Telegram! Get a 10 APX welcome bonus when you join through my link:";
     const fullUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
     window.open(fullUrl, '_blank');
   };
 
   const handleCopyLink = () => {
-    const inviteLink = "https://t.me/ApxMinerBot/app?startapp=invite";
+    const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
     navigator.clipboard.writeText(inviteLink);
     alert("✅ Invite link copied! Send it to your friends now.");
   };
 
-  // نظام شراء الترقيات (خصم 50 APX لزيادة السرعة)
-  const handleBuyBoost = () => {
+  // نظام شراء الترقيات
+  const handleBuyBoost = async () => {
     if (boostActive) return;
     
     const boostCost = 50;
@@ -91,8 +113,10 @@ export default function Home() {
       setBoostActive(true);
       setMiningRate(0.0002);
       
-      localStorage.setItem('apex_balance', newBalance.toString());
-      localStorage.setItem('apex_boost_active', 'true');
+      await supabase
+        .from('users')
+        .update({ balance: newBalance, boost_active: true })
+        .eq('telegram_id', userId);
     } else {
       alert("❌ Not enough APX balance! Claim more from mining first.");
     }
