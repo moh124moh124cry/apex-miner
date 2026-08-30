@@ -15,21 +15,24 @@ export default function Home() {
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
   const [userName, setUserName] = useState('');
+  const [startParam, setStartParam] = useState(null); // قراءة رابط الدعوة
   const [dbStatus, setDbStatus] = useState('Connecting...'); 
 
   const userAddress = useTonAddress();
 
-  // 1. جلب معرف تليجرام والأسماء
   useEffect(() => {
     let attempts = 0;
     const getTelegramUser = () => {
       if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
         window.Telegram.WebApp.ready();
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
+        const param = window.Telegram.WebApp.initDataUnsafe?.start_param; // سحب كود الإحالة
+        
         if (user) {
           setUserId(user.id.toString());
           setFirstName(user.first_name || 'Unknown');
           setUserName(user.username || 'No Username');
+          setStartParam(param);
           setDbStatus('TG User Found');
         } else {
           setUserId('test_user');
@@ -48,7 +51,6 @@ export default function Home() {
     getTelegramUser();
   }, []);
 
-  // 2. تحميل البيانات وتحديث الأسماء في الجدول
   useEffect(() => {
     async function fetchUserData() {
       if (!userId || userId === 'test_user') return;
@@ -66,43 +68,59 @@ export default function Home() {
           if (data.boost_active) setMiningRate(0.0002);
           setDbStatus('Data Loaded ✅');
 
-          // تحديث اسم المستخدم إذا قام بتغييره في تليجرام
           if (data.username !== userName || data.first_name !== firstName) {
-            await supabase
-              .from('users')
-              .update({ first_name: firstName, username: userName })
-              .eq('telegram_id', userId);
+            await supabase.from('users').update({ first_name: firstName, username: userName }).eq('telegram_id', userId);
           }
           
         } else if (error && error.code === 'PGRST116') {
-          // حساب جديد: نقوم بإنشائه مع الأسماء
+          // مستخدم جديد جاء عبر رابط دعوة
+          let initialBalance = 0;
+          let referrerId = (startParam && startParam !== userId) ? startParam : null;
+          
+          if (referrerId) initialBalance = 10; // هدية الترحيب للصديق المضاف
+
           const { error: insertError } = await supabase
             .from('users')
             .insert([{ 
               telegram_id: userId, 
               first_name: firstName,
               username: userName,
-              balance: 0, 
-              boost_active: false 
+              balance: initialBalance, 
+              boost_active: false,
+              referred_by: referrerId
             }]);
           
-          if (insertError) {
-            setDbStatus('Insert Error: ' + insertError.message);
-          } else {
+          if (!insertError) {
             setDbStatus('New User Saved ✅');
+            // إضافة هدية 10 APX لصاحب الرابط الأصلي
+            if (referrerId) {
+              const { data: refData } = await supabase.from('users').select('balance').eq('telegram_id', referrerId).single();
+              if (refData) {
+                await supabase.from('users').update({ balance: Number(refData.balance) + 10 }).eq('telegram_id', referrerId);
+              }
+            }
+          } else {
+            setDbStatus('Insert Error');
           }
-        } else {
-          setDbStatus('Fetch Error: ' + error.message);
         }
+
+        // جلب عدد الأصدقاء الذين دخلوا عبر رابطك
+        const { count } = await supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('referred_by', userId);
+        
+        setFriendsCount(count || 0);
+
       } catch (err) {
-        setDbStatus('Sys Error: ' + err.message);
+        setDbStatus('Sys Error');
       }
     }
 
     if (firstName || userName) {
       fetchUserData();
     }
-  }, [userId, firstName, userName]);
+  }, [userId, firstName, userName, startParam]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -118,27 +136,18 @@ export default function Home() {
 
     if (userId && userId !== 'test_user') {
       setDbStatus('Saving...');
-      const { error } = await supabase
-        .from('users')
-        .update({ balance: newTotalBalance })
-        .eq('telegram_id', userId);
-        
-      if (error) {
-        setDbStatus('Save Error');
-      } else {
-        setDbStatus('Saved ✅');
-      }
+      const { error } = await supabase.from('users').update({ balance: newTotalBalance }).eq('telegram_id', userId);
+      if (error) setDbStatus('Save Error');
+      else setDbStatus('Saved ✅');
     }
   };
 
   const handleJoinChannel = async () => {
     if (taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank');
-    
     const newBalance = balance + 5;
     setBalance(newBalance);
     setTaskCompleted(true);
-
     if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newBalance }).eq('telegram_id', userId);
     }
@@ -159,14 +168,12 @@ export default function Home() {
 
   const handleBuyBoost = async () => {
     if (boostActive) return;
-    
     const boostCost = 50;
     if (balance >= boostCost) {
       const newBalance = balance - boostCost;
       setBalance(newBalance);
       setBoostActive(true);
       setMiningRate(0.0002);
-      
       if (userId && userId !== 'test_user') {
         await supabase.from('users').update({ balance: newBalance, boost_active: true }).eq('telegram_id', userId);
       }
@@ -177,7 +184,6 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-24">
-      
       <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono">
         Status: {dbStatus}
       </div>
@@ -218,10 +224,7 @@ export default function Home() {
             </div>
           </div>
 
-          <button 
-            onClick={handleClaim}
-            className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-lg font-bold shadow-[0_4px_20px_rgba(79,70,229,0.4)] active:scale-95 transition-all"
-          >
+          <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-lg font-bold shadow-[0_4px_20px_rgba(79,70,229,0.4)] active:scale-95 transition-all">
             CLAIM APEX
           </button>
         </div>
@@ -235,11 +238,7 @@ export default function Home() {
               <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
               <p className="text-gray-400 text-xs">+5 APX Reward</p>
             </div>
-            <button 
-              onClick={handleJoinChannel}
-              disabled={taskCompleted}
-              className={`${taskCompleted ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors`}
-            >
+            <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors`}>
               {taskCompleted ? 'Completed ✓' : 'GO'}
             </button>
           </div>
@@ -256,16 +255,10 @@ export default function Home() {
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center flex flex-col gap-4">
              <h3 className="text-6xl mb-2">🎁</h3>
              <h4 className="text-white font-bold text-lg">Your Friends: {friendsCount}</h4>
-             <button 
-               onClick={handleInviteFriend}
-               className="w-full bg-blue-600 py-3 rounded-xl text-white font-bold text-lg shadow-[0_4px_20px_rgba(37,99,235,0.4)] active:scale-95 transition-all"
-             >
+             <button onClick={handleInviteFriend} className="w-full bg-blue-600 py-3 rounded-xl text-white font-bold text-lg shadow-[0_4px_20px_rgba(37,99,235,0.4)] active:scale-95 transition-all">
                Invite a Friend
              </button>
-             <button 
-               onClick={handleCopyLink}
-               className="w-full bg-slate-800 py-3 rounded-xl text-gray-300 font-bold active:scale-95 transition-all"
-             >
+             <button onClick={handleCopyLink} className="w-full bg-slate-800 py-3 rounded-xl text-gray-300 font-bold active:scale-95 transition-all">
                Copy Invite Link
              </button>
           </div>
@@ -280,11 +273,7 @@ export default function Home() {
               <h3 className="font-bold text-white text-lg">Speed Reactor</h3>
               <p className="text-gray-400 text-xs">Increase mining speed by 2x</p>
             </div>
-            <button 
-              onClick={handleBuyBoost}
-              disabled={boostActive}
-              className={`${boostActive ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors`}
-            >
+            <button onClick={handleBuyBoost} disabled={boostActive} className={`${boostActive ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors`}>
               {boostActive ? 'Active ✓' : '50 APX'}
             </button>
           </div>
