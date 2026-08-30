@@ -56,8 +56,20 @@ export default function Home() {
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         if (data) {
           setBalance(Number(data.balance || 0));
-          if (data.mining_rate) setMiningRate(Number(data.mining_rate)); 
+          const currentRate = Number(data.mining_rate || 0.0001);
+          setMiningRate(currentRate); 
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
+          
+          // حساب أرباح التعدين أثناء إغلاق التطبيق (Offline Mining)
+          if (data.last_claim) {
+            const lastTime = new Date(data.last_claim).getTime();
+            const now = new Date().getTime();
+            const diffSeconds = (now - lastTime) / 1000;
+            if (diffSeconds > 0) {
+              setMiningDelta(diffSeconds * currentRate);
+            }
+          }
+
           setDbStatus('Data Loaded ✅');
           
           if (data.username !== userName || data.first_name !== firstName) {
@@ -67,9 +79,10 @@ export default function Home() {
           let initialBalance = 0;
           let referrerId = (startParam && startParam !== userId) ? startParam : null;
           if (referrerId) initialBalance = 10;
+          const currentIsoTime = new Date().toISOString();
           const { error: insertError } = await supabase.from('users').insert([{ 
               telegram_id: userId, first_name: firstName, username: userName,
-              balance: initialBalance, mining_rate: 0.0001, referred_by: referrerId, channel_joined: false
+              balance: initialBalance, mining_rate: 0.0001, referred_by: referrerId, channel_joined: false, last_claim: currentIsoTime
           }]);
           if (!insertError) {
             setDbStatus('New User Saved ✅');
@@ -97,11 +110,12 @@ export default function Home() {
 
   const handleClaim = async () => {
     const newTotalBalance = balance + miningDelta;
+    const currentIsoTime = new Date().toISOString();
     setBalance(newTotalBalance);
     setMiningDelta(0);
     if (userId && userId !== 'test_user') {
       setDbStatus('Saving...');
-      const { error } = await supabase.from('users').update({ balance: newTotalBalance }).eq('telegram_id', userId);
+      const { error } = await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
       if (error) setDbStatus('Save Error');
       else setDbStatus('Saved ✅');
     }
@@ -135,13 +149,17 @@ export default function Home() {
       return;
     }
 
+    const currentIsoTime = new Date().toISOString();
+    const autoClaimedBalance = balance + miningDelta;
+
     if (costType === 'APX') {
-      if (balance >= costValue) {
-        const newBalance = balance - costValue;
+      if (autoClaimedBalance >= costValue) {
+        const newBalance = autoClaimedBalance - costValue;
         setBalance(newBalance);
+        setMiningDelta(0);
         setMiningRate(newRateSpeed);
         if (userId && userId !== 'test_user') {
-          await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed }).eq('telegram_id', userId);
+          await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
         }
         alert("✅ Upgrade purchased successfully with APX!");
       } else {
@@ -162,9 +180,11 @@ export default function Home() {
         setDbStatus('Awaiting Payment...');
         const result = await tonConnectUI.sendTransaction(transaction);
         if (result) {
+          setBalance(autoClaimedBalance);
+          setMiningDelta(0);
           setMiningRate(newRateSpeed);
           if (userId && userId !== 'test_user') {
-            await supabase.from('users').update({ mining_rate: newRateSpeed }).eq('telegram_id', userId);
+            await supabase.from('users').update({ balance: autoClaimedBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
           }
           alert("✅ Premium Upgrade activated!");
           setDbStatus('Upgrade Saved ✅');
@@ -184,7 +204,6 @@ export default function Home() {
       </div>
 
       <div className="w-full flex justify-between items-center p-4">
-        {/* تعديل مسار الصورة إلى logo2.png */}
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
           <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
@@ -216,7 +235,6 @@ export default function Home() {
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
             <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full"></div>
-            {/* تعديل مسار الصورة إلى logo2.png */}
             <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10 overflow-hidden">
                <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
             </div>
