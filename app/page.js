@@ -10,6 +10,7 @@ export default function Home() {
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0); 
   const [miningRate, setMiningRate] = useState(0.0001); 
+  const [topUsers, setTopUsers] = useState([]); // حالة لتخزين قائمة المتصدرين
   
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
@@ -23,6 +24,7 @@ export default function Home() {
   // عنوان محفظتك لاستقبال أرباح الـ TON
   const ADMIN_WALLET = "UQAlWRIbr0ePdYPuc5kV0nEN4gPhLRnqASKWjaCeGPbinBwq"; 
 
+  // جلب بيانات المستخدم الحالي
   useEffect(() => {
     let attempts = 0;
     const getTelegramUser = () => {
@@ -87,12 +89,35 @@ export default function Home() {
     if (firstName || userName) fetchUserData();
   }, [userId, firstName, userName, startParam]);
 
+  // عداد التعدين الحي
   useEffect(() => {
     const interval = setInterval(() => {
       setMiningDelta(prev => prev + miningRate);
     }, 1000);
     return () => clearInterval(interval);
   }, [miningRate]);
+
+  // جلب قائمة المتصدرين عند فتح التبويب
+  useEffect(() => {
+    async function fetchLeaderboard() {
+      if (activeTab === 'leaderboard') {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('first_name, balance')
+            .order('balance', { ascending: false })
+            .limit(50); // نجلب أفضل 50 معدن فقط
+            
+          if (data && !error) {
+            setTopUsers(data);
+          }
+        } catch (error) {
+          console.error("Error fetching leaderboard");
+        }
+      }
+    }
+    fetchLeaderboard();
+  }, [activeTab]);
 
   const handleClaim = async () => {
     const newTotalBalance = balance + miningDelta;
@@ -259,7 +284,6 @@ export default function Home() {
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
           <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to mine APX faster!</p>
-          
           <div className="flex flex-col gap-4">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
@@ -269,15 +293,10 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">⚙️</span>
               </div>
-              <button 
-                onClick={() => buyUpgrade('APX', 500, 0.0005)} 
-                disabled={miningRate >= 0.0005}
-                className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0005 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}
-              >
+              <button onClick={() => buyUpgrade('APX', 500, 0.0005)} disabled={miningRate >= 0.0005} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0005 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
                 {miningRate >= 0.0005 ? 'Owned ✓' : 'Pay 500 APX'}
               </button>
             </div>
-
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -286,15 +305,10 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">☁️</span>
               </div>
-              <button 
-                onClick={() => buyUpgrade('TON', 0.15, 0.0015)} 
-                disabled={miningRate >= 0.0015}
-                className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0015 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}
-              >
+              <button onClick={() => buyUpgrade('TON', 0.15, 0.0015)} disabled={miningRate >= 0.0015} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0015 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}>
                 {miningRate >= 0.0015 ? 'Owned ✓' : 'Buy for 0.15 TON'}
               </button>
             </div>
-
             <div className="bg-slate-900/80 border border-yellow-900/30 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -303,11 +317,7 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">🚀</span>
               </div>
-              <button 
-                onClick={() => buyUpgrade('TON', 0.50, 0.0050)} 
-                disabled={miningRate >= 0.0050}
-                className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0050 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}
-              >
+              <button onClick={() => buyUpgrade('TON', 0.50, 0.0050)} disabled={miningRate >= 0.0050} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0050 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}>
                 {miningRate >= 0.0050 ? 'Owned ✓' : 'Buy for 0.50 TON'}
               </button>
             </div>
@@ -315,18 +325,54 @@ export default function Home() {
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-md border-t border-slate-800 p-4 flex justify-between items-center z-50 px-6">
-        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 ${activeTab === 'mine' ? 'text-blue-400' : 'text-gray-500'}`}>
-          <span className="text-2xl">⛏️</span><span className="text-[10px] font-bold">Mine</span>
+      {/* قسم المتصدرين الجديد (Leaderboard) */}
+      {activeTab === 'leaderboard' && (
+        <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">Top Miners</h2>
+            <span className="text-3xl">🏆</span>
+          </div>
+          
+          <div className="flex flex-col gap-3">
+            {topUsers.length === 0 ? (
+              <p className="text-gray-400 text-center mt-10">Loading ranks...</p>
+            ) : (
+              topUsers.map((user, index) => (
+                <div key={index} className={`flex justify-between items-center p-4 rounded-2xl border ${index === 0 ? 'bg-yellow-900/30 border-yellow-700/50' : index === 1 ? 'bg-slate-800 border-slate-600' : index === 2 ? 'bg-orange-900/30 border-orange-700/50' : 'bg-slate-900/60 border-slate-800'}`}>
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl font-black w-8 text-center">
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-gray-500 text-lg">#{index + 1}</span>}
+                    </span>
+                    <span className="text-white font-bold truncate max-w-[120px]">
+                      {user.first_name || 'Anonymous'}
+                    </span>
+                  </div>
+                  <span className="text-blue-400 font-bold tabular-nums">
+                    {Number(user.balance).toLocaleString('en-US', { maximumFractionDigits: 0 })} <span className="text-[10px] text-gray-500">APX</span>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* شريط التنقل السفلي المحدث بـ 5 أزرار */}
+      <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-3 flex justify-around items-center z-50">
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
         </button>
-        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 ${activeTab === 'tasks' ? 'text-blue-400' : 'text-gray-500'}`}>
-          <span className="text-2xl">📋</span><span className="text-[10px] font-bold">Tasks</span>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">📋</span><span className="text-[9px] font-bold">Tasks</span>
         </button>
-        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 ${activeTab === 'friends' ? 'text-blue-400' : 'text-gray-500'}`}>
-          <span className="text-2xl">👥</span><span className="text-[10px] font-bold">Friends</span>
+        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
         </button>
-        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 ${activeTab === 'boosts' ? 'text-purple-400' : 'text-gray-500'}`}>
-          <span className="text-2xl">🚀</span><span className="text-[10px] font-bold">Boosts</span>
+        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">🚀</span><span className="text-[9px] font-bold">Boosts</span>
+        </button>
+        <button onClick={() => setActiveTab('leaderboard')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'leaderboard' ? 'text-yellow-500 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">🏆</span><span className="text-[9px] font-bold">Rank</span>
         </button>
       </div>
     </main>
