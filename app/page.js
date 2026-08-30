@@ -299,18 +299,133 @@ export default function Home() {
         </div>
       )}
 
+      {/* قسم الورقة البيضاء الجديد (Whitepaper) */}
+      {activeTab === 'whitepaper' && (
+        <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
+          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
+          <p className="text-gray-400 text-xs text-center mb-8">Official Whitepaper & Roadmap v1.0</p>
+
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Introduction</h2>
+          <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+            <strong>ApexMiner</strong> is an interactive Telegram-based Mini-App built on the <strong>TON (The Open Network)</strong> blockchain. It is designed to cultivate a robust, engaged decentralized community. The project focuses on rewarding early adopters through mining mechanics, gamification, and social tasks, culminating in a highly anticipated Token Generation Event (TGE).
+          </p>
+
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">2. Technical Token Details</h2>
+          <ul className="text-gray-300 text-sm mb-6 space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+            <li><strong className="text-blue-400">Token Name:</strong> Apex</li>
+            <li><strong className="text-blue-400">Ticker Symbol:</strong> APX</li>
+            <li><strong className="text-blue-400">Blockchain:</strong> The Open Network (TON)</li>
+            <li><strong className="text-blue-400">Total Supply:</strong> 1,000,000,000 APX <span className="text-yellow-500 font-bold">(Fixed)</span></li>
+            <li><strong className="text-blue-400">Decimals:</strong> 9</li>
+            <li><strong className="text-blue-400">Smart Contract:</strong> Will be publicly revealed right before the TGE in late 2028 to ensure liquidity protection.</li>
+          </ul>
+
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">3. Tokenomics & Allocation</h2>
+          <div className="space-y-4 mb-8">
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h3 className="font-bold text-white mb-1"><span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">63%</span>Community, Mining & Airdrop</h3>
+              <p className="text-gray-400 text-xs">630,000,000 APX - Distributed to players via the Mini-App through daily mining, referrals, and tournaments.</p>
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h3 className="font-bold text-white mb-1"><span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">20%</span>Liquidity & Exchanges</h3>
+              <p className="text-gray-400 text-xs">200,000,000 APX - Allocated to provide necessary liquidity for DEXs (e.g., STON.fi) and CEXs upon listing.</p>
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h3 className="font-bold text-white mb-1"><span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">10%</span>Marketing & Partnerships</h3>
+              <p className="text-gray-400 text-xs">100,000,000 APX - Used to fund campaigns, influencers, and alliances within the TON ecosystem.</p>
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h3 className="font-bold text-white mb-1"><span className="bg-orange-600 text-white px-2 py-0.5 rounded text-xs mr-2">5%</span>Core Team & Founders</h3>
+              <p className="text-gray-400 text-xs">50,000,000 APX - Allocated to fund infrastructure, servers, and long-term project management.</p>
+            </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h3 className="font-bold text-white mb-1"><span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">2%</span>Presale / ICO</h3>
+              <p className="text-gray-400 text-xs">20,000,000 APX - Limited allocation for early investors. The team reserves the right to cancel this phase entirely.</p>
+            </div>
+          </div>
+
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">4. Strategic Roadmap</h2>
+          <div className="border-l-2 border-slate-700 ml-3 pl-4 space-y-6 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-blue-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-blue-400">Q4 2026: The Genesis</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Official launch of the ApexMiner Mini-App.</li>
+                <li>Activation of core mining, referrals, and Boosts.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-purple-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-purple-400">H1 2027: Gamification</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Launch of Leaderboard and weekly rewards.</li>
+                <li>Introduction of "Squads" for group mining.</li>
+                <li><strong>First Halving:</strong> Base speed cut in half.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-green-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-green-400">H2 2027: Ecosystem</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Integration of Mini-Games for engagement.</li>
+                <li>Opening B2B advertising tasks.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-yellow-400">2028: Preparation</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Activation of APX Staking.</li>
+                <li>Converting advanced Boosts into tradable NFTs.</li>
+                <li><strong>Second Halving</strong> and Bot sweeping.</li>
+                <li><strong>Q4 2028:</strong> Closure of mining pools & Final Snapshot.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-red-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-red-400">Q1 2029: TGE & Listing</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>TGE and Airdrop distribution to Tonkeeper wallets.</li>
+                <li>Official listing of APX on public exchanges.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-xl mb-4">
+            <h3 className="text-red-400 font-bold text-sm mb-1">Disclaimer</h3>
+            <p className="text-gray-400 text-xs leading-relaxed">
+              Due to the rapidly evolving nature of cryptocurrency markets, all information contained in this whitepaper and roadmap timelines are flexible and subject to change by the management to ensure the continuity and success of the ApexMiner project.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* شريط التنقل السفلي المحدث بـ 5 أزرار */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-3 flex justify-around items-center z-50">
-        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/4 ${activeTab === 'mine' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
         </button>
-        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/4 ${activeTab === 'tasks' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">📋</span><span className="text-[9px] font-bold">Tasks</span>
         </button>
-        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/4 ${activeTab === 'friends' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
         </button>
-        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 w-1/4 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">🚀</span><span className="text-[9px] font-bold">Boosts</span>
+        </button>
+        <button onClick={() => setActiveTab('whitepaper')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'whitepaper' ? 'text-yellow-500 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">📄</span><span className="text-[9px] font-bold">Docs</span>
         </button>
       </div>
     </main>
