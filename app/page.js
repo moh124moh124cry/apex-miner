@@ -9,7 +9,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('mine');
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0); 
-  const [miningRate, setMiningRate] = useState(0.0001); // السرعة الافتراضية
+  const [miningRate, setMiningRate] = useState(0.0001); 
   
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
@@ -20,8 +20,8 @@ export default function Home() {
   const userAddress = useTonAddress();
   const [tonConnectUI] = useTonConnectUI(); 
 
-  // ⚠️ ضع عنوان محفظتك الحقيقية (TON) هنا لاستقبال أرباح الترقيات المدفوعة ⚠️
-  const ADMIN_WALLET = "YOUR_WALLET_ADDRESS_HERE"; 
+  // عنوان محفظتك لاستقبال أرباح الـ TON
+  const ADMIN_WALLET = "UQAlWRIbr0ePdYPuc5kV0nEN4gPhLRnqASKWjaCeGPbinBwq"; 
 
   useEffect(() => {
     let attempts = 0;
@@ -56,7 +56,7 @@ export default function Home() {
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         if (data) {
           setBalance(Number(data.balance || 0));
-          setMiningRate(Number(data.mining_rate || 0.0001)); // جلب السرعة المحفوظة
+          setMiningRate(Number(data.mining_rate || 0.0001)); 
           setDbStatus('Data Loaded ✅');
           
           if (data.username !== userName || data.first_name !== firstName) {
@@ -128,7 +128,6 @@ export default function Home() {
     alert("✅ Invite link copied!");
   };
 
-  // نظام شراء الترقيات (إما بـ APX أو بـ TON)
   const buyUpgrade = async (costType, costValue, newRateSpeed) => {
     if (miningRate >= newRateSpeed) {
       alert("✅ You already own this or a better upgrade!");
@@ -256,14 +255,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم الترقيات الجديد (Boosts) */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
           <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to mine APX faster!</p>
           
           <div className="flex flex-col gap-4">
-            {/* ترقية بنقاط APX (مجانية للمتفاعلين) */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -281,7 +278,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* ترقية مدفوعة بـ TON */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -299,7 +295,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* ترقية مدفوعة متقدمة بـ TON */}
             <div className="bg-slate-900/80 border border-yellow-900/30 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -330,7 +325,6 @@ export default function Home() {
         <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 ${activeTab === 'friends' ? 'text-blue-400' : 'text-gray-500'}`}>
           <span className="text-2xl">👥</span><span className="text-[10px] font-bold">Friends</span>
         </button>
-        {/* العودة لتبويب الترقيات */}
         <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 ${activeTab === 'boosts' ? 'text-purple-400' : 'text-gray-500'}`}>
           <span className="text-2xl">🚀</span><span className="text-[10px] font-bold">Boosts</span>
         </button>
