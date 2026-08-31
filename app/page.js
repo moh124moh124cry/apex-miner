@@ -30,6 +30,10 @@ export default function Home() {
   const [dbStatus, setDbStatus] = useState('Connecting...'); 
   const [isSaving, setIsSaving] = useState(false);
 
+  // Welcome Modal States
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeAmount, setWelcomeAmount] = useState(0);
+
   const userAddress = useTonAddress();
   const [tonConnectUI] = useTonConnectUI(); 
 
@@ -130,22 +134,48 @@ export default function Home() {
           }
 
         } else if (error && error.code === 'PGRST116') {
-          let initialBalance = 0;
+          
+          // --- معادلة التنصيف للمستخدمين الجدد (Early Adopter Halving) ---
+          const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
+          let currentTotal = totalUsers || 0;
+          
+          let welcomeBonus = 1000;
+          if (currentTotal < 10000) welcomeBonus = 10000;
+          else if (currentTotal < 50000) welcomeBonus = 5000;
+          else if (currentTotal < 100000) welcomeBonus = 2500;
+          else welcomeBonus = 1000;
+
+          let initialBalance = welcomeBonus;
           let referrerId = (startParam && startParam !== userId) ? startParam : null;
-          if (referrerId) initialBalance = 1000; 
+          
+          if (referrerId) {
+             initialBalance += 1000; // إضافة مكافأة الإحالة إذا دخل من رابط صديق
+          }
 
           const currentIsoTime = new Date().toISOString();
           const { error: insertError } = await supabase.from('users').insert([{ 
-              telegram_id: userId, first_name: firstName, username: userName,
-              balance: initialBalance, mining_rate: 0.00025, referred_by: referrerId, 
-              channel_joined: false, group_joined: false, checkin_streak: 0, last_claim: currentIsoTime
+              telegram_id: userId, 
+              first_name: firstName, 
+              username: userName,
+              balance: initialBalance, 
+              mining_rate: 0.00025, 
+              referred_by: referrerId, 
+              channel_joined: false, 
+              group_joined: false, 
+              checkin_streak: 0, 
+              last_claim: currentIsoTime
           }]);
 
           if (!insertError) {
             setDbStatus('New User Saved ✅');
+            setBalance(initialBalance);
             setTotalMiningRate(0.00025);
             setCanCheckIn(true);
             setDailyRewardAmt(100);
+            
+            // إظهار شاشة الترحيب والتهنئة للمستخدم الجديد فقط
+            setWelcomeAmount(welcomeBonus);
+            setShowWelcome(true);
           } else {
             setDbStatus('Insert Error ❌');
           }
@@ -231,7 +261,7 @@ export default function Home() {
 
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
-    const shareText = "🚀 Come mine APEX Points with me! Get a 1,000 Points welcome bonus:";
+    const shareText = "🚀 Come mine APEX Points with me! Get a massive early-adopter welcome bonus before it halves:";
     window.open(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
@@ -318,6 +348,47 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
+      {/* شاشة التهئنة المنبثقة (Welcome Modal) للمستخدمين الجدد */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="bg-gradient-to-b from-yellow-900/50 to-slate-900 border border-yellow-500/50 rounded-3xl w-full max-w-sm p-6 relative shadow-[0_0_40px_rgba(234,179,8,0.3)] animate-in zoom-in-90 duration-500 overflow-hidden">
+            
+            {/* زخارف احتفالية */}
+            <div className="absolute -top-6 -right-6 text-7xl opacity-20">🎉</div>
+            <div className="absolute -bottom-6 -left-6 text-7xl opacity-20">🎊</div>
+            
+            <div className="flex flex-col items-center text-center relative z-10">
+              <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-400/50 shadow-inner">
+                 <span className="text-4xl">🏆</span>
+              </div>
+              <h2 className="text-2xl font-black text-white mb-2">Congratulations!</h2>
+              <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                You are one of the early pioneers! As a reward for discovering us early, you've received a massive welcome bonus.
+              </p>
+              
+              <div className="bg-black/40 rounded-2xl p-4 w-full border border-yellow-500/30 mb-6">
+                 <span className="block text-[10px] text-yellow-400 uppercase tracking-widest mb-1">Early Adopter Bonus</span>
+                 <span className="text-4xl font-black text-white">+{welcomeAmount.toLocaleString()}</span>
+                 <span className="text-sm text-yellow-500 block font-bold">APEX Points</span>
+                 
+                 {startParam && startParam !== userId && (
+                   <span className="block text-xs font-bold text-green-400 mt-3 pt-3 border-t border-yellow-900/50">
+                     +1,000 APEX (Friend Referral)
+                   </span>
+                 )}
+              </div>
+
+              <button
+                onClick={() => setShowWelcome(false)}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-black text-lg shadow-[0_0_20px_rgba(245,158,11,0.5)] active:scale-95 transition-all"
+              >
+                Claim & Start Mining ⛏️
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono z-10">
         Status: {dbStatus}
       </div>
@@ -330,6 +401,7 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
+      {/* -------------------- TAB: MINE -------------------- */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -370,6 +442,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* -------------------- TAB: EARN -------------------- */}
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <div className="bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl p-5 mb-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.3)]">
@@ -422,6 +495,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* -------------------- TAB: FRIENDS -------------------- */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -452,6 +526,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* -------------------- TAB: BOOSTS -------------------- */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
@@ -497,7 +572,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: DISCOVER (Landing Page المُطورة) -------------------- */}
+      {/* -------------------- TAB: DISCOVER -------------------- */}
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
           
@@ -507,7 +582,6 @@ export default function Home() {
              <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-white' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
           </div>
 
-          {/* محتوى: عن المشروع (Landing Page متكاملة) */}
           {discoverView === 'about' && (
              <div className="w-full flex flex-col items-center pb-6">
                 <Image src="/hero-banner.png" alt="ApexMiner Hero" width={800} height={400} className="w-full h-auto object-cover border-b border-slate-800 shadow-xl" />
@@ -563,7 +637,6 @@ export default function Home() {
                      </button>
                    </div>
 
-                   {/* تذييل الصفحة (Footer) */}
                    <footer className="w-full border-t border-slate-800 pt-6 pb-4 text-center">
                      <div className="flex justify-center items-center gap-2 mb-2">
                         <Image src="/logo2.png" alt="Logo" width={20} height={20} className="grayscale opacity-50" />
@@ -578,7 +651,6 @@ export default function Home() {
              </div>
           )}
 
-          {/* محتوى: خريطة الطريق (مع إخلاء المسؤولية) */}
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
                 <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Roadmap</h2>
@@ -611,7 +683,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* إخلاء المسؤولية (القوة القاهرة) */}
                 <div className="mt-8 p-4 bg-slate-900/80 border border-slate-700 rounded-xl">
                    <h4 className="text-gray-300 font-bold text-sm mb-2">⚖️ Legal Disclaimer</h4>
                    <p className="text-gray-500 text-[10px] leading-relaxed">
@@ -621,7 +692,6 @@ export default function Home() {
              </div>
           )}
 
-          {/* محتوى: الورقة البيضاء (مع بند العقد الذكي) */}
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Whitepaper v1.1</h1>
@@ -671,7 +741,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* قسم الأمان والعقد الذكي */}
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">4. Smart Contract Security</h2>
                 <div className="bg-slate-900/50 p-4 rounded-xl border border-blue-700/50 mb-8">
                    <p className="text-gray-300 text-xs leading-relaxed">
