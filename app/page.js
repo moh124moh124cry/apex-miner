@@ -9,6 +9,7 @@ export default function Home() {
   const [miningDelta, setMiningDelta] = useState(0);
   const [activeTab, setActiveTab] = useState('mine');
   const [taskCompleted, setTaskCompleted] = useState(false);
+  const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
   const [friendsCount, setFriendsCount] = useState(0); 
   const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
   const [dbMiningRate, setDbMiningRate] = useState(0.00025); 
@@ -70,6 +71,7 @@ export default function Home() {
             setDbMiningRate(currentDbRate); 
           }
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
+          if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
 
           const { count: totalCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
           setFriendsCount(totalCount || 0);
@@ -105,7 +107,7 @@ export default function Home() {
           const currentIsoTime = new Date().toISOString();
           const { error: insertError } = await supabase.from('users').insert([{ 
               telegram_id: userId, first_name: firstName, username: userName,
-              balance: initialBalance, mining_rate: 0.00025, referred_by: referrerId, channel_joined: false, last_claim: currentIsoTime
+              balance: initialBalance, mining_rate: 0.00025, referred_by: referrerId, channel_joined: false, group_joined: false, last_claim: currentIsoTime
           }]);
 
           if (!insertError) {
@@ -157,6 +159,17 @@ export default function Home() {
     setTaskCompleted(true);
     if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newBalance, channel_joined: true }).eq('telegram_id', userId);
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (groupTaskCompleted) return;
+    window.open('https://t.me/ApexMinerGroup', '_blank'); 
+    const newBalance = balance + 500; 
+    setBalance(newBalance);
+    setGroupTaskCompleted(true);
+    if (userId && userId !== 'test_user') {
+      await supabase.from('users').update({ balance: newBalance, group_joined: true }).eq('telegram_id', userId);
     }
   };
 
@@ -261,7 +274,6 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
-      {/* ----------------- TAB: MINE ----------------- */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -302,23 +314,37 @@ export default function Home() {
         </div>
       )}
 
-      {/* ----------------- TAB: TASKS ----------------- */}
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <h2 className="text-2xl font-bold text-white mb-6">Earn More Points</h2>
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
-              <p className="text-yellow-400 text-xs">+500 APEX Points</p>
+          
+          <div className="flex flex-col gap-4">
+            {/* مهمة القناة */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
+                <p className="text-yellow-400 text-xs">+500 APEX Points</p>
+              </div>
+              <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-yellow-600'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+                {taskCompleted ? 'Done ✓' : 'GO'}
+              </button>
             </div>
-            <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-yellow-600'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
-              {taskCompleted ? 'Done ✓' : 'GO'}
-            </button>
+
+            {/* مهمة المجموعة */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
+                <p className="text-yellow-400 text-xs">+500 APEX Points</p>
+              </div>
+              <button onClick={handleJoinGroup} disabled={groupTaskCompleted} className={`${groupTaskCompleted ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+                {groupTaskCompleted ? 'Done ✓' : 'GO'}
+              </button>
+            </div>
           </div>
+
         </div>
       )}
 
-      {/* ----------------- TAB: FRIENDS ----------------- */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -350,7 +376,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ----------------- TAB: BOOSTS ----------------- */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
@@ -396,7 +421,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ----------------- TAB: GUIDE (التعليمات الجديدة كصفحة) ----------------- */}
       {activeTab === 'guide' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600 text-center mb-8">How It Works</h1>
@@ -429,7 +453,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ----------------- TAB: WHITEPAPER ----------------- */}
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
@@ -549,7 +572,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ----------------- شريط القوائم السفلي المعدل (6 أزرار) ----------------- */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50">
         <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
