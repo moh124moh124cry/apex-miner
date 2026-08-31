@@ -135,7 +135,6 @@ export default function Home() {
 
         } else if (error && error.code === 'PGRST116') {
           
-          // --- معادلة التنصيف للمستخدمين الجدد (Early Adopter Halving) ---
           const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
           let currentTotal = totalUsers || 0;
           
@@ -149,7 +148,7 @@ export default function Home() {
           let referrerId = (startParam && startParam !== userId) ? startParam : null;
           
           if (referrerId) {
-             initialBalance += 1000; // إضافة مكافأة الإحالة إذا دخل من رابط صديق
+             initialBalance += 1000; 
           }
 
           const currentIsoTime = new Date().toISOString();
@@ -163,6 +162,7 @@ export default function Home() {
               channel_joined: false, 
               group_joined: false, 
               checkin_streak: 0, 
+              last_checkin_date: null,
               last_claim: currentIsoTime
           }]);
 
@@ -173,11 +173,11 @@ export default function Home() {
             setCanCheckIn(true);
             setDailyRewardAmt(100);
             
-            // إظهار شاشة الترحيب والتهنئة للمستخدم الجديد فقط
             setWelcomeAmount(welcomeBonus);
             setShowWelcome(true);
           } else {
-            setDbStatus('Insert Error ❌');
+            // هنا قمنا بتغيير الكود ليعرض الخطأ الدقيق من قاعدة البيانات
+            setDbStatus(`DB Error: ${insertError.message}`);
           }
         }
       } catch (err) {
@@ -348,12 +348,10 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
-      {/* شاشة التهئنة المنبثقة (Welcome Modal) للمستخدمين الجدد */}
       {showWelcome && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
           <div className="bg-gradient-to-b from-yellow-900/50 to-slate-900 border border-yellow-500/50 rounded-3xl w-full max-w-sm p-6 relative shadow-[0_0_40px_rgba(234,179,8,0.3)] animate-in zoom-in-90 duration-500 overflow-hidden">
             
-            {/* زخارف احتفالية */}
             <div className="absolute -top-6 -right-6 text-7xl opacity-20">🎉</div>
             <div className="absolute -bottom-6 -left-6 text-7xl opacity-20">🎊</div>
             
@@ -389,7 +387,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono z-10">
+      {/* شريط الإشعارات يدعم إظهار الخطأ الدقيق الآن */}
+      <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono z-10 break-words px-2">
         Status: {dbStatus}
       </div>
 
@@ -401,7 +400,6 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
-      {/* -------------------- TAB: MINE -------------------- */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -442,7 +440,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: EARN -------------------- */}
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <div className="bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl p-5 mb-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.3)]">
@@ -495,7 +492,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: FRIENDS -------------------- */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -526,7 +522,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: BOOSTS -------------------- */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
@@ -572,7 +567,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: DISCOVER -------------------- */}
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
           
@@ -752,7 +746,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* الشريط السفلي */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50 px-2">
         <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
           <span className="text-xl leading-none">⛏️</span><span className="text-[10px] font-bold leading-none mt-1">Mine</span>
