@@ -11,8 +11,8 @@ export default function Home() {
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0); 
   const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
-  const [dbMiningRate, setDbMiningRate] = useState(0.00023); // السرعة الأساسية من قاعدة البيانات
-  const [totalMiningRate, setTotalMiningRate] = useState(0.00023); // السرعة الإجمالية (مع الـ 5% من الأصدقاء)
+  const [dbMiningRate, setDbMiningRate] = useState(0.00023); 
+  const [totalMiningRate, setTotalMiningRate] = useState(0.00023); 
   
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
@@ -57,7 +57,7 @@ export default function Home() {
     async function fetchUserData() {
       if (!userId || userId === 'test_user') return;
       try {
-        let currentDbRate = 0.00023; // 10 points per 12 hours
+        let currentDbRate = 0.00023; 
         let activeFriends = 0;
 
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
@@ -70,17 +70,14 @@ export default function Home() {
           }
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
 
-          // حساب الأصدقاء الكلي
           const { count: totalCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
           setFriendsCount(totalCount || 0);
 
-          // حساب الأصدقاء النشطين (الذين دخلوا في آخر 24 ساعة)
           const yesterday = new Date(Date.now() - 86400000).toISOString();
           const { count: activeCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId).gte('last_claim', yesterday);
           activeFriends = activeCount || 0;
           setActiveFriendsCount(activeFriends);
 
-          // حساب السرعة الإجمالية = السرعة الأساسية + (5% عن كل صديق نشط)
           const friendsBonus = activeFriends * (currentDbRate * 0.05);
           const finalRate = currentDbRate + friendsBonus;
           setTotalMiningRate(finalRate);
@@ -100,10 +97,9 @@ export default function Home() {
           }
 
         } else if (error && error.code === 'PGRST116') {
-          // حساب جديد
           let initialBalance = 0;
           let referrerId = (startParam && startParam !== userId) ? startParam : null;
-          if (referrerId) initialBalance = 1000; // المحال يأخذ 1000 نقطة
+          if (referrerId) initialBalance = 1000; 
 
           const currentIsoTime = new Date().toISOString();
           const { error: insertError } = await supabase.from('users').insert([{ 
@@ -153,7 +149,7 @@ export default function Home() {
   const handleJoinChannel = async () => {
     if (taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank'); 
-    const newBalance = balance + 500; // 500 نقطة للانضمام
+    const newBalance = balance + 500; 
     setBalance(newBalance);
     setTaskCompleted(true);
     if (userId && userId !== 'test_user') {
@@ -196,7 +192,6 @@ export default function Home() {
         setBalance(newBalance);
         setMiningDelta(0);
         setDbMiningRate(newRateSpeed);
-        // تحديث السرعة الإجمالية مع بونص الأصدقاء
         setTotalMiningRate(newRateSpeed + (activeFriendsCount * (newRateSpeed * 0.05)));
         alert("✅ Upgrade purchased successfully with Points!");
       } else {
@@ -255,9 +250,10 @@ export default function Home() {
       </div>
 
       <div className="w-full flex justify-between items-center p-4">
+        {/* كلمة APEX والشعار في الأعلى باللون الأزرق الاحترافي */}
         <div className="flex items-center gap-2">
-          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
-          <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600">APEX</span>
+          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
+          <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
         </div>
         <TonConnectButton />
       </div>
@@ -274,7 +270,7 @@ export default function Home() {
           <div className="w-full flex flex-col gap-3 mt-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex justify-between items-center">
                <div className="flex flex-col">
-                 <span className="text-gray-400 text-xs font-medium">TOTAL MINING SPEED</span>
+                 <span className="text-gray-400 text-sm font-medium">TOTAL MINING SPEED</span>
                  {activeFriendsCount > 0 && <span className="text-[9px] text-green-400">Includes +5% per active friend</span>}
                </div>
                <span className="font-semibold text-yellow-400 text-xs">+{totalMiningRate.toFixed(5)} APEX/sec</span>
@@ -288,11 +284,13 @@ export default function Home() {
           </div>
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
-            <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
-            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-yellow-600 to-orange-800 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(250,204,21,0.4)] z-10 overflow-hidden">
-               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] hover:scale-105 transition-transform duration-300" />
+            {/* إرجاع لون دائرة الشعار الكبيرة إلى الأزرق كما في الصورة المطلوبة */}
+            <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full"></div>
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10 overflow-hidden">
+               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
+          {/* زر التجميع باللون الذهبي ليتناسب مع النقاط */}
           <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
             CLAIM POINTS
           </button>
@@ -392,7 +390,7 @@ export default function Home() {
 
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
-          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
+          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
           <p className="text-gray-400 text-xs text-center mb-8">Official Whitepaper & Roadmap v1.1</p>
 
           <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Points vs. Tokens System</h2>
@@ -439,13 +437,13 @@ export default function Home() {
       )}
 
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-3 flex justify-around items-center z-50">
-        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
         </button>
-        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">📋</span><span className="text-[9px] font-bold">Earn</span>
         </button>
-        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
         </button>
         <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
