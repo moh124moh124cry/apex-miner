@@ -19,6 +19,7 @@ export default function Home() {
   const [userName, setUserName] = useState('');
   const [startParam, setStartParam] = useState(null);
   const [dbStatus, setDbStatus] = useState('Connecting...'); 
+  const [isSaving, setIsSaving] = useState(false); // حماية من الضغط المزدوج
 
   const userAddress = useTonAddress();
   const [tonConnectUI] = useTonConnectUI(); 
@@ -35,7 +36,7 @@ export default function Home() {
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
         const param = window.Telegram.WebApp.initDataUnsafe?.start_param;
         if (user) {
-          setUserId(user.id.toString());
+          setUserId(user.id.toString()); // تحويل الـ ID إلى نص لضمان التوافق عبر الأجهزة
           setFirstName(user.first_name || 'Unknown');
           setUserName(user.username || 'No Username');
           setStartParam(param);
@@ -60,6 +61,7 @@ export default function Home() {
         let currentDbRate = 0.00025; 
         let activeFriends = 0;
 
+        // القراءة من Supabase بناءً على الـ telegram_id الموحد عبر جميع الأجهزة
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         
         if (data) {
@@ -112,7 +114,6 @@ export default function Home() {
             setTotalMiningRate(0.00025);
           } else {
             setDbStatus('Insert Error ❌');
-            alert(`DB Insert Error: ${insertError.message}`);
           }
         }
       } catch (err) {
@@ -130,20 +131,23 @@ export default function Home() {
   }, [totalMiningRate]);
 
   const handleClaim = async () => {
+    if (isSaving || miningDelta < 0.0001) return; // حماية من السبام
+    setIsSaving(true);
     const newTotalBalance = balance + miningDelta;
     const currentIsoTime = new Date().toISOString();
     setBalance(newTotalBalance);
     setMiningDelta(0);
+    
     if (userId && userId !== 'test_user') {
       setDbStatus('Saving...');
       const { error } = await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
       if (error) {
         setDbStatus('Save Error ❌');
-        alert(`Error: ${error.message} - Please fix 'mining_rate' or 'last_claim' in Supabase.`);
       } else {
         setDbStatus('Saved ✅');
       }
     }
+    setTimeout(() => setIsSaving(false), 1000); // تحرير الزر بعد ثانية
   };
 
   const handleJoinChannel = async () => {
@@ -182,9 +186,10 @@ export default function Home() {
         const newBalance = autoClaimedBalance - costValue;
         
         if (userId && userId !== 'test_user') {
+          // الحفظ في قاعدة البيانات بقوة
           const { error } = await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
           if (error) {
-            alert(`❌ Database Error: ${error.message}. Fix Supabase schema.`);
+            alert(`❌ Database Error: ${error.message}.`);
             return;
           }
         }
@@ -193,7 +198,7 @@ export default function Home() {
         setMiningDelta(0);
         setDbMiningRate(newRateSpeed);
         setTotalMiningRate(newRateSpeed + (activeFriendsCount * (newRateSpeed * 0.05)));
-        alert("✅ Upgrade purchased successfully with Points!");
+        alert("✅ Upgrade purchased successfully! It is safely stored in the Cloud.");
       } else {
         alert("❌ Not enough APEX Points!");
       }
@@ -218,7 +223,7 @@ export default function Home() {
           setTotalMiningRate(newRateSpeed + (activeFriendsCount * (newRateSpeed * 0.05)));
           setBalance(autoClaimedBalance);
           setMiningDelta(0);
-          alert("✅ Payment Confirmed! Activating Speed...");
+          alert("✅ Payment Confirmed! Activating & Saving to Cloud...");
 
           if (userId && userId !== 'test_user') {
             const { error } = await supabase.from('users').update({ 
@@ -288,8 +293,11 @@ export default function Home() {
                <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
-          <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
-            CLAIM POINTS
+          <button 
+            onClick={handleClaim} 
+            disabled={isSaving}
+            className={`w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
+            {isSaving ? 'SAVING...' : 'CLAIM POINTS'}
           </button>
         </div>
       )}
@@ -385,7 +393,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم الورقة البيضاء المكتمل والنهائي */}
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
