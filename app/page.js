@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { supabase } from '../lib/supabase'; 
 import Image from 'next/image';
-import InstructionsButton from '../components/InstructionsButton';
 
 export default function Home() {
   const [balance, setBalance] = useState(0); 
@@ -249,9 +248,6 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-24">
-      
-      {/* تم إضافة زر التعليمات هنا ليكون متاحاً دائماً كزر عائم */}
-      <InstructionsButton />
 
       <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono">
         Status: {dbStatus}
@@ -265,6 +261,7 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
+      {/* ----------------- TAB: MINE ----------------- */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -305,6 +302,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* ----------------- TAB: TASKS ----------------- */}
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <h2 className="text-2xl font-bold text-white mb-6">Earn More Points</h2>
@@ -320,6 +318,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* ----------------- TAB: FRIENDS ----------------- */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -351,6 +350,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* ----------------- TAB: BOOSTS ----------------- */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
@@ -396,6 +396,40 @@ export default function Home() {
         </div>
       )}
 
+      {/* ----------------- TAB: GUIDE (التعليمات الجديدة كصفحة) ----------------- */}
+      {activeTab === 'guide' && (
+        <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
+          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600 text-center mb-8">How It Works</h1>
+
+          <div className="space-y-4">
+            <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-800 shadow-md">
+               <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">⚡</span>
+                  <h3 className="font-bold text-white text-lg">1. Mine APEX Points</h3>
+               </div>
+               <p className="text-gray-400 text-sm ml-9 leading-relaxed">Your rig mines automatically at your base speed. These virtual APEX points will later be converted to real APX Tokens on the TON network.</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-800 shadow-md">
+               <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">👥</span>
+                  <h3 className="font-bold text-white text-lg">2. Invite & Earn</h3>
+               </div>
+               <p className="text-gray-400 text-sm ml-9 leading-relaxed">Grow your squad! You will receive a <strong className="text-green-400">+5% permanent mining speed boost</strong> for every active friend you invite to the app.</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-800 shadow-md">
+               <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">🚀</span>
+                  <h3 className="font-bold text-white text-lg">3. Upgrade Your Rig</h3>
+               </div>
+               <p className="text-gray-400 text-sm ml-9 leading-relaxed">Use your mined APEX or real GRAM via TonConnect to purchase powerful Cloud Servers and ASICs for massive speed boosts.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- TAB: WHITEPAPER ----------------- */}
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
@@ -515,20 +549,24 @@ export default function Home() {
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-3 flex justify-around items-center z-50">
-        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+      {/* ----------------- شريط القوائم السفلي المعدل (6 أزرار) ----------------- */}
+      <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50">
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
         </button>
-        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">📋</span><span className="text-[9px] font-bold">Earn</span>
         </button>
-        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
         </button>
-        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">🚀</span><span className="text-[9px] font-bold">Boosts</span>
         </button>
-        <button onClick={() => setActiveTab('whitepaper')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'whitepaper' ? 'text-yellow-500 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('guide')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'guide' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">📖</span><span className="text-[9px] font-bold">Guide</span>
+        </button>
+        <button onClick={() => setActiveTab('whitepaper')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'whitepaper' ? 'text-yellow-500 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">📄</span><span className="text-[9px] font-bold">Docs</span>
         </button>
       </div>
