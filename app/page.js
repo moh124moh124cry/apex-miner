@@ -10,7 +10,9 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('mine');
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0); 
-  const [miningRate, setMiningRate] = useState(0.0001); 
+  const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
+  const [dbMiningRate, setDbMiningRate] = useState(0.00023); // السرعة الأساسية من قاعدة البيانات
+  const [totalMiningRate, setTotalMiningRate] = useState(0.00023); // السرعة الإجمالية (مع الـ 5% من الأصدقاء)
   
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
@@ -28,7 +30,7 @@ export default function Home() {
     const getTelegramUser = () => {
       if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
         window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand(); // منع إغلاق التطبيق في الخلفية
+        window.Telegram.WebApp.expand(); 
         
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
         const param = window.Telegram.WebApp.initDataUnsafe?.start_param;
@@ -55,47 +57,68 @@ export default function Home() {
     async function fetchUserData() {
       if (!userId || userId === 'test_user') return;
       try {
+        let currentDbRate = 0.00023; // 10 points per 12 hours
+        let activeFriends = 0;
+
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
+        
         if (data) {
           setBalance(Number(data.balance || 0));
           if (data.mining_rate !== undefined && data.mining_rate !== null) {
-            setMiningRate(Number(data.mining_rate)); 
+            currentDbRate = Number(data.mining_rate);
+            setDbMiningRate(currentDbRate); 
           }
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
+
+          // حساب الأصدقاء الكلي
+          const { count: totalCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
+          setFriendsCount(totalCount || 0);
+
+          // حساب الأصدقاء النشطين (الذين دخلوا في آخر 24 ساعة)
+          const yesterday = new Date(Date.now() - 86400000).toISOString();
+          const { count: activeCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId).gte('last_claim', yesterday);
+          activeFriends = activeCount || 0;
+          setActiveFriendsCount(activeFriends);
+
+          // حساب السرعة الإجمالية = السرعة الأساسية + (5% عن كل صديق نشط)
+          const friendsBonus = activeFriends * (currentDbRate * 0.05);
+          const finalRate = currentDbRate + friendsBonus;
+          setTotalMiningRate(finalRate);
           
           if (data.last_claim) {
             const lastTime = new Date(data.last_claim).getTime();
             const now = new Date().getTime();
             const diffSeconds = (now - lastTime) / 1000;
             if (diffSeconds > 0) {
-              setMiningDelta(diffSeconds * Number(data.mining_rate || 0.0001));
+              setMiningDelta(diffSeconds * finalRate);
             }
           }
 
           setDbStatus('Data Loaded ✅');
-          
           if (data.username !== userName || data.first_name !== firstName) {
             await supabase.from('users').update({ first_name: firstName, username: userName }).eq('telegram_id', userId);
           }
+
         } else if (error && error.code === 'PGRST116') {
+          // حساب جديد
           let initialBalance = 0;
           let referrerId = (startParam && startParam !== userId) ? startParam : null;
-          if (referrerId) initialBalance = 10;
+          if (referrerId) initialBalance = 1000; // المحال يأخذ 1000 نقطة
+
           const currentIsoTime = new Date().toISOString();
           const { error: insertError } = await supabase.from('users').insert([{ 
               telegram_id: userId, first_name: firstName, username: userName,
-              balance: initialBalance, mining_rate: 0.0001, referred_by: referrerId, channel_joined: false, last_claim: currentIsoTime
+              balance: initialBalance, mining_rate: 0.00023, referred_by: referrerId, channel_joined: false, last_claim: currentIsoTime
           }]);
+
           if (!insertError) {
             setDbStatus('New User Saved ✅');
-            if (referrerId) {
-              const { data: refData } = await supabase.from('users').select('balance').eq('telegram_id', referrerId).single();
-              if (refData) await supabase.from('users').update({ balance: Number(refData.balance) + 10 }).eq('telegram_id', referrerId);
-            }
+            setTotalMiningRate(0.00023);
+          } else {
+            setDbStatus('Insert Error ❌');
+            alert(`DB Insert Error: ${insertError.message}`);
           }
         }
-        const { count } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
-        setFriendsCount(count || 0);
       } catch (err) {
         setDbStatus('Sys Error');
       }
@@ -105,10 +128,10 @@ export default function Home() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setMiningDelta(prev => prev + miningRate);
+      setMiningDelta(prev => prev + totalMiningRate);
     }, 1000);
     return () => clearInterval(interval);
-  }, [miningRate]);
+  }, [totalMiningRate]);
 
   const handleClaim = async () => {
     const newTotalBalance = balance + miningDelta;
@@ -118,15 +141,19 @@ export default function Home() {
     if (userId && userId !== 'test_user') {
       setDbStatus('Saving...');
       const { error } = await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
-      if (error) setDbStatus('Save Error');
-      else setDbStatus('Saved ✅');
+      if (error) {
+        setDbStatus('Save Error ❌');
+        alert(`Error: ${error.message} - Please fix 'mining_rate' or 'last_claim' in Supabase.`);
+      } else {
+        setDbStatus('Saved ✅');
+      }
     }
   };
 
   const handleJoinChannel = async () => {
     if (taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank'); 
-    const newBalance = balance + 5;
+    const newBalance = balance + 500; // 500 نقطة للانضمام
     setBalance(newBalance);
     setTaskCompleted(true);
     if (userId && userId !== 'test_user') {
@@ -136,7 +163,7 @@ export default function Home() {
 
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
-    const shareText = "🚀 Come mine APX with me for free on Telegram! Get a 10 APX welcome bonus:";
+    const shareText = "🚀 Come mine APEX Points with me! Get a 1,000 Points welcome bonus:";
     window.open(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
@@ -146,7 +173,7 @@ export default function Home() {
   };
 
   const buyUpgrade = async (costType, costValue, newRateSpeed) => {
-    if (miningRate >= newRateSpeed) {
+    if (dbMiningRate >= newRateSpeed) {
       alert("✅ You already own this or a better upgrade!");
       return;
     }
@@ -161,25 +188,26 @@ export default function Home() {
         if (userId && userId !== 'test_user') {
           const { error } = await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
           if (error) {
-            alert(`❌ Database Error: ${error.message}`);
+            alert(`❌ Database Error: ${error.message}. Fix Supabase schema.`);
             return;
           }
         }
         
         setBalance(newBalance);
         setMiningDelta(0);
-        setMiningRate(newRateSpeed);
-        alert("✅ Upgrade purchased successfully with APX!");
+        setDbMiningRate(newRateSpeed);
+        // تحديث السرعة الإجمالية مع بونص الأصدقاء
+        setTotalMiningRate(newRateSpeed + (activeFriendsCount * (newRateSpeed * 0.05)));
+        alert("✅ Upgrade purchased successfully with Points!");
       } else {
-        alert("❌ Not enough APX balance!");
+        alert("❌ Not enough APEX Points!");
       }
     } 
-    else if (costType === 'GRAM') { // تحديث نوع العملة إلى GRAM
+    else if (costType === 'GRAM') { 
       if (!userAddress) {
         alert("❌ Please connect your wallet first!");
         return;
       }
-      // المعاملة على البلوكتشين تبقى بنفس الحساب الرياضي (النانو)
       const amountInNano = (costValue * 1000000000).toString(); 
       const transaction = {
         validUntil: Math.floor(Date.now() / 1000) + 300, 
@@ -191,8 +219,8 @@ export default function Home() {
         const result = await tonConnectUI.sendTransaction(transaction);
         
         if (result) {
-          // التحديث الفوري للواجهة
-          setMiningRate(newRateSpeed);
+          setDbMiningRate(newRateSpeed);
+          setTotalMiningRate(newRateSpeed + (activeFriendsCount * (newRateSpeed * 0.05)));
           setBalance(autoClaimedBalance);
           setMiningDelta(0);
           alert("✅ Payment Confirmed! Activating Speed...");
@@ -228,8 +256,8 @@ export default function Home() {
 
       <div className="w-full flex justify-between items-center p-4">
         <div className="flex items-center gap-2">
-          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
-          <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
+          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+          <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600">APEX</span>
         </div>
         <TonConnectButton />
       </div>
@@ -237,46 +265,49 @@ export default function Home() {
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
-            <h1 className="text-gray-400 text-xs tracking-widest uppercase mb-2">Total Balance</h1>
+            <h1 className="text-gray-400 text-xs tracking-widest uppercase mb-2">Total Points</h1>
             <h2 className="text-4xl font-bold text-white">
-              {balance.toFixed(4)} <span className="text-xl text-purple-400">APX</span>
+              {balance.toFixed(4)} <span className="text-xl text-yellow-400 font-black">APEX</span>
             </h2>
           </div>
 
           <div className="w-full flex flex-col gap-3 mt-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex justify-between items-center">
-               <span className="text-gray-400 text-sm font-medium">MINING SPEED</span>
-               <span className="font-semibold text-blue-400 text-xs">+{miningRate} APX/sec</span>
+               <div className="flex flex-col">
+                 <span className="text-gray-400 text-xs font-medium">TOTAL MINING SPEED</span>
+                 {activeFriendsCount > 0 && <span className="text-[9px] text-green-400">Includes +5% per active friend</span>}
+               </div>
+               <span className="font-semibold text-yellow-400 text-xs">+{totalMiningRate.toFixed(5)} APEX/sec</span>
             </div>
           </div>
 
           <div className="mt-8 text-center">
-             <h3 className="text-5xl font-black text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] tabular-nums">
+             <h3 className="text-5xl font-black text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)] tabular-nums">
                +{miningDelta.toFixed(4)}
              </h3>
           </div>
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
-            <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full"></div>
-            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10 overflow-hidden">
-               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
+            <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-yellow-600 to-orange-800 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(250,204,21,0.4)] z-10 overflow-hidden">
+               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
-          <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-lg font-bold shadow-[0_4px_20px_rgba(79,70,229,0.4)] active:scale-95 transition-all">
-            CLAIM APEX
+          <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
+            CLAIM POINTS
           </button>
         </div>
       )}
 
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
-          <h2 className="text-2xl font-bold text-white mb-6">Earn More APX</h2>
+          <h2 className="text-2xl font-bold text-white mb-6">Earn More Points</h2>
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between mb-4">
             <div>
               <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
-              <p className="text-gray-400 text-xs">+5 APX Reward</p>
+              <p className="text-yellow-400 text-xs">+500 APEX Points</p>
             </div>
-            <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors`}>
+            <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-yellow-600'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
               {taskCompleted ? 'Done ✓' : 'GO'}
             </button>
           </div>
@@ -285,14 +316,26 @@ export default function Home() {
 
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
-          <div className="text-center mb-8 mt-4">
+          <div className="text-center mb-6 mt-2">
              <h2 className="text-3xl font-bold text-white mb-2">Invite Friends!</h2>
-             <p className="text-gray-400 text-sm">Get <span className="text-blue-400 font-bold">10 APX</span> for each friend</p>
+             <p className="text-gray-400 text-xs leading-relaxed">
+               Get <span className="text-green-400 font-bold">+5%</span> mining speed for every <span className="text-white">ACTIVE</span> friend.<br/>
+               They get <span className="text-yellow-400 font-bold">1,000 Points</span> welcome bonus!
+             </p>
           </div>
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center flex flex-col gap-4">
-             <h3 className="text-6xl mb-2">🎁</h3>
-             <h4 className="text-white font-bold text-lg">Your Friends: {friendsCount}</h4>
-             <button onClick={handleInviteFriend} className="w-full bg-blue-600 py-3 rounded-xl text-white font-bold text-lg shadow-[0_4px_20px_rgba(37,99,235,0.4)] active:scale-95 transition-all">
+             <div className="flex justify-around mb-2">
+                <div className="flex flex-col">
+                  <span className="text-2xl font-bold text-white">{friendsCount}</span>
+                  <span className="text-[10px] text-gray-500 uppercase">Total</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-2xl font-bold text-green-400">{activeFriendsCount}</span>
+                  <span className="text-[10px] text-gray-500 uppercase">Active (24h)</span>
+                </div>
+             </div>
+             
+             <button onClick={handleInviteFriend} className="w-full bg-yellow-600 py-3 rounded-xl text-white font-bold text-lg shadow-[0_4px_20px_rgba(202,138,4,0.4)] active:scale-95 transition-all">
                Invite a Friend
              </button>
              <button onClick={handleCopyLink} className="w-full bg-slate-800 py-3 rounded-xl text-gray-300 font-bold active:scale-95 transition-all">
@@ -305,44 +348,42 @@ export default function Home() {
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
-          <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to mine APX faster!</p>
+          <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to increase your base speed!</p>
           <div className="flex flex-col gap-4">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-white text-lg">GPU Overclock</h3>
-                  <p className="text-blue-400 text-sm font-bold">Speed: 0.0005 APX/sec</p>
+                  <p className="text-yellow-400 text-sm font-bold">Base Speed: 0.0005 pts/sec</p>
                 </div>
                 <span className="text-2xl">⚙️</span>
               </div>
-              <button onClick={() => buyUpgrade('APX', 500, 0.0005)} disabled={miningRate >= 0.0005} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0005 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
-                {miningRate >= 0.0005 ? 'Owned ✓' : 'Pay 500 APX'}
+              <button onClick={() => buyUpgrade('APX', 5000, 0.0005)} disabled={dbMiningRate >= 0.0005} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.0005 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
+                {dbMiningRate >= 0.0005 ? 'Owned ✓' : 'Pay 5,000 Points'}
               </button>
             </div>
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-white text-lg">Cloud Server Rig</h3>
-                  <p className="text-purple-400 text-sm font-bold">Speed: 0.0015 APX/sec</p>
+                  <p className="text-purple-400 text-sm font-bold">Base Speed: 0.0015 pts/sec</p>
                 </div>
                 <span className="text-2xl">☁️</span>
               </div>
-              {/* تعديل الزر ليعرض عملة GRAM */}
-              <button onClick={() => buyUpgrade('GRAM', 0.15, 0.0015)} disabled={miningRate >= 0.0015} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0015 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}>
-                {miningRate >= 0.0015 ? 'Owned ✓' : 'Buy for 0.15 GRAM'}
+              <button onClick={() => buyUpgrade('GRAM', 0.15, 0.0015)} disabled={dbMiningRate >= 0.0015} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.0015 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}>
+                {dbMiningRate >= 0.0015 ? 'Owned ✓' : 'Buy for 0.15 GRAM'}
               </button>
             </div>
             <div className="bg-slate-900/80 border border-yellow-900/30 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-yellow-500 text-lg">Quantum ASIC</h3>
-                  <p className="text-yellow-400 text-sm font-bold">Speed: 0.0050 APX/sec</p>
+                  <p className="text-yellow-400 text-sm font-bold">Base Speed: 0.0050 pts/sec</p>
                 </div>
                 <span className="text-2xl">🚀</span>
               </div>
-              {/* تعديل الزر ليعرض عملة GRAM */}
-              <button onClick={() => buyUpgrade('GRAM', 0.50, 0.0050)} disabled={miningRate >= 0.0050} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0050 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}>
-                {miningRate >= 0.0050 ? 'Owned ✓' : 'Buy for 0.50 GRAM'}
+              <button onClick={() => buyUpgrade('GRAM', 0.50, 0.0050)} disabled={dbMiningRate >= 0.0050} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.0050 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}>
+                {dbMiningRate >= 0.0050 ? 'Owned ✓' : 'Buy for 0.50 GRAM'}
               </button>
             </div>
           </div>
@@ -351,122 +392,60 @@ export default function Home() {
 
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
-          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
-          <p className="text-gray-400 text-xs text-center mb-8">Official Whitepaper & Roadmap v1.0</p>
+          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
+          <p className="text-gray-400 text-xs text-center mb-8">Official Whitepaper & Roadmap v1.1</p>
 
-          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Introduction</h2>
-          <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-            <strong>ApexMiner</strong> is an interactive Telegram-based Mini-App built on the <strong>TON (The Open Network)</strong> blockchain. It is designed to cultivate a robust, engaged decentralized community. The project focuses on rewarding early adopters through mining mechanics, gamification, and social tasks, culminating in a highly anticipated Token Generation Event (TGE).
-          </p>
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Points vs. Tokens System</h2>
+          <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-6">
+            <p className="text-gray-300 text-sm leading-relaxed mb-3">
+              To protect the token economy from hyperinflation and ensure a fair distribution over a 2-year mining period, ApexMiner utilizes a dual-system:
+            </p>
+            <ul className="text-xs text-gray-400 space-y-2 ml-4 list-disc">
+              <li><strong className="text-yellow-400">APEX Points (Gold):</strong> The virtual in-game points you are currently mining.</li>
+              <li><strong className="text-purple-400">APX Token (Purple):</strong> The real cryptocurrency (1 Billion Supply) on the TON blockchain.</li>
+            </ul>
+            <p className="text-green-400 text-xs mt-3 font-bold">
+              * Secret Conversion: Before the TGE listing, all mined APEX Points will be converted into real APX Tokens. The exact conversion ratio remains highly confidential to prevent bot manipulation and will reward active, genuine users.
+            </p>
+          </div>
 
           <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">2. Technical Token Details</h2>
           <ul className="text-gray-300 text-sm mb-6 space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-            <li><strong className="text-blue-400">Token Name:</strong> Apex</li>
-            <li><strong className="text-blue-400">Ticker Symbol:</strong> APX</li>
-            <li><strong className="text-blue-400">Blockchain:</strong> The Open Network (TON)</li>
-            <li><strong className="text-blue-400">Total Supply:</strong> 1,000,000,000 APX <span className="text-yellow-500 font-bold">(Fixed)</span></li>
-            <li><strong className="text-blue-400">Decimals:</strong> 9</li>
-            <li><strong className="text-blue-400">Smart Contract:</strong> Will be publicly revealed right before the TGE in late 2028 to ensure liquidity protection.</li>
+            <li><strong className="text-purple-400">Token Name:</strong> Apex</li>
+            <li><strong className="text-purple-400">Ticker Symbol:</strong> APX</li>
+            <li><strong className="text-purple-400">Blockchain:</strong> The Open Network (TON)</li>
+            <li><strong className="text-purple-400">Total Supply:</strong> 1,000,000,000 APX <span className="text-yellow-500 font-bold">(Fixed)</span></li>
+            <li><strong className="text-purple-400">Smart Contract:</strong> Will be publicly revealed right before the TGE in late 2028.</li>
           </ul>
 
           <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">3. Tokenomics & Allocation</h2>
           <div className="space-y-4 mb-8">
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
               <h3 className="font-bold text-white mb-1"><span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">63%</span>Community, Mining & Airdrop</h3>
-              <p className="text-gray-400 text-xs">630,000,000 APX - Distributed to players via the Mini-App through daily mining, referrals, and tournaments.</p>
+              <p className="text-gray-400 text-xs">630,000,000 APX - Distributed via the secret conversion ratio before listing.</p>
             </div>
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
               <h3 className="font-bold text-white mb-1"><span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">20%</span>Liquidity & Exchanges</h3>
-              <p className="text-gray-400 text-xs">200,000,000 APX - Allocated to provide necessary liquidity for DEXs (e.g., STON.fi) and CEXs upon listing.</p>
+              <p className="text-gray-400 text-xs">200,000,000 APX - Allocated to provide necessary liquidity for DEXs & CEXs.</p>
             </div>
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
               <h3 className="font-bold text-white mb-1"><span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">10%</span>Marketing & Partnerships</h3>
-              <p className="text-gray-400 text-xs">100,000,000 APX - Used to fund campaigns, influencers, and alliances within the TON ecosystem.</p>
             </div>
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
               <h3 className="font-bold text-white mb-1"><span className="bg-orange-600 text-white px-2 py-0.5 rounded text-xs mr-2">5%</span>Core Team & Founders</h3>
-              <p className="text-gray-400 text-xs">50,000,000 APX - Allocated to fund infrastructure, servers, and long-term project management.</p>
             </div>
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-              <h3 className="font-bold text-white mb-1"><span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">2%</span>Presale / ICO</h3>
-              <p className="text-gray-400 text-xs">20,000,000 APX - Limited allocation for early investors. The team reserves the right to cancel this phase entirely.</p>
-            </div>
-          </div>
-
-          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">4. Strategic Roadmap</h2>
-          <div className="border-l-2 border-slate-700 ml-3 pl-4 space-y-6 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-blue-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-blue-400">Q4 2026: The Genesis</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Official launch of the ApexMiner Mini-App.</li>
-                <li>Activation of core mining, referrals, and Boosts.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-purple-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-purple-400">H1 2027: Gamification</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Launch of Leaderboard and weekly rewards.</li>
-                <li>Introduction of "Squads" for group mining.</li>
-                <li><strong>First Halving:</strong> Base speed cut in half.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-green-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-green-400">H2 2027: Ecosystem</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Integration of Mini-Games for engagement.</li>
-                <li>Opening B2B advertising tasks.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-yellow-400">2028: Preparation</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Activation of APX Staking.</li>
-                <li>Converting advanced Boosts into tradable NFTs.</li>
-                <li><strong>Second Halving</strong> and Bot sweeping.</li>
-                <li><strong>Q4 2028:</strong> Closure of mining pools & Final Snapshot.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-red-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-red-400">Q1 2029: TGE & Listing</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>TGE and Airdrop distribution to Tonkeeper wallets.</li>
-                <li>Official listing of APX on public exchanges.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-xl mb-4">
-            <h3 className="text-red-400 font-bold text-sm mb-1">Disclaimer</h3>
-            <p className="text-gray-400 text-xs leading-relaxed">
-              Due to the rapidly evolving nature of cryptocurrency markets, all information contained in this whitepaper and roadmap timelines are flexible and subject to change by the management to ensure the continuity and success of the ApexMiner project.
-            </p>
           </div>
         </div>
       )}
 
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-3 flex justify-around items-center z-50">
-        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
         </button>
-        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">📋</span><span className="text-[9px] font-bold">Speed</span>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+          <span className="text-xl">📋</span><span className="text-[9px] font-bold">Earn</span>
         </button>
-        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
+        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
         </button>
         <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
