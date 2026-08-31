@@ -9,6 +9,9 @@ export default function Home() {
   const [miningDelta, setMiningDelta] = useState(0);
   const [activeTab, setActiveTab] = useState('mine');
   
+  // State للقائمة الفرعية داخل صفحة Discover
+  const [discoverView, setDiscoverView] = useState('about'); 
+  
   // Tasks State
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
@@ -81,7 +84,6 @@ export default function Home() {
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
 
-          // نظام التحقق من الدخول اليومي والمكافآت (Streak Logic)
           let currentStreak = data.checkin_streak || 0;
           let isCheckinAvailable = true;
           const now = new Date();
@@ -90,19 +92,19 @@ export default function Home() {
           if (data.last_checkin_date) {
             const lastDate = new Date(data.last_checkin_date);
             if (lastDate.toDateString() === todayStr) {
-              isCheckinAvailable = false; // سجل دخوله اليوم بالفعل
+              isCheckinAvailable = false; 
             } else {
               const yesterday = new Date();
               yesterday.setDate(yesterday.getDate() - 1);
               if (lastDate.toDateString() !== yesterday.toDateString()) {
-                currentStreak = 0; // تغيب عن الدخول، يرجع العداد لصفر
+                currentStreak = 0; 
               }
             }
           }
           
           setCheckinStreak(currentStreak);
           setCanCheckIn(isCheckinAvailable);
-          setDailyRewardAmt(((currentStreak % 7) + 1) * 100); // 100 لليوم الأول، 200 للثاني...
+          setDailyRewardAmt(((currentStreak % 7) + 1) * 100); 
 
           const { count: totalCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
           setFriendsCount(totalCount || 0);
@@ -165,7 +167,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [totalMiningRate]);
 
-  // دالة استلام المكافأة اليومية
   const handleDailyCheckIn = async () => {
     if (!canCheckIn || isSaving) return;
     setIsSaving(true);
@@ -318,13 +319,13 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-24">
+    <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-20">
 
-      <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono">
+      <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono z-10">
         Status: {dbStatus}
       </div>
 
-      <div className="w-full flex justify-between items-center p-4">
+      <div className="w-full flex justify-between items-center p-4 z-10">
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
           <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
@@ -332,6 +333,7 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
+      {/* -------------------- TAB: MINE -------------------- */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -366,16 +368,16 @@ export default function Home() {
           <button 
             onClick={handleClaim} 
             disabled={isSaving}
-            className={`w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
+            className={`w-full py-4 mt-auto mb-4 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
             {isSaving ? 'SAVING...' : 'CLAIM POINTS'}
           </button>
         </div>
       )}
 
+      {/* -------------------- TAB: EARN (Tasks & Check-in) -------------------- */}
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           
-          {/* واجهة الدخول اليومي (Daily Check-in) الجديدة */}
           <div className="bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl p-5 mb-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.3)]">
             <div className="relative z-10 flex flex-col items-center">
               <h3 className="font-black text-white text-2xl mb-1 drop-shadow-md">Daily Check-In</h3>
@@ -404,9 +406,9 @@ export default function Home() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-4">Earn More Points</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Social Tasks</h2>
           
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 mb-8">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
@@ -430,6 +432,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* -------------------- TAB: FRIENDS -------------------- */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -461,11 +464,12 @@ export default function Home() {
         </div>
       )}
 
+      {/* -------------------- TAB: BOOSTS -------------------- */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
           <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to increase your base speed!</p>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 pb-8">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -506,188 +510,173 @@ export default function Home() {
         </div>
       )}
 
-      {activeTab === 'guide' && (
-        <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
-          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600 text-center mb-8">How It Works</h1>
-
-          <div className="space-y-4">
-            <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-800 shadow-md">
-               <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">⚡</span>
-                  <h3 className="font-bold text-white text-lg">1. Mine APEX Points</h3>
-               </div>
-               <p className="text-gray-400 text-sm ml-9 leading-relaxed">Your rig mines automatically at your base speed. These virtual APEX points will later be converted to real APX Tokens on the TON network.</p>
-            </div>
-
-            <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-800 shadow-md">
-               <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">👥</span>
-                  <h3 className="font-bold text-white text-lg">2. Invite & Earn</h3>
-               </div>
-               <p className="text-gray-400 text-sm ml-9 leading-relaxed">Grow your squad! You will receive a <strong className="text-green-400">+5% permanent mining speed boost</strong> for every active friend you invite to the app.</p>
-            </div>
-
-            <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-800 shadow-md">
-               <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">🚀</span>
-                  <h3 className="font-bold text-white text-lg">3. Upgrade Your Rig</h3>
-               </div>
-               <p className="text-gray-400 text-sm ml-9 leading-relaxed">Use your mined APEX or real GRAM via TonConnect to purchase powerful Cloud Servers and ASICs for massive speed boosts.</p>
-            </div>
-
-            {/* تم إضافة شرح المكافأة اليومية هنا ليكون شرطاً للحصول على الأيردروب */}
-            <div className="bg-slate-900/90 p-5 rounded-xl border border-yellow-600/50 shadow-[0_0_15px_rgba(202,138,4,0.15)] relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
-               <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">📅</span>
-                  <h3 className="font-bold text-yellow-500 text-lg">4. Check-in & Airdrop</h3>
-               </div>
-               <p className="text-gray-300 text-sm ml-9 leading-relaxed">
-                 Claim your daily check-in reward to build your streak. <strong className="text-red-400">Warning: Missing a single day resets your streak back to zero!</strong><br/><br/>
-                 <strong className="text-green-400">Airdrop Factor:</strong> Maintaining a consistent check-in streak proves you are a genuine, active miner. Your streak history will be a critical factor in determining your <strong className="text-white">FULL Airdrop Allocation</strong> during the TGE!
-               </p>
-            </div>
+      {/* -------------------- TAB: DISCOVER (Landing Page الجديدة) -------------------- */}
+      {activeTab === 'discover' && (
+        <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
+          
+          {/* القائمة العلوية للتنقل (Sub-Menu) */}
+          <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
+             <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>About</button>
+             <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>Roadmap</button>
+             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-white' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
           </div>
+
+          {/* محتوى: عن المشروع (About & Guide) */}
+          {discoverView === 'about' && (
+             <div className="w-full flex flex-col items-center pb-6">
+                {/* صورة الغلاف */}
+                <Image src="/hero-banner.png" alt="ApexMiner Hero" width={800} height={400} className="w-full h-auto object-cover border-b border-slate-800 shadow-xl" />
+                
+                <div className="px-6 w-full mt-6">
+                   <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-2">ApexMiner</h1>
+                   <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                     Welcome to the future of Mini-App mining. ApexMiner is built on the robust TON blockchain, bringing you a seamless and transparent crypto experience.
+                   </p>
+
+                   {/* صورة المشروع */}
+                   <div className="w-full flex justify-center mb-6">
+                      <Image src="/about-project.png" alt="About Project" width={150} height={150} className="drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]" />
+                   </div>
+
+                   <h2 className="text-xl font-bold text-white mb-4 border-b border-slate-800 pb-2">How It Works</h2>
+                   <div className="space-y-4">
+                      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex gap-3">
+                         <span className="text-xl">⚡</span>
+                         <div>
+                           <h3 className="font-bold text-white text-sm">Mine APEX Points</h3>
+                           <p className="text-gray-400 text-xs mt-1">Your rig mines automatically. These virtual points will later convert to real APX Tokens.</p>
+                         </div>
+                      </div>
+                      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex gap-3">
+                         <span className="text-xl">👥</span>
+                         <div>
+                           <h3 className="font-bold text-white text-sm">Invite & Earn</h3>
+                           <p className="text-gray-400 text-xs mt-1">Get +5% mining boost for every active friend.</p>
+                         </div>
+                      </div>
+                      
+                      {/* تنبيه الأيردروب والدخول اليومي */}
+                      <div className="bg-gradient-to-r from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-700/50">
+                         <h3 className="font-bold text-yellow-400 text-sm flex items-center gap-2"><span>⚠️</span> Airdrop Warning</h3>
+                         <p className="text-gray-300 text-xs mt-2 leading-relaxed">
+                           Claim your daily check-in reward to build your streak. <strong className="text-white">Missing a day resets it to 0.</strong> Your streak history will be a critical factor in determining your FULL Airdrop Allocation!
+                         </p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {/* محتوى: خريطة الطريق (Timeline CSS) */}
+          {discoverView === 'roadmap' && (
+             <div className="px-6 pt-8 w-full">
+                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Roadmap</h2>
+                
+                <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
+                  {/* Phase 1 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>
+                    <h3 className="font-black text-blue-400 text-lg mb-1">Q4 2026: The Genesis</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">Official launch of ApexMiner Mini-App. Activation of core mining, referrals, and hardware boosts.</p>
+                  </div>
+                  {/* Phase 2 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-purple-400 text-lg mb-1">H1 2027: Gamification</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">Launch of Leaderboards and Squads. First Halving event to increase scarcity.</p>
+                  </div>
+                  {/* Phase 3 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-green-400 text-lg mb-1">H2 2027: Ecosystem</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">Integration of Mini-Games and B2B funded advertising tasks for partner projects.</p>
+                  </div>
+                  {/* Phase 4 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-yellow-400 text-lg mb-1">2028: Preparation</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">Internal APX Staking. Second Halving. Q4 closure of mining pools and Snapshot taken.</p>
+                  </div>
+                  {/* Phase 5 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
+                    <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2029: TGE & Listing</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">Token Generation Event (TGE). Airdrop distribution and official listing on exchanges.</p>
+                  </div>
+                </div>
+             </div>
+          )}
+
+          {/* محتوى: الورقة البيضاء */}
+          {discoverView === 'whitepaper' && (
+             <div className="px-6 pt-6 w-full">
+                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Whitepaper v1.1</h1>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Points vs. Tokens System</h2>
+                <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-6">
+                  <p className="text-gray-300 text-xs leading-relaxed mb-3">
+                    To protect the token economy from hyperinflation and ensure a fair distribution, ApexMiner utilizes a dual-system:
+                  </p>
+                  <ul className="text-xs text-gray-400 space-y-2 ml-4 list-disc">
+                    <li><strong className="text-yellow-400">APEX Points:</strong> Virtual in-game points.</li>
+                    <li><strong className="text-purple-400">APX Token:</strong> The real cryptocurrency (1 Billion Supply).</li>
+                  </ul>
+                  <p className="text-green-400 text-[10px] mt-3 font-bold uppercase">
+                    * Secret Conversion ratio to be revealed before TGE.
+                  </p>
+                </div>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">2. Technical Details</h2>
+                <ul className="text-gray-300 text-xs mb-6 space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                  <li><strong className="text-purple-400">Name:</strong> Apex (APX)</li>
+                  <li><strong className="text-purple-400">Blockchain:</strong> The Open Network (TON)</li>
+                  <li><strong className="text-purple-400">Total Supply:</strong> 1,000,000,000 APX <span className="text-yellow-500 font-bold">(Fixed)</span></li>
+                </ul>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">3. Tokenomics</h2>
+                <div className="space-y-3 mb-8">
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Community & Airdrop</span>
+                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black">63%</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Liquidity & Exchanges</span>
+                    <span className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-black">20%</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Marketing & Partners</span>
+                    <span className="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-black">10%</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Core Team</span>
+                    <span className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black">5%</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Presale / ICO</span>
+                    <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black">2%</span>
+                  </div>
+                </div>
+             </div>
+          )}
         </div>
       )}
 
-      {activeTab === 'whitepaper' && (
-        <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
-          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
-          <p className="text-gray-400 text-xs text-center mb-8">Official Whitepaper & Roadmap v1.1</p>
-
-          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Points vs. Tokens System</h2>
-          <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-6">
-            <p className="text-gray-300 text-sm leading-relaxed mb-3">
-              To protect the token economy from hyperinflation and ensure a fair distribution over a 2-year mining period, ApexMiner utilizes a dual-system:
-            </p>
-            <ul className="text-xs text-gray-400 space-y-2 ml-4 list-disc">
-              <li><strong className="text-yellow-400">APEX Points (Gold):</strong> The virtual in-game points you are currently mining.</li>
-              <li><strong className="text-purple-400">APX Token (Purple):</strong> The real cryptocurrency (1 Billion Supply) on the TON blockchain.</li>
-            </ul>
-            <p className="text-green-400 text-xs mt-3 font-bold">
-              * Secret Conversion: Before the TGE listing, all mined APEX Points will be converted into real APX Tokens. The exact conversion ratio remains highly confidential to prevent bot manipulation and will reward active, genuine users.
-            </p>
-          </div>
-
-          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">2. Technical Token Details</h2>
-          <ul className="text-gray-300 text-sm mb-6 space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-            <li><strong className="text-purple-400">Token Name:</strong> Apex</li>
-            <li><strong className="text-purple-400">Ticker Symbol:</strong> APX</li>
-            <li><strong className="text-purple-400">Blockchain:</strong> The Open Network (TON)</li>
-            <li><strong className="text-purple-400">Total Supply:</strong> 1,000,000,000 APX <span className="text-yellow-500 font-bold">(Fixed)</span></li>
-            <li><strong className="text-purple-400">Smart Contract:</strong> Will be publicly revealed right before the TGE in late 2028.</li>
-          </ul>
-
-          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">3. Tokenomics & Allocation</h2>
-          <div className="space-y-4 mb-8">
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-              <h3 className="font-bold text-white mb-1"><span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-2">63%</span>Community, Mining & Airdrop</h3>
-              <p className="text-gray-400 text-xs">630,000,000 APX - Distributed via the secret conversion ratio before listing.</p>
-            </div>
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-              <h3 className="font-bold text-white mb-1"><span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mr-2">20%</span>Liquidity & Exchanges</h3>
-              <p className="text-gray-400 text-xs">200,000,000 APX - Allocated to provide necessary liquidity for DEXs & CEXs.</p>
-            </div>
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-              <h3 className="font-bold text-white mb-1"><span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">10%</span>Marketing & Partnerships</h3>
-              <p className="text-gray-400 text-xs">100,000,000 APX - Used to fund advertising campaigns, influencer collaborations, and build strategic alliances within the TON ecosystem.</p>
-            </div>
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-              <h3 className="font-bold text-white mb-1"><span className="bg-orange-600 text-white px-2 py-0.5 rounded text-xs mr-2">5%</span>Core Team & Founders</h3>
-              <p className="text-gray-400 text-xs">50,000,000 APX - Allocated to the founding team and developers to fund infrastructure, servers, and long-term project management.</p>
-            </div>
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-              <h3 className="font-bold text-white mb-1"><span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">2%</span>Presale / ICO</h3>
-              <p className="text-gray-400 text-xs">20,000,000 APX - A strictly limited allocation that may be offered to early investors to accelerate development. (The team reserves the right to cancel this phase entirely).</p>
-            </div>
-          </div>
-
-          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">4. Strategic Roadmap</h2>
-          <div className="border-l-2 border-slate-700 ml-3 pl-4 space-y-6 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-blue-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-blue-400">Q4 2026: The Genesis</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Official launch of the ApexMiner Mini-App on Telegram.</li>
-                <li>Activation of core mining, referral systems, and hardware upgrades (Boosts).</li>
-                <li>Building the foundational user base.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-purple-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-purple-400">H1 2027: Gamification</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Launch of the Leaderboard and weekly rewards.</li>
-                <li>Introduction of "Squads" to allow group mining.</li>
-                <li><strong className="text-yellow-400">First Halving:</strong> Base mining speed of APEX Points is cut in half to increase scarcity.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-green-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-green-400">H2 2027: Ecosystem</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Integration of Mini-Games within the app to increase retention and engagement.</li>
-                <li>Opening B2B funded advertising tasks for partner projects.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-yellow-400">2028: Preparation</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Activation of the internal APX Staking system.</li>
-                <li>Converting advanced hardware upgrades into tradable NFTs on TON.</li>
-                <li><strong className="text-yellow-400">Second Halving</strong> of point mining speeds.</li>
-                <li><strong>Q4 2028:</strong> Closure of mining pools, sweeping of Bot accounts, official reveal of the Smart Contract, and taking the final Snapshot of user point balances.</li>
-              </ul>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 bg-red-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
-                <h3 className="font-bold text-red-400">Q1 2029: TGE & Listing</h3>
-              </div>
-              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
-                <li>Token Generation Event (TGE) and Airdrop distribution of real APX Tokens to active users' wallets.</li>
-                <li>Official listing of APX on cryptocurrency exchanges for public trading.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-xl mb-4">
-            <h3 className="text-red-400 font-bold text-sm mb-1">Disclaimer</h3>
-            <p className="text-gray-400 text-xs leading-relaxed">
-              Due to the rapidly evolving nature of cryptocurrency markets, all information contained in this whitepaper and roadmap timelines are flexible and subject to change by the management to ensure the continuity and success of the ApexMiner project.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50">
-        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
+      {/* -------------------- الشريط السفلي (5 أزرار مرتبة بامتياز) -------------------- */}
+      <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50 px-2">
+        <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+          <span className="text-xl leading-none">⛏️</span><span className="text-[10px] font-bold leading-none mt-1">Mine</span>
         </button>
-        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">📋</span><span className="text-[9px] font-bold">Earn</span>
+        <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+          <span className="text-xl leading-none">📋</span><span className="text-[10px] font-bold leading-none mt-1">Earn</span>
         </button>
-        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
+        <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+          <span className="text-xl leading-none">👥</span><span className="text-[10px] font-bold leading-none mt-1">Friends</span>
         </button>
-        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">🚀</span><span className="text-[9px] font-bold">Boosts</span>
+        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+          <span className="text-xl leading-none">🚀</span><span className="text-[10px] font-bold leading-none mt-1">Boosts</span>
         </button>
-        <button onClick={() => setActiveTab('guide')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'guide' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">📖</span><span className="text-[9px] font-bold">Guide</span>
-        </button>
-        <button onClick={() => setActiveTab('whitepaper')} className={`flex flex-col items-center gap-1 flex-1 ${activeTab === 'whitepaper' ? 'text-yellow-500 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">📄</span><span className="text-[9px] font-bold">Docs</span>
+        <button onClick={() => setActiveTab('discover')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'discover' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+          <span className="text-xl leading-none">🌍</span><span className="text-[10px] font-bold leading-none mt-1">Discover</span>
         </button>
       </div>
     </main>
