@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { supabase } from '../lib/supabase'; 
 import Image from 'next/image';
+import InstructionsButton from '../components/InstructionsButton';
 
 export default function Home() {
   const [balance, setBalance] = useState(0); 
@@ -19,7 +20,7 @@ export default function Home() {
   const [userName, setUserName] = useState('');
   const [startParam, setStartParam] = useState(null);
   const [dbStatus, setDbStatus] = useState('Connecting...'); 
-  const [isSaving, setIsSaving] = useState(false); // حماية من الضغط المزدوج
+  const [isSaving, setIsSaving] = useState(false);
 
   const userAddress = useTonAddress();
   const [tonConnectUI] = useTonConnectUI(); 
@@ -36,7 +37,7 @@ export default function Home() {
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
         const param = window.Telegram.WebApp.initDataUnsafe?.start_param;
         if (user) {
-          setUserId(user.id.toString()); // تحويل الـ ID إلى نص لضمان التوافق عبر الأجهزة
+          setUserId(user.id.toString());
           setFirstName(user.first_name || 'Unknown');
           setUserName(user.username || 'No Username');
           setStartParam(param);
@@ -61,7 +62,6 @@ export default function Home() {
         let currentDbRate = 0.00025; 
         let activeFriends = 0;
 
-        // القراءة من Supabase بناءً على الـ telegram_id الموحد عبر جميع الأجهزة
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         
         if (data) {
@@ -131,7 +131,7 @@ export default function Home() {
   }, [totalMiningRate]);
 
   const handleClaim = async () => {
-    if (isSaving || miningDelta < 0.0001) return; // حماية من السبام
+    if (isSaving || miningDelta < 0.0001) return; 
     setIsSaving(true);
     const newTotalBalance = balance + miningDelta;
     const currentIsoTime = new Date().toISOString();
@@ -147,7 +147,7 @@ export default function Home() {
         setDbStatus('Saved ✅');
       }
     }
-    setTimeout(() => setIsSaving(false), 1000); // تحرير الزر بعد ثانية
+    setTimeout(() => setIsSaving(false), 1000); 
   };
 
   const handleJoinChannel = async () => {
@@ -186,7 +186,6 @@ export default function Home() {
         const newBalance = autoClaimedBalance - costValue;
         
         if (userId && userId !== 'test_user') {
-          // الحفظ في قاعدة البيانات بقوة
           const { error } = await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
           if (error) {
             alert(`❌ Database Error: ${error.message}.`);
@@ -250,6 +249,10 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-24">
+      
+      {/* تم إضافة زر التعليمات هنا ليكون متاحاً دائماً كزر عائم */}
+      <InstructionsButton />
+
       <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono">
         Status: {dbStatus}
       </div>
