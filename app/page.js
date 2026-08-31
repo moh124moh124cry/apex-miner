@@ -11,7 +11,7 @@ export default function Home() {
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0); 
   const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
-  const [dbMiningRate, setDbMiningRate] = useState(0.00025); // السرعة الأساسية الجديدة المجانية
+  const [dbMiningRate, setDbMiningRate] = useState(0.00025); 
   const [totalMiningRate, setTotalMiningRate] = useState(0.00025); 
   
   const [userId, setUserId] = useState(null);
@@ -250,7 +250,6 @@ export default function Home() {
       </div>
 
       <div className="w-full flex justify-between items-center p-4">
-        {/* كلمة APEX والشعار في الأعلى باللون الأزرق الاحترافي */}
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
           <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">APEX</span>
@@ -284,13 +283,11 @@ export default function Home() {
           </div>
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
-            {/* الدائرة الزرقاء للشعار */}
             <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full"></div>
             <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10 overflow-hidden">
                <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
-          {/* زر التجميع الذهبي */}
           <button onClick={handleClaim} className="w-full py-4 mt-auto mb-2 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
             CLAIM POINTS
           </button>
@@ -388,6 +385,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* قسم الورقة البيضاء المكتمل والنهائي */}
       {activeTab === 'whitepaper' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-6 overflow-y-auto text-left pb-10">
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-1">ApexMiner</h1>
@@ -428,10 +426,81 @@ export default function Home() {
             </div>
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
               <h3 className="font-bold text-white mb-1"><span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-2">10%</span>Marketing & Partnerships</h3>
+              <p className="text-gray-400 text-xs">100,000,000 APX - Used to fund advertising campaigns, influencer collaborations, and build strategic alliances within the TON ecosystem.</p>
             </div>
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
               <h3 className="font-bold text-white mb-1"><span className="bg-orange-600 text-white px-2 py-0.5 rounded text-xs mr-2">5%</span>Core Team & Founders</h3>
+              <p className="text-gray-400 text-xs">50,000,000 APX - Allocated to the founding team and developers to fund infrastructure, servers, and long-term project management.</p>
             </div>
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <h3 className="font-bold text-white mb-1"><span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-2">2%</span>Presale / ICO</h3>
+              <p className="text-gray-400 text-xs">20,000,000 APX - A strictly limited allocation that may be offered to early investors to accelerate development. (The team reserves the right to cancel this phase entirely).</p>
+            </div>
+          </div>
+
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2 mb-4">4. Strategic Roadmap</h2>
+          <div className="border-l-2 border-slate-700 ml-3 pl-4 space-y-6 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-blue-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-blue-400">Q4 2026: The Genesis</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Official launch of the ApexMiner Mini-App on Telegram.</li>
+                <li>Activation of core mining, referral systems, and hardware upgrades (Boosts).</li>
+                <li>Building the foundational user base.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-purple-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-purple-400">H1 2027: Gamification</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Launch of the Leaderboard and weekly rewards.</li>
+                <li>Introduction of "Squads" to allow group mining.</li>
+                <li><strong className="text-yellow-400">First Halving:</strong> Base mining speed of APEX Points is cut in half to increase scarcity.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-green-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-green-400">H2 2027: Ecosystem</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Integration of Mini-Games within the app to increase retention and engagement.</li>
+                <li>Opening B2B funded advertising tasks for partner projects.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-yellow-400">2028: Preparation</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Activation of the internal APX Staking system.</li>
+                <li>Converting advanced hardware upgrades into tradable NFTs on TON.</li>
+                <li><strong className="text-yellow-400">Second Halving</strong> of point mining speeds.</li>
+                <li><strong>Q4 2028:</strong> Closure of mining pools, sweeping of Bot accounts, official reveal of the Smart Contract, and taking the final Snapshot of user point balances.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-red-500 rounded-full -ml-[23px] ring-4 ring-slate-950"></div>
+                <h3 className="font-bold text-red-400">Q1 2029: TGE & Listing</h3>
+              </div>
+              <ul className="text-gray-400 text-xs list-disc ml-4 space-y-1">
+                <li>Token Generation Event (TGE) and Airdrop distribution of real APX Tokens to active users' wallets.</li>
+                <li>Official listing of APX on cryptocurrency exchanges for public trading.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-xl mb-4">
+            <h3 className="text-red-400 font-bold text-sm mb-1">Disclaimer</h3>
+            <p className="text-gray-400 text-xs leading-relaxed">
+              Due to the rapidly evolving nature of cryptocurrency markets, all information contained in this whitepaper and roadmap timelines are flexible and subject to change by the management to ensure the continuity and success of the ApexMiner project.
+            </p>
           </div>
         </div>
       )}
