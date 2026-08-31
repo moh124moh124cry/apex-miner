@@ -28,6 +28,8 @@ export default function Home() {
     const getTelegramUser = () => {
       if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
         window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand(); // منع إغلاق التطبيق في الخلفية
+        
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
         const param = window.Telegram.WebApp.initDataUnsafe?.start_param;
         if (user) {
@@ -56,12 +58,9 @@ export default function Home() {
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         if (data) {
           setBalance(Number(data.balance || 0));
-          
-          // قراءة السرعة بشكل صارم
           if (data.mining_rate !== undefined && data.mining_rate !== null) {
             setMiningRate(Number(data.mining_rate)); 
           }
-          
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           
           if (data.last_claim) {
@@ -160,9 +159,7 @@ export default function Home() {
         const newBalance = autoClaimedBalance - costValue;
         
         if (userId && userId !== 'test_user') {
-          // تحديث قاعدة البيانات أولاً للتأكد
           const { error } = await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
-          
           if (error) {
             alert(`❌ Database Error: ${error.message}`);
             return;
@@ -177,36 +174,42 @@ export default function Home() {
         alert("❌ Not enough APX balance!");
       }
     } 
-    else if (costType === 'TON') {
+    else if (costType === 'GRAM') { // تحديث نوع العملة إلى GRAM
       if (!userAddress) {
         alert("❌ Please connect your wallet first!");
         return;
       }
-      const amountInNanoTON = (costValue * 1000000000).toString(); 
+      // المعاملة على البلوكتشين تبقى بنفس الحساب الرياضي (النانو)
+      const amountInNano = (costValue * 1000000000).toString(); 
       const transaction = {
         validUntil: Math.floor(Date.now() / 1000) + 300, 
-        messages: [{ address: ADMIN_WALLET, amount: amountInNanoTON }]
+        messages: [{ address: ADMIN_WALLET, amount: amountInNano }]
       };
+      
       try {
         setDbStatus('Awaiting Payment...');
         const result = await tonConnectUI.sendTransaction(transaction);
+        
         if (result) {
-          
+          // التحديث الفوري للواجهة
+          setMiningRate(newRateSpeed);
+          setBalance(autoClaimedBalance);
+          setMiningDelta(0);
+          alert("✅ Payment Confirmed! Activating Speed...");
+
           if (userId && userId !== 'test_user') {
-             // إجبار قاعدة البيانات على الحفظ وإظهار الخطأ إن وُجد
-            const { error } = await supabase.from('users').update({ balance: autoClaimedBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
+            const { error } = await supabase.from('users').update({ 
+              balance: autoClaimedBalance, 
+              mining_rate: newRateSpeed, 
+              last_claim: currentIsoTime 
+            }).eq('telegram_id', userId);
             
             if (error) {
-              alert(`❌ DB Error: ${error.message}. Please check Supabase columns.`);
+              alert(`❌ Cloud Sync Error: ${error.message}.`);
               setDbStatus('DB Save Error');
               return;
             }
           }
-
-          setBalance(autoClaimedBalance);
-          setMiningDelta(0);
-          setMiningRate(newRateSpeed);
-          alert("✅ Premium Upgrade activated and saved!");
           setDbStatus('Upgrade Saved ✅');
         }
       } catch (error) {
@@ -324,8 +327,9 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">☁️</span>
               </div>
-              <button onClick={() => buyUpgrade('TON', 0.15, 0.0015)} disabled={miningRate >= 0.0015} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0015 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}>
-                {miningRate >= 0.0015 ? 'Owned ✓' : 'Buy for 0.15 TON'}
+              {/* تعديل الزر ليعرض عملة GRAM */}
+              <button onClick={() => buyUpgrade('GRAM', 0.15, 0.0015)} disabled={miningRate >= 0.0015} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0015 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}>
+                {miningRate >= 0.0015 ? 'Owned ✓' : 'Buy for 0.15 GRAM'}
               </button>
             </div>
             <div className="bg-slate-900/80 border border-yellow-900/30 rounded-2xl p-4 flex flex-col gap-3">
@@ -336,8 +340,9 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">🚀</span>
               </div>
-              <button onClick={() => buyUpgrade('TON', 0.50, 0.0050)} disabled={miningRate >= 0.0050} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0050 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}>
-                {miningRate >= 0.0050 ? 'Owned ✓' : 'Buy for 0.50 TON'}
+              {/* تعديل الزر ليعرض عملة GRAM */}
+              <button onClick={() => buyUpgrade('GRAM', 0.50, 0.0050)} disabled={miningRate >= 0.0050} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${miningRate >= 0.0050 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}>
+                {miningRate >= 0.0050 ? 'Owned ✓' : 'Buy for 0.50 GRAM'}
               </button>
             </div>
           </div>
@@ -459,7 +464,7 @@ export default function Home() {
           <span className="text-xl">⛏️</span><span className="text-[9px] font-bold">Mine</span>
         </button>
         <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'tasks' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
-          <span className="text-xl">📋</span><span className="text-[9px] font-bold">Tasks</span>
+          <span className="text-xl">📋</span><span className="text-[9px] font-bold">Speed</span>
         </button>
         <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center gap-1 w-1/5 ${activeTab === 'friends' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500'}`}>
           <span className="text-xl">👥</span><span className="text-[9px] font-bold">Friends</span>
