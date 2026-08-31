@@ -9,14 +9,11 @@ export default function Home() {
   const [miningDelta, setMiningDelta] = useState(0);
   const [activeTab, setActiveTab] = useState('mine');
   
-  // State للقائمة الفرعية داخل صفحة Discover
   const [discoverView, setDiscoverView] = useState('about'); 
   
-  // Tasks State
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
   
-  // Daily Check-in State
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
   const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
@@ -319,7 +316,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-20">
+    <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
       <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono z-10">
         Status: {dbStatus}
@@ -333,7 +330,6 @@ export default function Home() {
         <TonConnectButton />
       </div>
 
-      {/* -------------------- TAB: MINE -------------------- */}
       {activeTab === 'mine' && (
         <div className="flex-1 w-full flex flex-col items-center px-6">
           <div className="w-full text-center mt-2">
@@ -374,17 +370,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: EARN (Tasks & Check-in) -------------------- */}
       {activeTab === 'tasks' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
-          
           <div className="bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl p-5 mb-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.3)]">
             <div className="relative z-10 flex flex-col items-center">
               <h3 className="font-black text-white text-2xl mb-1 drop-shadow-md">Daily Check-In</h3>
               <p className="text-yellow-100 text-[11px] text-center mb-4 font-medium leading-relaxed">
                 Log in daily to increase your reward.<br/> <span className="font-bold text-white">Missing a day resets your streak to 0!</span>
               </p>
-              
               <div className="flex items-center justify-center gap-3 mb-4 w-full">
                  <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
                     <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">Current Streak</span>
@@ -395,7 +388,6 @@ export default function Home() {
                     <span className="text-2xl font-black text-yellow-400">+{dailyRewardAmt}</span>
                  </div>
               </div>
-
               <button 
                 onClick={handleDailyCheckIn} 
                 disabled={!canCheckIn || isSaving}
@@ -407,7 +399,6 @@ export default function Home() {
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-4">Social Tasks</h2>
-          
           <div className="flex flex-col gap-4 mb-8">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
@@ -418,7 +409,6 @@ export default function Home() {
                 {taskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
-
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
@@ -432,7 +422,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: FRIENDS -------------------- */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -453,7 +442,6 @@ export default function Home() {
                   <span className="text-[10px] text-gray-500 uppercase">Active (24h)</span>
                 </div>
              </div>
-             
              <button onClick={handleInviteFriend} className="w-full bg-yellow-600 py-3 rounded-xl text-white font-bold text-lg shadow-[0_4px_20px_rgba(202,138,4,0.4)] active:scale-95 transition-all">
                Invite a Friend
              </button>
@@ -464,7 +452,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: BOOSTS -------------------- */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
@@ -510,104 +497,131 @@ export default function Home() {
         </div>
       )}
 
-      {/* -------------------- TAB: DISCOVER (Landing Page الجديدة) -------------------- */}
+      {/* -------------------- TAB: DISCOVER (Landing Page المُطورة) -------------------- */}
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
           
-          {/* القائمة العلوية للتنقل (Sub-Menu) */}
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
              <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>About</button>
              <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>Roadmap</button>
              <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-white' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
           </div>
 
-          {/* محتوى: عن المشروع (About & Guide) */}
+          {/* محتوى: عن المشروع (Landing Page متكاملة) */}
           {discoverView === 'about' && (
              <div className="w-full flex flex-col items-center pb-6">
-                {/* صورة الغلاف */}
                 <Image src="/hero-banner.png" alt="ApexMiner Hero" width={800} height={400} className="w-full h-auto object-cover border-b border-slate-800 shadow-xl" />
                 
                 <div className="px-6 w-full mt-6">
-                   <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-2">ApexMiner</h1>
-                   <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                     Welcome to the future of Mini-App mining. ApexMiner is built on the robust TON blockchain, bringing you a seamless and transparent crypto experience.
+                   <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-2">ApexMiner</h1>
+                   <p className="text-gray-300 text-sm leading-relaxed mb-6 font-medium">
+                     Welcome to the ultimate Mini-App mining platform. Built natively on the robust <strong className="text-blue-400">TON Blockchain</strong>, ApexMiner offers a seamless, highly secure, and deeply rewarding Web3 experience directly within Telegram.
                    </p>
 
-                   {/* صورة المشروع */}
-                   <div className="w-full flex justify-center mb-6">
-                      <Image src="/about-project.png" alt="About Project" width={150} height={150} className="drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]" />
+                   <div className="w-full flex justify-center mb-8">
+                      <Image src="/about-project.png" alt="About Project" width={180} height={180} className="drop-shadow-[0_0_25px_rgba(59,130,246,0.4)]" />
                    </div>
 
-                   <h2 className="text-xl font-bold text-white mb-4 border-b border-slate-800 pb-2">How It Works</h2>
-                   <div className="space-y-4">
-                      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex gap-3">
-                         <span className="text-xl">⚡</span>
-                         <div>
-                           <h3 className="font-bold text-white text-sm">Mine APEX Points</h3>
-                           <p className="text-gray-400 text-xs mt-1">Your rig mines automatically. These virtual points will later convert to real APX Tokens.</p>
-                         </div>
+                   <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Core Features</h2>
+                   <div className="grid grid-cols-2 gap-3 mb-8">
+                      <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                         <span className="text-3xl block mb-2">⚡</span>
+                         <h3 className="font-bold text-white text-sm">Cloud Mining</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">Automated APEX points generation.</p>
                       </div>
-                      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex gap-3">
-                         <span className="text-xl">👥</span>
-                         <div>
-                           <h3 className="font-bold text-white text-sm">Invite & Earn</h3>
-                           <p className="text-gray-400 text-xs mt-1">Get +5% mining boost for every active friend.</p>
-                         </div>
+                      <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                         <span className="text-3xl block mb-2">🛡️</span>
+                         <h3 className="font-bold text-white text-sm">Secure Yield</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">Protected balance & blockchain tech.</p>
                       </div>
-                      
-                      {/* تنبيه الأيردروب والدخول اليومي */}
-                      <div className="bg-gradient-to-r from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-700/50">
-                         <h3 className="font-bold text-yellow-400 text-sm flex items-center gap-2"><span>⚠️</span> Airdrop Warning</h3>
-                         <p className="text-gray-300 text-xs mt-2 leading-relaxed">
-                           Claim your daily check-in reward to build your streak. <strong className="text-white">Missing a day resets it to 0.</strong> Your streak history will be a critical factor in determining your FULL Airdrop Allocation!
-                         </p>
+                      <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                         <span className="text-3xl block mb-2">🚀</span>
+                         <h3 className="font-bold text-white text-sm">Hardware Boosts</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">Scale up via TON transactions.</p>
+                      </div>
+                      <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+                         <span className="text-3xl block mb-2">👥</span>
+                         <h3 className="font-bold text-white text-sm">Community</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">Earn massive referral rewards.</p>
                       </div>
                    </div>
+
+                   <div className="bg-gradient-to-r from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-700/50 mb-8">
+                      <h3 className="font-bold text-yellow-400 text-sm flex items-center gap-2"><span>⚠️</span> Airdrop Factor</h3>
+                      <p className="text-gray-300 text-xs mt-2 leading-relaxed">
+                        Claim your daily check-in reward to build your streak. <strong className="text-white">Missing a day resets it to 0.</strong> Your streak history will directly impact your TGE Airdrop Allocation!
+                      </p>
+                   </div>
+
+                   <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Join Our Community</h2>
+                   <div className="flex flex-col gap-3 w-full mb-10">
+                     <button onClick={() => window.open('https://t.me/ApexMiner_Official', '_blank')} className="w-full bg-[#2AABEE] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                        <span>📢</span> Official Channel
+                     </button>
+                     <button onClick={() => window.open('https://t.me/ApexMinerGroup', '_blank')} className="w-full bg-[#229ED9] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                        <span>💬</span> Global Group
+                     </button>
+                   </div>
+
+                   {/* تذييل الصفحة (Footer) */}
+                   <footer className="w-full border-t border-slate-800 pt-6 pb-4 text-center">
+                     <div className="flex justify-center items-center gap-2 mb-2">
+                        <Image src="/logo2.png" alt="Logo" width={20} height={20} className="grayscale opacity-50" />
+                        <span className="text-gray-500 font-black text-sm">ApexMiner</span>
+                     </div>
+                     <p className="text-gray-500 text-[10px] leading-relaxed">
+                        © 2026 ApexMiner (APX). All rights reserved.<br/>
+                        Built with ❤️ for the TON Ecosystem.
+                     </p>
+                   </footer>
                 </div>
              </div>
           )}
 
-          {/* محتوى: خريطة الطريق (Timeline CSS) */}
+          {/* محتوى: خريطة الطريق (مع إخلاء المسؤولية) */}
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
                 <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Roadmap</h2>
                 
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
-                  {/* Phase 1 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>
                     <h3 className="font-black text-blue-400 text-lg mb-1">Q4 2026: The Genesis</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">Official launch of ApexMiner Mini-App. Activation of core mining, referrals, and hardware boosts.</p>
                   </div>
-                  {/* Phase 2 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
                     <h3 className="font-black text-purple-400 text-lg mb-1">H1 2027: Gamification</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">Launch of Leaderboards and Squads. First Halving event to increase scarcity.</p>
                   </div>
-                  {/* Phase 3 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
                     <h3 className="font-black text-green-400 text-lg mb-1">H2 2027: Ecosystem</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">Integration of Mini-Games and B2B funded advertising tasks for partner projects.</p>
                   </div>
-                  {/* Phase 4 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950"></span>
                     <h3 className="font-black text-yellow-400 text-lg mb-1">2028: Preparation</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">Internal APX Staking. Second Halving. Q4 closure of mining pools and Snapshot taken.</p>
                   </div>
-                  {/* Phase 5 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
                     <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2029: TGE & Listing</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">Token Generation Event (TGE). Airdrop distribution and official listing on exchanges.</p>
                   </div>
                 </div>
+
+                {/* إخلاء المسؤولية (القوة القاهرة) */}
+                <div className="mt-8 p-4 bg-slate-900/80 border border-slate-700 rounded-xl">
+                   <h4 className="text-gray-300 font-bold text-sm mb-2">⚖️ Legal Disclaimer</h4>
+                   <p className="text-gray-500 text-[10px] leading-relaxed">
+                     Please note that the timeline, roadmap phases, and whitepaper specifications are subject to modification or adjustment. The core team reserves the right to alter plans in the event of force majeure, unforeseen extreme market conditions, or major shifts in global regulatory and blockchain policies.
+                   </p>
+                </div>
              </div>
           )}
 
-          {/* محتوى: الورقة البيضاء */}
+          {/* محتوى: الورقة البيضاء (مع بند العقد الذكي) */}
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Whitepaper v1.1</h1>
@@ -656,12 +670,20 @@ export default function Home() {
                     <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black">2%</span>
                   </div>
                 </div>
+
+                {/* قسم الأمان والعقد الذكي */}
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">4. Smart Contract Security</h2>
+                <div className="bg-slate-900/50 p-4 rounded-xl border border-blue-700/50 mb-8">
+                   <p className="text-gray-300 text-xs leading-relaxed">
+                     The ApexMiner Smart Contract is thoroughly secured and strictly protected. To ensure absolute fairness for genuine miners and prevent sniper bots manipulation, the official Contract Address will remain classified. <strong className="text-blue-400">It will be publicly announced exactly simultaneously with the final points reset and the Airdrop distribution during the TGE phase.</strong>
+                   </p>
+                </div>
              </div>
           )}
         </div>
       )}
 
-      {/* -------------------- الشريط السفلي (5 أزرار مرتبة بامتياز) -------------------- */}
+      {/* الشريط السفلي */}
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50 px-2">
         <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
           <span className="text-xl leading-none">⛏️</span><span className="text-[10px] font-bold leading-none mt-1">Mine</span>
