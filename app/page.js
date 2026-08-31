@@ -8,8 +8,16 @@ export default function Home() {
   const [balance, setBalance] = useState(0); 
   const [miningDelta, setMiningDelta] = useState(0);
   const [activeTab, setActiveTab] = useState('mine');
+  
+  // Tasks State
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
+  
+  // Daily Check-in State
+  const [checkinStreak, setCheckinStreak] = useState(0);
+  const [canCheckIn, setCanCheckIn] = useState(false);
+  const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
+
   const [friendsCount, setFriendsCount] = useState(0); 
   const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
   const [dbMiningRate, setDbMiningRate] = useState(0.00025); 
@@ -73,11 +81,34 @@ export default function Home() {
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
 
+          // نظام التحقق من الدخول اليومي والمكافآت (Streak Logic)
+          let currentStreak = data.checkin_streak || 0;
+          let isCheckinAvailable = true;
+          const now = new Date();
+          const todayStr = now.toDateString();
+
+          if (data.last_checkin_date) {
+            const lastDate = new Date(data.last_checkin_date);
+            if (lastDate.toDateString() === todayStr) {
+              isCheckinAvailable = false; // سجل دخوله اليوم بالفعل
+            } else {
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+              if (lastDate.toDateString() !== yesterday.toDateString()) {
+                currentStreak = 0; // تغيب عن الدخول، يرجع العداد لصفر
+              }
+            }
+          }
+          
+          setCheckinStreak(currentStreak);
+          setCanCheckIn(isCheckinAvailable);
+          setDailyRewardAmt(((currentStreak % 7) + 1) * 100); // 100 لليوم الأول، 200 للثاني...
+
           const { count: totalCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
           setFriendsCount(totalCount || 0);
 
-          const yesterday = new Date(Date.now() - 86400000).toISOString();
-          const { count: activeCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId).gte('last_claim', yesterday);
+          const yesterdayStr = new Date(Date.now() - 86400000).toISOString();
+          const { count: activeCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId).gte('last_claim', yesterdayStr);
           activeFriends = activeCount || 0;
           setActiveFriendsCount(activeFriends);
 
@@ -87,8 +118,8 @@ export default function Home() {
           
           if (data.last_claim) {
             const lastTime = new Date(data.last_claim).getTime();
-            const now = new Date().getTime();
-            const diffSeconds = (now - lastTime) / 1000;
+            const nowTime = new Date().getTime();
+            const diffSeconds = (nowTime - lastTime) / 1000;
             if (diffSeconds > 0) {
               setMiningDelta(diffSeconds * finalRate);
             }
@@ -107,12 +138,15 @@ export default function Home() {
           const currentIsoTime = new Date().toISOString();
           const { error: insertError } = await supabase.from('users').insert([{ 
               telegram_id: userId, first_name: firstName, username: userName,
-              balance: initialBalance, mining_rate: 0.00025, referred_by: referrerId, channel_joined: false, group_joined: false, last_claim: currentIsoTime
+              balance: initialBalance, mining_rate: 0.00025, referred_by: referrerId, 
+              channel_joined: false, group_joined: false, checkin_streak: 0, last_claim: currentIsoTime
           }]);
 
           if (!insertError) {
             setDbStatus('New User Saved ✅');
             setTotalMiningRate(0.00025);
+            setCanCheckIn(true);
+            setDailyRewardAmt(100);
           } else {
             setDbStatus('Insert Error ❌');
           }
@@ -130,6 +164,30 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(interval);
   }, [totalMiningRate]);
+
+  // دالة استلام المكافأة اليومية
+  const handleDailyCheckIn = async () => {
+    if (!canCheckIn || isSaving) return;
+    setIsSaving(true);
+    
+    const newStreak = checkinStreak + 1;
+    const newBalance = balance + dailyRewardAmt;
+    const todayIso = new Date().toISOString();
+
+    setBalance(newBalance);
+    setCheckinStreak(newStreak);
+    setCanCheckIn(false);
+
+    if (userId && userId !== 'test_user') {
+      await supabase.from('users').update({ 
+        balance: newBalance, 
+        checkin_streak: newStreak, 
+        last_checkin_date: todayIso 
+      }).eq('telegram_id', userId);
+    }
+    
+    setIsSaving(false);
+  };
 
   const handleClaim = async () => {
     if (isSaving || miningDelta < 0.0001) return; 
@@ -315,11 +373,40 @@ export default function Home() {
       )}
 
       {activeTab === 'tasks' && (
-        <div className="flex-1 w-full flex flex-col px-6 pt-4">
-          <h2 className="text-2xl font-bold text-white mb-6">Earn More Points</h2>
+        <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
+          
+          {/* واجهة الدخول اليومي (Daily Check-in) الجديدة */}
+          <div className="bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl p-5 mb-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+            <div className="relative z-10 flex flex-col items-center">
+              <h3 className="font-black text-white text-2xl mb-1 drop-shadow-md">Daily Check-In</h3>
+              <p className="text-yellow-100 text-[11px] text-center mb-4 font-medium leading-relaxed">
+                Log in daily to increase your reward.<br/> <span className="font-bold text-white">Missing a day resets your streak to 0!</span>
+              </p>
+              
+              <div className="flex items-center justify-center gap-3 mb-4 w-full">
+                 <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
+                    <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">Current Streak</span>
+                    <span className="text-2xl font-black text-white">{checkinStreak} <span className="text-sm">Days</span>🔥</span>
+                 </div>
+                 <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
+                    <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">Today's Reward</span>
+                    <span className="text-2xl font-black text-yellow-400">+{dailyRewardAmt}</span>
+                 </div>
+              </div>
+
+              <button 
+                onClick={handleDailyCheckIn} 
+                disabled={!canCheckIn || isSaving}
+                className={`w-full py-3 rounded-xl text-base font-black uppercase tracking-wider transition-all shadow-lg ${canCheckIn ? 'bg-white text-orange-600 hover:scale-105 active:scale-95' : 'bg-black/30 text-white/50 cursor-not-allowed border border-white/10'}`}
+              >
+                {isSaving ? 'Claiming...' : (canCheckIn ? 'Claim Reward' : 'Come Back Tomorrow')}
+              </button>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold text-white mb-4">Earn More Points</h2>
           
           <div className="flex flex-col gap-4">
-            {/* مهمة القناة */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
@@ -330,7 +417,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* مهمة المجموعة */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
@@ -341,7 +427,6 @@ export default function Home() {
               </button>
             </div>
           </div>
-
         </div>
       )}
 
@@ -448,6 +533,19 @@ export default function Home() {
                   <h3 className="font-bold text-white text-lg">3. Upgrade Your Rig</h3>
                </div>
                <p className="text-gray-400 text-sm ml-9 leading-relaxed">Use your mined APEX or real GRAM via TonConnect to purchase powerful Cloud Servers and ASICs for massive speed boosts.</p>
+            </div>
+
+            {/* تم إضافة شرح المكافأة اليومية هنا ليكون شرطاً للحصول على الأيردروب */}
+            <div className="bg-slate-900/90 p-5 rounded-xl border border-yellow-600/50 shadow-[0_0_15px_rgba(202,138,4,0.15)] relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
+               <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">📅</span>
+                  <h3 className="font-bold text-yellow-500 text-lg">4. Check-in & Airdrop</h3>
+               </div>
+               <p className="text-gray-300 text-sm ml-9 leading-relaxed">
+                 Claim your daily check-in reward to build your streak. <strong className="text-red-400">Warning: Missing a single day resets your streak back to zero!</strong><br/><br/>
+                 <strong className="text-green-400">Airdrop Factor:</strong> Maintaining a consistent check-in streak proves you are a genuine, active miner. Your streak history will be a critical factor in determining your <strong className="text-white">FULL Airdrop Allocation</strong> during the TGE!
+               </p>
             </div>
           </div>
         </div>
