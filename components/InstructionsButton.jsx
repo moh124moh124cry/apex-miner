@@ -6,64 +6,68 @@ export default function InstructionsButton() {
 
   return (
     <>
-      {/* الزر العائم */}
+      {/* الزر العائم: تم نقله لأسفل اليمين ليكون مرتباً ولا يتداخل مع التطبيق */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed left-3 top-1/2 -translate-y-1/2 z-40 p-3 rounded-full bg-slate-800/80 backdrop-blur-md border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] text-2xl hover:scale-110 hover:border-blue-400 transition-all duration-300"
+        className="fixed bottom-24 right-4 z-50 w-12 h-12 flex items-center justify-center rounded-full bg-blue-600 border-2 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.5)] text-2xl hover:scale-105 active:scale-95 transition-all"
         aria-label="How it works"
       >
         📖
       </button>
 
-      {/* النافذة المنبثقة */}
+      {/* النافذة المنبثقة: تم رفع الـ z-index وتوضيح الألوان */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-opacity">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-md p-6 relative shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-md p-5 relative shadow-2xl">
             
-            <button
-              onClick={() => setIsOpen(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xl transition-colors"
-            >
-              ✖️
-            </button>
+            {/* رأس النافذة مع زر الإغلاق بجانب العنوان مباشرة */}
+            <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
+              <h2 className="text-2xl font-black text-white drop-shadow-md">
+                How it Works
+              </h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-white hover:bg-red-500 transition-colors text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
-            <h2 className="text-2xl font-extrabold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent mb-6 text-center">
-              How ApexMiner Works
-            </h2>
-
-            <div className="space-y-5 text-slate-300">
+            {/* قائمة التعليمات بألوان فاتحة وتباين عالي */}
+            <div className="space-y-4">
               
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-slate-900 rounded-lg text-xl shadow-inner">⚡</div>
+              <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-yellow-500/20 rounded-full text-xl shadow-inner">⚡</div>
                 <div>
-                  <h3 className="font-bold text-slate-200">1. Mine APEX Points</h3>
-                  <p className="text-sm text-slate-400 mt-1">Your rig mines automatically at 0.00025 APEX/sec. APEX points will later be converted to APX Tokens.</p>
+                  <h3 className="font-bold text-white text-base">1. Mine APEX Points</h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">Your rig mines automatically at 0.00025 APEX/sec. Points will later convert to APX Tokens.</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-slate-900 rounded-lg text-xl shadow-inner">👥</div>
+              <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-blue-500/20 rounded-full text-xl shadow-inner">👥</div>
                 <div>
-                  <h3 className="font-bold text-slate-200">2. Invite & Earn</h3>
-                  <p className="text-sm text-slate-400 mt-1">Get a +5% permanent mining speed boost for every active friend you invite.</p>
+                  <h3 className="font-bold text-white text-base">2. Invite & Earn</h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">Get a +5% permanent mining speed boost for every active friend you invite.</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-slate-900 rounded-lg text-xl shadow-inner">🚀</div>
+              <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-xl shadow-inner">🚀</div>
                 <div>
-                  <h3 className="font-bold text-slate-200">3. Upgrade Your Rig</h3>
-                  <p className="text-sm text-slate-400 mt-1">Use your mined APEX or GRAM via TonConnect to purchase Cloud Servers and Quantum ASICs for massive speed boosts.</p>
+                  <h3 className="font-bold text-white text-base">3. Upgrade Your Rig</h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">Use APEX or GRAM via TonConnect to purchase Servers and ASICs for massive speed boosts.</p>
                 </div>
               </div>
 
             </div>
 
+            {/* زر التأكيد السفلي */}
             <button
               onClick={() => setIsOpen(false)}
-              className="w-full mt-8 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold hover:from-blue-500 hover:to-blue-700 shadow-lg shadow-blue-900/50 transition-all active:scale-95"
+              className="w-full mt-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] active:scale-95 transition-all"
             >
-              Start Mining Now
+              Got it! Let's Mine ⛏️
             </button>
           </div>
         </div>
