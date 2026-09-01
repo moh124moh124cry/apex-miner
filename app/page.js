@@ -31,9 +31,26 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
 
-  // نظام المحافظ الجديد BSC
+  // نظام المحافظ الجديد BSC - محاكاة احترافية
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState('');
+
+  const handleConnectWallet = (walletName) => {
+    setSelectedWallet(walletName);
+    setIsConnecting(true);
+    
+    // محاكاة تأخير الاتصال الواقعي
+    setTimeout(() => {
+      const generateHex = () => Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+      const mockAddress = `0x${generateHex().substring(0,4)}...${generateHex().substring(0,4)}`.toLowerCase();
+      
+      setWalletAddress(mockAddress);
+      setIsConnecting(false);
+      setShowWalletModal(false);
+    }, 1500);
+  };
 
   useEffect(() => {
     let attempts = 0;
@@ -264,14 +281,17 @@ export default function Home() {
                  <span>🟡</span> Connect BSC Wallet
               </h3>
               <div className="flex flex-col gap-3">
-                 <button onClick={() => { setWalletAddress('0xM...8fA'); setShowWalletModal(false); }} className="w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-orange-500 hover:bg-slate-800/80 transition-all">
-                    <span className="text-2xl">🦊</span> <span className="text-white font-bold text-lg">MetaMask</span>
+                 <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
+                    <span className="text-2xl">🦊</span> 
+                    <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
                  </button>
-                 <button onClick={() => { setWalletAddress('0xT...2cB'); setShowWalletModal(false); }} className="w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-blue-500 hover:bg-slate-800/80 transition-all">
-                    <span className="text-2xl">🛡️</span> <span className="text-white font-bold text-lg">Trust Wallet</span>
+                 <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
+                    <span className="text-2xl">🛡️</span> 
+                    <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
                  </button>
-                 <button onClick={() => { setWalletAddress('0xO...9eD'); setShowWalletModal(false); }} className="w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-white hover:bg-slate-800/80 transition-all">
-                    <span className="text-2xl font-black text-white px-1">OKX</span> <span className="text-white font-bold text-lg">OKX Web3</span>
+                 <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
+                    <span className="text-2xl font-black text-white px-1">OKX</span> 
+                    <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'OKX Web3' ? 'Connecting...' : 'OKX Web3'}</span>
                  </button>
               </div>
               <p className="text-[10px] font-bold text-yellow-500 text-center mt-6 uppercase tracking-wider">Supports Binance Smart Chain (BEP-20)</p>
@@ -311,11 +331,11 @@ export default function Home() {
       {/* الهيدر مع زر المحفظة الجديد */}
       <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
-          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
+          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
           <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
         </div>
         <button onClick={() => setShowWalletModal(true)} className="bg-slate-800 border border-slate-700 text-white font-bold px-4 py-2 rounded-xl text-xs hover:border-yellow-500 transition-colors flex items-center gap-2">
-          <span>🟡</span> {walletAddress ? `${walletAddress.slice(0,4)}...${walletAddress.slice(-4)}` : 'Connect Wallet'}
+          <span>🟡</span> {walletAddress ? walletAddress : 'Connect Wallet'}
         </button>
       </div>
 
@@ -341,11 +361,19 @@ export default function Home() {
                +{miningDelta.toFixed(4)}
              </h3>
           </div>
+          
+          {/* الشعار بتصميم ثلاثي الأبعاد واحترافي */}
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
-            <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-10 rounded-full"></div>
-            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-slate-800 to-slate-900 border-4 border-yellow-600/30 flex items-center justify-center shadow-[0_0_40px_rgba(234,179,8,0.2)] z-10 overflow-hidden">
-               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105 transition-transform duration-300" />
+            <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
+            
+            <div className="w-56 h-56 rounded-full p-[4px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-800 shadow-[0_0_50px_rgba(234,179,8,0.4),inset_0_0_20px_rgba(255,255,255,0.5)] z-10 flex items-center justify-center">
+              <div className="w-full h-full rounded-full border-[6px] border-slate-950 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] relative">
+                 <Image src="/logo2.png" alt="Apex Coin" width={200} height={200} className="w-full h-full object-cover rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+                 {/* طبقة إضاءة خفيفة فوق الصورة لتعزيز الواقعية */}
+                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent rounded-full pointer-events-none"></div>
+              </div>
             </div>
+            
           </div>
           <button onClick={handleClaim} disabled={isSaving} className={`w-full py-4 mt-auto mb-4 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
             {isSaving ? 'SAVING...' : 'CLAIM POINTS'}
@@ -516,7 +544,7 @@ export default function Home() {
                 <div className="w-full py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-b border-yellow-500/30 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                    <div className="absolute inset-0 bg-black/40 mix-blend-overlay"></div>
                    <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-400/50 shadow-[0_0_30px_rgba(234,179,8,0.5)] z-10">
-                      <Image src="/logo2.png" alt="Apex Logo" width={60} height={60} className="rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" />
+                      <Image src="/logo2.png" alt="Apex Logo" width={60} height={60} className="rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] object-cover w-full h-full" />
                    </div>
                    <h1 className="text-4xl font-black text-white mb-2 z-10">Apex Network</h1>
                    
