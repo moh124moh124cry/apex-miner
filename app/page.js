@@ -31,11 +31,15 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
 
-  // نظام المحافظ الجديد BSC (اتصال حقيقي)
+  // نظام المحافظ الجديد (معدل للهواتف الذكية وتيليجرام)
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState('');
+  
+  // حالات الربط اليدوي للهاتف
+  const [manualWalletInput, setManualWalletInput] = useState(false);
+  const [tempAddress, setTempAddress] = useState('');
 
   const handleConnectWallet = async (walletName) => {
     setSelectedWallet(walletName);
@@ -44,6 +48,7 @@ export default function Home() {
     try {
       let provider = null;
 
+      // فحص وجود المحفظة في المتصفح
       if (typeof window !== 'undefined') {
         if (walletName === 'MetaMask' && window.ethereum) {
           provider = window.ethereum;
@@ -56,48 +61,46 @@ export default function Home() {
         }
       }
 
+      // إذا لم يجد المحفظة (وهو ما يحدث داخل متصفح تيليجرام في الهاتف)
       if (!provider) {
-        alert(`❌ لم يتم العثور على ${walletName}! يرجى فتح التطبيق من متصفح المحفظة (dApp Browser) أو تثبيت الإضافة.`);
+        // بدلاً من الخطأ، نعرض واجهة الربط اليدوي الذكية
+        setManualWalletInput(true);
         setIsConnecting(false);
         return;
       }
 
+      // إذا وجد المحفظة (في الكمبيوتر)
       const accounts = await provider.request({ method: 'eth_requestAccounts' });
       
       if (accounts && accounts.length > 0) {
         const address = accounts[0];
         setWalletAddress(`0x${address.substring(2, 6)}...${address.substring(address.length - 4)}`);
         setShowWalletModal(false);
-
-        // التحويل التلقائي لشبكة BSC
-        try {
-          await provider.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x38' }], // 0x38 هو الـ Chain ID لشبكة BSC
-          });
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            await provider.request({
-              method: 'wallet_addEthereumChain',
-              params: [
-                {
-                  chainId: '0x38',
-                  chainName: 'Binance Smart Chain',
-                  nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-                  rpcUrls: ['https://bsc-dataseed.binance.org/'],
-                  blockExplorerUrls: ['https://bscscan.com/']
-                }
-              ],
-            });
-          }
-        }
       }
     } catch (error) {
       console.error("Connection error:", error);
-      alert("❌ تم إلغاء الاتصال أو حدث خطأ.");
+      alert("❌ Connection cancelled or failed.");
     } finally {
       setIsConnecting(false);
     }
+  };
+
+  const handleManualBind = () => {
+    if (tempAddress.length === 42 && tempAddress.startsWith('0x')) {
+      setWalletAddress(`${tempAddress.substring(0, 6)}...${tempAddress.substring(tempAddress.length - 4)}`);
+      setShowWalletModal(false);
+      setManualWalletInput(false);
+      setTempAddress('');
+      alert("✅ Wallet Successfully Linked for TGE!");
+    } else {
+      alert("❌ Please enter a valid BSC (BEP-20) address starting with '0x'!");
+    }
+  };
+
+  const closeModal = () => {
+    setShowWalletModal(false);
+    setManualWalletInput(false);
+    setTempAddress('');
   };
 
   useEffect(() => {
@@ -320,28 +323,64 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
+      {/* مودال ربط المحفظة (المعدل) */}
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
-              <button onClick={() => setShowWalletModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✖</button>
-              <h3 className="text-xl font-black text-white mb-6 text-center flex items-center justify-center gap-2">
-                 <span>🟡</span> Connect BSC Wallet
-              </h3>
-              <div className="flex flex-col gap-3">
-                 <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
-                    <span className="text-2xl">🦊</span> 
-                    <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
-                 </button>
-                 <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
-                    <span className="text-2xl">🛡️</span> 
-                    <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
-                 </button>
-                 <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
-                    <span className="text-2xl font-black text-white px-1">OKX</span> 
-                    <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'OKX Web3' ? 'Connecting...' : 'OKX Web3'}</span>
-                 </button>
-              </div>
-              <p className="text-[10px] font-bold text-yellow-500 text-center mt-6 uppercase tracking-wider">Supports Binance Smart Chain (BEP-20)</p>
+              <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✖</button>
+              
+              {!manualWalletInput ? (
+                <>
+                  <h3 className="text-xl font-black text-white mb-6 text-center flex items-center justify-center gap-2">
+                     <span>🟡</span> Connect BSC Wallet
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                     <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
+                        <span className="text-2xl">🦊</span> 
+                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
+                     </button>
+                     <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
+                        <span className="text-2xl">🛡️</span> 
+                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
+                     </button>
+                     <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
+                        <span className="text-2xl font-black text-white px-1">OKX</span> 
+                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'OKX Web3' ? 'Connecting...' : 'OKX Web3'}</span>
+                     </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center animate-in fade-in duration-300">
+                   <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-500/50">
+                     <span className="text-2xl">🔗</span>
+                   </div>
+                   <h3 className="text-lg font-black text-white mb-2 text-center">Link Wallet Address</h3>
+                   <p className="text-xs text-gray-400 text-center mb-6 leading-relaxed">
+                     Telegram browser does not support direct connections. Please paste your <strong className="text-yellow-400">BSC (BEP-20)</strong> address below to link it to your account for future Airdrops.
+                   </p>
+                   
+                   <div className="w-full mb-4">
+                     <label className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1 block">Your BEP-20 Address</label>
+                     <input 
+                       type="text" 
+                       value={tempAddress}
+                       onChange={(e) => setTempAddress(e.target.value)}
+                       placeholder="0x..." 
+                       className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-all font-mono"
+                     />
+                   </div>
+                   
+                   <button onClick={handleManualBind} className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
+                     Bind Address
+                   </button>
+                   
+                   <button onClick={() => setManualWalletInput(false)} className="w-full mt-3 py-2 text-gray-500 text-xs font-bold hover:text-white transition-colors">
+                     Cancel
+                   </button>
+                </div>
+              )}
+              
+              {!manualWalletInput && <p className="text-[10px] font-bold text-yellow-500 text-center mt-6 uppercase tracking-wider">Supports Binance Smart Chain (BEP-20)</p>}
            </div>
         </div>
       )}
@@ -380,8 +419,8 @@ export default function Home() {
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
           <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
         </div>
-        <button onClick={() => setShowWalletModal(true)} className="bg-slate-800 border border-slate-700 text-white font-bold px-4 py-2 rounded-xl text-xs hover:border-yellow-500 transition-colors flex items-center gap-2">
-          <span>🟡</span> {walletAddress ? walletAddress : 'Connect Wallet'}
+        <button onClick={() => setShowWalletModal(true)} className={`border font-bold px-4 py-2 rounded-xl text-xs transition-colors flex items-center gap-2 ${walletAddress ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-700 text-white hover:border-yellow-500'}`}>
+          <span>{walletAddress ? '✅' : '🟡'}</span> {walletAddress ? walletAddress : 'Connect Wallet'}
         </button>
       </div>
 
