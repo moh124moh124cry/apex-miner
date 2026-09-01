@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { supabase } from '../lib/supabase'; 
 import Image from 'next/image';
 
@@ -32,10 +31,9 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
 
-  const userAddress = useTonAddress();
-  const [tonConnectUI] = useTonConnectUI(); 
-
-  const ADMIN_WALLET = "UQAlWRIbr0ePdYPuc5kV0nEN4gPhLRnqASKWjaCeGPbinBwq"; 
+  // نظام المحافظ الجديد BSC
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [walletAddress, setWalletAddress] = useState(null);
 
   useEffect(() => {
     let attempts = 0;
@@ -204,7 +202,6 @@ export default function Home() {
         last_checkin_date: todayIso 
       }).eq('telegram_id', userId);
     }
-    
     setIsSaving(false);
   };
 
@@ -246,7 +243,7 @@ export default function Home() {
 
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
-    const shareText = "🚀 Join Apex Network and mine $APXN Points! Early pioneer welcome bonus active:";
+    const shareText = "🚀 Join Apex Network on BSC and mine $APXN Points! Early pioneer welcome bonus active:";
     window.open(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
@@ -255,59 +252,32 @@ export default function Home() {
     alert("✅ Invite link copied!");
   };
 
-  const buyUpgrade = async (costValue, newRateSpeed) => {
-    if (dbMiningRate >= newRateSpeed) {
-      alert("✅ You already own this or a better upgrade!");
-      return;
-    }
-
-    const currentIsoTime = new Date().toISOString();
-    const autoClaimedBalance = balance + miningDelta;
-
-    if (autoClaimedBalance >= costValue) {
-      const newBalance = autoClaimedBalance - costValue;
-      
-      if (userId && userId !== 'test_user') {
-        const { error } = await supabase.from('users').update({ balance: newBalance, mining_rate: newRateSpeed, last_claim: currentIsoTime }).eq('telegram_id', userId);
-        if (error) {
-          alert(`❌ Database Error: ${error.message}.`);
-          return;
-        }
-      }
-      
-      setBalance(newBalance);
-      setMiningDelta(0);
-      setDbMiningRate(newRateSpeed);
-      setTotalMiningRate(newRateSpeed + (activeFriendsCount * (newRateSpeed * 0.05)));
-      alert("✅ Upgrade purchased successfully!");
-    } else {
-      alert("❌ Not enough APXN Points!");
-    }
-  };
-
-  const buyTicket = async (ticketType, priceInGram) => {
-    if (!userAddress) {
-      alert("❌ Please connect your Wallet first!");
-      return;
-    }
-    const amountInNano = (priceInGram * 1000000000).toString(); 
-    const transaction = {
-      validUntil: Math.floor(Date.now() / 1000) + 300, 
-      messages: [{ address: ADMIN_WALLET, amount: amountInNano }]
-    };
-    
-    try {
-      const result = await tonConnectUI.sendTransaction(transaction);
-      if (result) {
-        alert(`✅ ${ticketType} Ticket Confirmed! Your Presale Allocation is secured.`);
-      }
-    } catch (error) {
-      alert("❌ Payment cancelled or failed.");
-    }
-  };
-
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
+
+      {/* مودال ربط المحفظة (BSC) */}
+      {showWalletModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+           <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
+              <button onClick={() => setShowWalletModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✖</button>
+              <h3 className="text-xl font-black text-white mb-6 text-center flex items-center justify-center gap-2">
+                 <span>🟡</span> Connect BSC Wallet
+              </h3>
+              <div className="flex flex-col gap-3">
+                 <button onClick={() => { setWalletAddress('0xM...8fA'); setShowWalletModal(false); }} className="w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-orange-500 hover:bg-slate-800/80 transition-all">
+                    <span className="text-2xl">🦊</span> <span className="text-white font-bold text-lg">MetaMask</span>
+                 </button>
+                 <button onClick={() => { setWalletAddress('0xT...2cB'); setShowWalletModal(false); }} className="w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-blue-500 hover:bg-slate-800/80 transition-all">
+                    <span className="text-2xl">🛡️</span> <span className="text-white font-bold text-lg">Trust Wallet</span>
+                 </button>
+                 <button onClick={() => { setWalletAddress('0xO...9eD'); setShowWalletModal(false); }} className="w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-white hover:bg-slate-800/80 transition-all">
+                    <span className="text-2xl font-black text-white px-1">OKX</span> <span className="text-white font-bold text-lg">OKX Web3</span>
+                 </button>
+              </div>
+              <p className="text-[10px] font-bold text-yellow-500 text-center mt-6 uppercase tracking-wider">Supports Binance Smart Chain (BEP-20)</p>
+           </div>
+        </div>
+      )}
 
       {showWelcome && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
@@ -338,12 +308,15 @@ export default function Home() {
         </div>
       )}
 
+      {/* الهيدر مع زر المحفظة الجديد */}
       <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
-          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
-          <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Apex Network</span>
+          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]" />
+          <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
         </div>
-        <TonConnectButton />
+        <button onClick={() => setShowWalletModal(true)} className="bg-slate-800 border border-slate-700 text-white font-bold px-4 py-2 rounded-xl text-xs hover:border-yellow-500 transition-colors flex items-center gap-2">
+          <span>🟡</span> {walletAddress ? `${walletAddress.slice(0,4)}...${walletAddress.slice(-4)}` : 'Connect Wallet'}
+        </button>
       </div>
 
       {activeTab === 'mine' && (
@@ -369,9 +342,9 @@ export default function Home() {
              </h3>
           </div>
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
-            <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full"></div>
-            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-700 to-purple-900 border-4 border-slate-700 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)] z-10 overflow-hidden">
-               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300" />
+            <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-10 rounded-full"></div>
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-slate-800 to-slate-900 border-4 border-yellow-600/30 flex items-center justify-center shadow-[0_0_40px_rgba(234,179,8,0.2)] z-10 overflow-hidden">
+               <Image src="/logo2.png" alt="Apex Coin" width={140} height={140} className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
           <button onClick={handleClaim} disabled={isSaving} className={`w-full py-4 mt-auto mb-4 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
@@ -457,12 +430,16 @@ export default function Home() {
         </div>
       )}
 
+      {/* قسم الترقيات - مقفل بانتظار العقد الذكي */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
-          <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to increase your base speed!</p>
-          <div className="flex flex-col gap-4 mb-8">
+          <p className="text-yellow-500/80 text-[11px] font-bold mb-6 uppercase tracking-wider">
+            ⚠️ All Upgrades are currently locked until Smart Contract Deployment.
+          </p>
+          
+          <div className="flex flex-col gap-4 mb-8 opacity-60 grayscale">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -471,10 +448,11 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">⚙️</span>
               </div>
-              <button onClick={() => buyUpgrade(5000, 0.001)} disabled={dbMiningRate >= 0.001} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.001 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700'}`}>
-                {dbMiningRate >= 0.001 ? 'Owned ✓' : 'Pay 5,000 Points'}
+              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
+                Locked (Awaiting Contract)
               </button>
             </div>
+            
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -483,10 +461,11 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">☁️</span>
               </div>
-              <button onClick={() => buyUpgrade(10000, 0.0025)} disabled={dbMiningRate >= 0.0025} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.0025 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700'}`}>
-                {dbMiningRate >= 0.0025 ? 'Owned ✓' : 'Pay 10,000 Points'}
+              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
+                Locked (Awaiting Contract)
               </button>
             </div>
+
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -495,17 +474,16 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">🚀</span>
               </div>
-              <button onClick={() => buyUpgrade(20000, 0.006)} disabled={dbMiningRate >= 0.006} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.006 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700'}`}>
-                {dbMiningRate >= 0.006 ? 'Owned ✓' : 'Pay 20,000 Points'}
+              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
+                Locked (Awaiting Contract)
               </button>
             </div>
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-2 border-t border-slate-800 pt-6">VIP Presale Passes</h2>
-          <p className="text-yellow-400 text-xs mb-4 font-bold">Secure your TGE Allocation Now! (Limited Supply)</p>
-          <div className="flex flex-col gap-4 pb-8">
+          <p className="text-gray-500 text-xs mb-4">Exclusive TGE Allocations via BSC Network.</p>
+          <div className="flex flex-col gap-4 pb-8 opacity-50 grayscale">
             <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded-bl-lg">ONLY 500 LEFT</div>
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-white text-lg">Silver VIP Pass</h3>
@@ -513,21 +491,8 @@ export default function Home() {
                 </div>
                 <span className="text-3xl">🎫</span>
               </div>
-              <button onClick={() => buyTicket('Silver', 0.5)} className="w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors bg-gradient-to-r from-slate-400 to-slate-500 text-slate-900">
-                Buy for 0.5 GRAM
-              </button>
-            </div>
-            <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 border border-yellow-600/50 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden shadow-[0_0_15px_rgba(202,138,4,0.15)]">
-              <div className="absolute top-0 right-0 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded-bl-lg">ONLY 100 LEFT</div>
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-yellow-500 text-lg">Gold VIP Pass</h3>
-                  <p className="text-yellow-200/70 text-[10px]">Max Allocation + Private Sale Access</p>
-                </div>
-                <span className="text-3xl">👑</span>
-              </div>
-              <button onClick={() => buyTicket('Gold', 2)} className="w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-[0_0_10px_rgba(245,158,11,0.4)]">
-                Buy for 2 GRAM
+              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
+                Locked (Awaiting Charts & DEX)
               </button>
             </div>
           </div>
@@ -535,30 +500,40 @@ export default function Home() {
         </div>
       )}
 
+      {/* قسم الاكتشاف مع الهوية الجديدة BSC */}
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
           
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
-             <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>About</button>
-             <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>Roadmap</button>
-             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-white' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
+             <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>About</button>
+             <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Roadmap</button>
+             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
           </div>
 
           {discoverView === 'about' && (
              <div className="w-full flex flex-col items-center pb-6">
                 
-                <div className="w-full py-12 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 border-b border-blue-500/30 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
+                <div className="w-full py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-b border-yellow-500/30 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                    <div className="absolute inset-0 bg-black/40 mix-blend-overlay"></div>
-                   <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 border border-blue-400/50 shadow-[0_0_30px_rgba(59,130,246,0.5)] z-10">
+                   <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-400/50 shadow-[0_0_30px_rgba(234,179,8,0.5)] z-10">
                       <Image src="/logo2.png" alt="Apex Logo" width={60} height={60} className="rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" />
                    </div>
-                   <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-2 z-10">Apex Network</h1>
-                   <span className="text-blue-400 font-bold tracking-[0.2em] text-xs z-10 border border-blue-500/30 px-3 py-1 rounded-full bg-blue-900/30">MINE APXN POINTS</span>
+                   <h1 className="text-4xl font-black text-white mb-2 z-10">Apex Network</h1>
+                   
+                   {/* شارات الشبكة والمنصة */}
+                   <div className="flex gap-2 mt-2 z-10">
+                      <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
+                        <span>🟡</span> POWERED BY BSC
+                      </span>
+                      <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
+                        <span>🥞</span> PANCAKESWAP
+                      </span>
+                   </div>
                 </div>
                 
                 <div className="px-6 w-full mt-8">
                    <p className="text-gray-300 text-sm leading-relaxed mb-8 font-medium text-center">
-                     Welcome to the next generation of cloud infrastructure. Built for scalability, Apex Network offers a seamless, highly secure, and rewarding Web3 mining ecosystem directly inside Telegram.
+                     Welcome to the next generation of cloud infrastructure. Built natively on the <strong className="text-yellow-500">Binance Smart Chain (BSC)</strong> for extreme scalability and ultra-low fees, Apex Network offers a seamless Web3 mining ecosystem directly inside Telegram.
                    </p>
 
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Core Features</h2>
@@ -570,26 +545,19 @@ export default function Home() {
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
                          <span className="text-3xl block mb-2">🛡️</span>
-                         <h3 className="font-bold text-white text-sm">Secure Yield</h3>
-                         <p className="text-gray-400 text-[10px] mt-1">Protected balance & blockchain tech.</p>
+                         <h3 className="font-bold text-white text-sm">BEP-20 Security</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">Audited smart contract & liquidity.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
                          <span className="text-3xl block mb-2">🚀</span>
-                         <h3 className="font-bold text-white text-sm">Hardware Boosts</h3>
-                         <p className="text-gray-400 text-[10px] mt-1">Scale up your mining empire.</p>
+                         <h3 className="font-bold text-white text-sm">PancakeSwap LP</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">Guaranteed decentralized trading.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
                          <span className="text-3xl block mb-2">👥</span>
                          <h3 className="font-bold text-white text-sm">Community</h3>
                          <p className="text-gray-400 text-[10px] mt-1">Earn massive referral rewards.</p>
                       </div>
-                   </div>
-
-                   <div className="bg-gradient-to-r from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-700/50 mb-8">
-                      <h3 className="font-bold text-yellow-400 text-sm flex items-center gap-2"><span>⚠️</span> Airdrop Factor</h3>
-                      <p className="text-gray-300 text-xs mt-2 leading-relaxed">
-                        Claim your daily check-in reward to build your streak. <strong className="text-white">Missing a day resets it to 0.</strong> Your streak history will directly impact your TGE Airdrop Allocation!
-                      </p>
                    </div>
 
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Join Our Community</h2>
@@ -601,101 +569,72 @@ export default function Home() {
                         <span>💬</span> Global Group
                      </button>
                    </div>
-
-                   <footer className="w-full border-t border-slate-800 pt-6 pb-4 text-center">
-                     <div className="flex justify-center items-center gap-2 mb-2">
-                        <Image src="/logo2.png" alt="Logo" width={20} height={20} className="grayscale opacity-50" />
-                        <span className="text-gray-500 font-black text-sm">Apex Network</span>
-                     </div>
-                     <p className="text-gray-500 text-[10px] leading-relaxed">
-                        © 2026 Apex Network (APXN). All rights reserved.<br/>
-                        Built with ❤️ for the Web3 Ecosystem.
-                     </p>
-                   </footer>
                 </div>
              </div>
           )}
 
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
-                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Roadmap</h2>
+                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">BSC Roadmap</h2>
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>
-                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Internal Economy & P2P</h3>
+                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Genesis & Point Mining</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Launch of new mining speed upgrades purchasable via internal point balances. Activation of P2P transfers.
+                      Launch of Telegram mining app. Community building and internal APXN points accumulation.
                     </p>
                   </div>
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Brand Expansion</h3>
+                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: BEP-20 Contract</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Official website launch. Expansion to X (Twitter) and dedicated Support center.
+                      Deployment of the official APXN Smart Contract on Binance Smart Chain. BscScan Verification.
                     </p>
                   </div>
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: TGE Preparation Phase</h3>
+                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: Presale & Liquidity Gen</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Publication of TGE eligibility criteria. Launch of TGE Qualification Passes (VIP Presale).
+                      Exclusive VIP Presale events within the app. Generating initial BNB liquidity.
                     </p>
                   </div>
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2027: Phased Presale (ICO)</h3>
+                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2027: PancakeSwap Launch</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Initiation of the multi-stage APXN Token Presale directly within the Mini-App.
+                      Initial DEX Offering (IDO) on PancakeSwap. Locking Liquidity Pool for secure trading.
                     </p>
                   </div>
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2028: Snapshot & Airdrop (TGE)</h3>
+                    <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2028: Snapshot & Airdrop</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Final snapshot of all eligible accounts. Token Generation Event (TGE), official Smart Contract deployment, and Airdrop.
+                      Final snapshot of miner accounts. Official Token Generation Event (TGE) and Airdrop to wallets.
                     </p>
                   </div>
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-red-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
-                    <h3 className="font-black text-red-400 text-lg mb-1">Q2 2028: Public Listings & Staking</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Liquidity pool injections and public trading on major DEXs (PancakeSwap/STON.fi) and CEXs. Launch of on-chain APXN Staking.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-8 p-4 bg-slate-900/80 border border-slate-700 rounded-xl">
-                   <h4 className="text-gray-300 font-bold text-sm mb-2">⚖️ Legal Disclaimer</h4>
-                   <p className="text-gray-500 text-[10px] leading-relaxed">
-                     Please note that the timeline, roadmap phases, and whitepaper specifications are subject to modification.
-                   </p>
                 </div>
              </div>
           )}
 
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
-                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Whitepaper v1.2</h1>
+                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Whitepaper v2.0 (BSC)</h1>
 
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Points vs. Tokens System</h2>
                 <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-6">
-                  <p className="text-gray-300 text-xs leading-relaxed mb-3">
-                    To protect the token economy from hyperinflation and ensure a fair distribution, Apex Network utilizes a dual-layer system:
-                  </p>
                   <ul className="text-xs text-gray-400 space-y-2 ml-4 list-disc">
-                    <li><strong className="text-yellow-400">APXN Points:</strong> Virtual off-chain mining rewards.</li>
-                    <li><strong className="text-purple-400">APXN Token:</strong> The on-chain utility token (100 Million Supply).</li>
+                    <li><strong className="text-yellow-400">APXN Points:</strong> Virtual off-chain mining rewards inside Telegram.</li>
+                    <li><strong className="text-yellow-400">APXN Token:</strong> The strictly limited BEP-20 on-chain token (100M).</li>
                   </ul>
-                  <p className="text-green-400 text-[10px] mt-3 font-bold uppercase">
-                    * Conversion ratio to be finalized before TGE.
-                  </p>
                 </div>
 
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">2. Technical Details</h2>
                 <ul className="text-gray-300 text-xs mb-6 space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                  <li><strong className="text-purple-400">Name:</strong> Apex Network</li>
-                  <li><strong className="text-purple-400">Ticker:</strong> APXN</li>
-                  <li><strong className="text-purple-400">Blockchain:</strong> BSC / TON</li>
-                  <li><strong className="text-purple-400">Total Supply:</strong> 100,000,000 APXN <span className="text-yellow-500 font-bold">(Fixed)</span></li>
+                  <li><strong className="text-yellow-500">Name:</strong> Apex Network</li>
+                  <li><strong className="text-yellow-500">Ticker:</strong> APXN</li>
+                  <li><strong className="text-yellow-500">Blockchain:</strong> Binance Smart Chain (BEP-20)</li>
+                  <li><strong className="text-yellow-500">Total Supply:</strong> 100,000,000 APXN <span className="text-green-500 font-bold">(Fixed/No Mint)</span></li>
+                  <li><strong className="text-yellow-500">DEX:</strong> PancakeSwap</li>
                 </ul>
 
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">3. Tokenomics</h2>
@@ -705,7 +644,7 @@ export default function Home() {
                     <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black">63%</span>
                   </div>
                   <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">Liquidity & Exchanges</span>
+                    <span className="font-bold text-white text-xs">PancakeSwap Liquidity</span>
                     <span className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-black">20%</span>
                   </div>
                   <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
@@ -736,10 +675,10 @@ export default function Home() {
         <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
           <span className="text-xl leading-none">👥</span><span className="text-[10px] font-bold leading-none mt-1">Friends</span>
         </button>
-        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'boosts' ? 'text-purple-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+        <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'boosts' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
           <span className="text-xl leading-none">🚀</span><span className="text-[10px] font-bold leading-none mt-1">Boosts</span>
         </button>
-        <button onClick={() => setActiveTab('discover')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'discover' ? 'text-blue-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
+        <button onClick={() => setActiveTab('discover')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'discover' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
           <span className="text-xl leading-none">🌍</span><span className="text-[10px] font-bold leading-none mt-1">Discover</span>
         </button>
       </div>
