@@ -375,9 +375,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="w-full text-center bg-slate-900 border-b border-slate-800 text-[10px] py-1 text-yellow-400 font-mono z-10 break-words px-2">
-        Status: {dbStatus}
-      </div>
+  
 
       <div className="w-full flex justify-between items-center p-4 z-10">
         <div className="flex items-center gap-2">
