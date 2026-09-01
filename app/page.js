@@ -332,7 +332,7 @@ export default function Home() {
                   </h3>
                   <div className="flex flex-col gap-3">
                      <button onClick={() => handleConnectWallet('Binance Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Binance Web3' ? 'border-yellow-400 bg-slate-800/80' : 'border-slate-700 hover:border-yellow-400'} transition-all`}>
-                        <span className="text-2xl">🟨</span> 
+                        <Image src="/binance-logo-1.png" alt="Binance" width={24} height={24} className="object-contain drop-shadow-md" /> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
@@ -613,7 +613,7 @@ export default function Home() {
                    
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
-                        <span>🟨</span> BINANCE ECOSYSTEM
+                        <Image src="/binance-logo-1.png" alt="Binance" width={12} height={12} className="object-contain" /> BINANCE ECOSYSTEM
                       </span>
                       <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
                         <span>🥞</span> PANCAKESWAP
