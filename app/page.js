@@ -414,7 +414,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* شريط الهيدر مع أيقونة بينانس */}
+      {/* شريط الهيدر */}
       <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
@@ -664,6 +664,21 @@ export default function Home() {
                      <button onClick={() => window.open('https://t.me/ApexMinerGroup', '_blank')} className="w-full bg-[#229ED9] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>💬</span> Global Group
                      </button>
+                   </div>
+                   
+                   {/* فقرة إخلاء المسؤولية (Legal Disclaimer) */}
+                   <div className="bg-gradient-to-br from-red-950/60 to-black p-5 rounded-2xl border border-red-900/50 shadow-[0_10px_30px_rgba(153,27,27,0.3)] mb-8 relative overflow-hidden">
+                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900"></div>
+                     <div className="flex items-center gap-2 mb-3">
+                       <span className="text-red-500 text-xl">⚠️</span>
+                       <h3 className="text-red-500 font-black tracking-widest text-sm uppercase">Legal Disclaimer</h3>
+                     </div>
+                     <p className="text-gray-400 text-[11px] leading-relaxed mb-3 font-medium">
+                       <strong className="text-gray-200">NOT FINANCIAL ADVICE:</strong> The information provided within the Apex Network application, whitepaper, and roadmap does not constitute investment, financial, or trading advice.
+                     </p>
+                     <p className="text-gray-500 text-[10px] leading-relaxed">
+                       The blockchain industry is highly volatile. The Core Team reserves the absolute right to amend, delay, or restructure the Whitepaper, Tokenomics, and Roadmap phases at any time due to unforeseen force majeure events, global regulatory changes, or shifting market dynamics to protect the ecosystem's integrity.
+                     </p>
                    </div>
                 </div>
              </div>
