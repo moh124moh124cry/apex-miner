@@ -31,13 +31,11 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
 
-  // نظام المحافظ الجديد (معدل للهواتف الذكية وتيليجرام)
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState('');
   
-  // حالات الربط اليدوي للهاتف
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
 
@@ -48,7 +46,6 @@ export default function Home() {
     try {
       let provider = null;
 
-      // فحص وجود المحفظة في المتصفح
       if (typeof window !== 'undefined') {
         if (walletName === 'MetaMask' && window.ethereum) {
           provider = window.ethereum;
@@ -56,20 +53,19 @@ export default function Home() {
           provider = window.trustwallet;
         } else if (walletName === 'OKX Web3' && window.okxwallet) {
           provider = window.okxwallet;
+        } else if (walletName === 'Binance Web3' && window.BinanceChain) {
+          provider = window.BinanceChain;
         } else if (window.ethereum) {
           provider = window.ethereum; 
         }
       }
 
-      // إذا لم يجد المحفظة (وهو ما يحدث داخل متصفح تيليجرام في الهاتف)
       if (!provider) {
-        // بدلاً من الخطأ، نعرض واجهة الربط اليدوي الذكية
         setManualWalletInput(true);
         setIsConnecting(false);
         return;
       }
 
-      // إذا وجد المحفظة (في الكمبيوتر)
       const accounts = await provider.request({ method: 'eth_requestAccounts' });
       
       if (accounts && accounts.length > 0) {
@@ -323,7 +319,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
-      {/* مودال ربط المحفظة (المعدل) */}
+      {/* مودال ربط المحفظة */}
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
@@ -335,6 +331,10 @@ export default function Home() {
                      <span>🟡</span> Connect BSC Wallet
                   </h3>
                   <div className="flex flex-col gap-3">
+                     <button onClick={() => handleConnectWallet('Binance Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Binance Web3' ? 'border-yellow-400 bg-slate-800/80' : 'border-slate-700 hover:border-yellow-400'} transition-all`}>
+                        <span className="text-2xl">🟨</span> 
+                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
+                     </button>
                      <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
                         <span className="text-2xl">🦊</span> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
@@ -589,24 +589,6 @@ export default function Home() {
               </button>
             </div>
           </div>
-
-          <h2 className="text-2xl font-bold text-white mb-2 border-t border-slate-800 pt-6">VIP Presale Passes</h2>
-          <p className="text-gray-500 text-xs mb-4">Exclusive TGE Allocations via BSC Network.</p>
-          <div className="flex flex-col gap-4 pb-8 opacity-50 grayscale">
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-white text-lg">Silver VIP Pass</h3>
-                  <p className="text-gray-400 text-[10px]">Guarantees Tier 2 Airdrop Allocation</p>
-                </div>
-                <span className="text-3xl">🎫</span>
-              </div>
-              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
-                Locked (Awaiting Charts & DEX)
-              </button>
-            </div>
-          </div>
-
         </div>
       )}
 
@@ -616,7 +598,7 @@ export default function Home() {
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
              <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>About</button>
              <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Roadmap</button>
-             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
+             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Tokenomics</button>
           </div>
 
           {discoverView === 'about' && (
@@ -631,7 +613,7 @@ export default function Home() {
                    
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
-                        <span>🟡</span> POWERED BY BSC
+                        <span>🟨</span> BINANCE ECOSYSTEM
                       </span>
                       <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
                         <span>🥞</span> PANCAKESWAP
@@ -685,39 +667,52 @@ export default function Home() {
              <div className="px-6 pt-8 w-full">
                 <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">BSC Roadmap</h2>
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
+                  
                   <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>
-                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Genesis & Point Mining</h3>
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></span>
+                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2026: Genesis Launch</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Launch of Telegram mining app. Community building and internal APXN points accumulation.
+                      Official Launch of Apex Network Telegram application. Initial user onboarding and internal APXN points accumulation begins.
                     </p>
                   </div>
+
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Internal Economy</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Activation of point-burning hardware upgrades and ecosystem gamification to build robust daily active users (DAU).
+                    </p>
+                  </div>
+
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: BEP-20 Contract</h3>
+                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Phased Presale Starts</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Deployment of the official APXN Smart Contract on Binance Smart Chain. BscScan Verification.
+                      Initiation of the multi-stage APXN Token Presale. This phase will run continuously until the official listing announcement.
                     </p>
                   </div>
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: Presale & Liquidity Gen</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Exclusive VIP Presale events within the app. Generating initial BNB liquidity.
-                    </p>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2027: PancakeSwap Launch</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Initial DEX Offering (IDO) on PancakeSwap. Locking Liquidity Pool for secure trading.
-                    </p>
-                  </div>
+
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2028: Snapshot & Airdrop</h3>
+                    <h3 className="font-black text-orange-400 text-lg mb-1">Q4 2027: BEP-20 Contract & TGE</h3>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      Final snapshot of miner accounts. Official Token Generation Event (TGE) and Airdrop to wallets.
+                      Official Token Generation Event (TGE). Deployment of BEP-20 Contract, DEX/CEX Listings, and Airdrop distribution.
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-green-400 text-lg mb-1">Q1 2028: Apex Testnet & Staking</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Launch of the sovereign Apex Testnet. Continuation of on-chain APXN Staking mechanisms to ensure price stability.
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-cyan-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
+                    <h3 className="font-black text-cyan-400 text-lg mb-1">Q3 2028: Apex Mainnet Launch</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Full migration to our own independent Apex Mainnet, cementing our position as a top-tier Web3 infrastructure provider.
                     </p>
                   </div>
                 </div>
@@ -726,48 +721,80 @@ export default function Home() {
 
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
-                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Whitepaper v2.0 (BSC)</h1>
+                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Tokenomics</h1>
 
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">1. Points vs. Tokens System</h2>
-                <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-6">
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Airdrop Conversion Criteria</h2>
+                <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-8">
+                  <p className="text-gray-300 text-xs leading-relaxed mb-3">
+                    APXN Points collected in-app will be converted to real $APXN tokens during TGE. The conversion ratio is strictly dependent on:
+                  </p>
                   <ul className="text-xs text-gray-400 space-y-2 ml-4 list-disc">
-                    <li><strong className="text-yellow-400">APXN Points:</strong> Virtual off-chain mining rewards inside Telegram.</li>
-                    <li><strong className="text-yellow-400">APXN Token:</strong> The strictly limited BEP-20 on-chain token (100M).</li>
+                    <li><strong className="text-white">Activity Evaluation:</strong> Consistency in daily check-ins (streaks) and active friend referrals.</li>
+                    <li><strong className="text-white">In-App Upgrades:</strong> Purchasing hardware boosts utilizing your mined points proves ecosystem loyalty.</li>
+                    <li><strong className="text-white">Early Access:</strong> Genesis pioneer accounts will receive favorable multipliers.</li>
                   </ul>
                 </div>
 
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">2. Technical Details</h2>
-                <ul className="text-gray-300 text-xs mb-6 space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                  <li><strong className="text-yellow-500">Name:</strong> Apex Network</li>
-                  <li><strong className="text-yellow-500">Ticker:</strong> APXN</li>
-                  <li><strong className="text-yellow-500">Blockchain:</strong> Binance Smart Chain (BEP-20)</li>
-                  <li><strong className="text-yellow-500">Total Supply:</strong> 100,000,000 APXN <span className="text-green-500 font-bold">(Fixed/No Mint)</span></li>
-                  <li><strong className="text-yellow-500">DEX:</strong> PancakeSwap</li>
-                </ul>
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Distribution Details (100M Total)</h2>
+                
+                <div className="space-y-4 mb-8">
+                  {/* البطاقة 1 */}
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white text-sm">Community & Airdrop</span>
+                      <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black">63%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      Allocated entirely to our true supporters. Distributed via the conversion criteria above to ensure a fair and decentralized ecosystem.
+                    </p>
+                  </div>
 
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">3. Tokenomics</h2>
-                <div className="space-y-3 mb-8">
-                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">Community & Airdrop</span>
-                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black">63%</span>
+                  {/* البطاقة 2 */}
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white text-sm">DEX & CEX Liquidity</span>
+                      <span className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-black">20%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      Locked liquidity specifically reserved for PancakeSwap (DEX) and top-tier Centralized Exchanges (CEXs) to ensure smooth trading, deep order books, and price stability.
+                    </p>
                   </div>
-                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">PancakeSwap Liquidity</span>
-                    <span className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-black">20%</span>
+
+                  {/* البطاقة 3 */}
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white text-sm">Marketing & Partners</span>
+                      <span className="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-black">10%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      Strategic fund for global influencer campaigns, KOL onboarding, and future Web3 brand partnerships to drive mass adoption.
+                    </p>
                   </div>
-                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">Marketing & Partners</span>
-                    <span className="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-black">10%</span>
+
+                  {/* البطاقة 4 */}
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white text-sm">Core Team</span>
+                      <span className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black">6%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      Development allocation. Strictly locked via smart contracts with a prolonged vesting period to align founder incentives with long-term project success.
+                    </p>
                   </div>
-                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">Core Team</span>
-                    <span className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black">6%</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">Presale / ICO</span>
-                    <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black">1%</span>
+
+                  {/* البطاقة 5 */}
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-yellow-700/50 flex flex-col gap-2 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-1 h-full bg-yellow-500"></div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white text-sm">Phased Presale / ICO</span>
+                      <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black">1%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      Exclusive early-bird allocation. This phased presale will commence in Q2 2027 and run continuously throughout the project's lifespan until the official TGE announcement.
+                    </p>
                   </div>
                 </div>
+
              </div>
           )}
         </div>
