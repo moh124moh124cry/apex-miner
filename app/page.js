@@ -328,11 +328,10 @@ export default function Home() {
               {!manualWalletInput ? (
                 <>
                   <h3 className="text-xl font-black text-white mb-6 text-center flex items-center justify-center gap-2">
-                     <span>🟡</span> Connect BSC Wallet
+                     <img src="/binance-logo-1.png" alt="Binance" className="w-6 h-6 object-contain" /> Connect BSC Wallet
                   </h3>
                   <div className="flex flex-col gap-3">
                      <button onClick={() => handleConnectWallet('Binance Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Binance Web3' ? 'border-yellow-400 bg-slate-800/80' : 'border-slate-700 hover:border-yellow-400'} transition-all`}>
-                        {/* استخدام الوسم img المباشر لتجنب تأخير التحميل */}
                         <img src="/binance-logo-1.png" alt="Binance" className="w-7 h-7 object-contain drop-shadow-md" /> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
                      </button>
@@ -415,13 +414,19 @@ export default function Home() {
         </div>
       )}
 
+      {/* شريط الهيدر مع أيقونة بينانس */}
       <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
           <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
         </div>
         <button onClick={() => setShowWalletModal(true)} className={`border font-bold px-4 py-2 rounded-xl text-xs transition-colors flex items-center gap-2 ${walletAddress ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-700 text-white hover:border-yellow-500'}`}>
-          <span>{walletAddress ? '✅' : '🟡'}</span> {walletAddress ? walletAddress : 'Connect Wallet'}
+          {walletAddress ? (
+             <span>✅</span>
+          ) : (
+             <img src="/binance-logo-1.png" alt="Binance" className="w-4 h-4 object-contain" />
+          )}
+          <span>{walletAddress ? walletAddress : 'Connect Wallet'}</span>
         </button>
       </div>
 
@@ -614,7 +619,6 @@ export default function Home() {
                    
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
-                        {/* استخدام الصورة في شارة About */}
                         <img src="/binance-logo-1.png" alt="Binance" className="w-3 h-3 object-contain" /> BINANCE ECOSYSTEM
                       </span>
                       <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
