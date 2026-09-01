@@ -375,9 +375,7 @@ export default function Home() {
         </div>
       )}
 
-  
-
-      <div className="w-full flex justify-between items-center p-4 z-10">
+      <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
           <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Apex Network</span>
@@ -512,42 +510,59 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
           <p className="text-gray-400 text-xs mb-6">Upgrade your hardware to increase your base speed!</p>
           <div className="flex flex-col gap-4 pb-8">
+            
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-white text-lg">GPU Overclock</h3>
-                  <p className="text-yellow-400 text-sm font-bold">Base Speed: 0.001 pts/sec</p>
+                  <p className="text-yellow-400 text-sm font-bold">Speed: 0.001 pts/sec</p>
                 </div>
                 <span className="text-2xl">⚙️</span>
               </div>
-              <button onClick={() => buyUpgrade('APXN', 1000, 0.001)} disabled={dbMiningRate >= 0.001} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.001 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
-                {dbMiningRate >= 0.001 ? 'Owned ✓' : 'Pay 1,000 Points'}
+              <button onClick={() => buyUpgrade('APXN', 5000, 0.001)} disabled={dbMiningRate >= 0.001} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.001 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
+                {dbMiningRate >= 0.001 ? 'Owned ✓' : 'Pay 5,000 Points'}
               </button>
             </div>
+
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-white text-lg">Cloud Server Rig</h3>
-                  <p className="text-purple-400 text-sm font-bold">Base Speed: 0.003 pts/sec</p>
+                  <p className="text-purple-400 text-sm font-bold">Speed: 0.0025 pts/sec</p>
                 </div>
                 <span className="text-2xl">☁️</span>
               </div>
-              <button onClick={() => buyUpgrade('GRAM', 0.15, 0.003)} disabled={dbMiningRate >= 0.003} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.003 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'}`}>
-                {dbMiningRate >= 0.003 ? 'Owned ✓' : 'Buy for 0.15 GRAM'}
+              <button onClick={() => buyUpgrade('APXN', 10000, 0.0025)} disabled={dbMiningRate >= 0.0025} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.0025 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
+                {dbMiningRate >= 0.0025 ? 'Owned ✓' : 'Pay 10,000 Points'}
               </button>
             </div>
-            <div className="bg-slate-900/80 border border-yellow-900/30 rounded-2xl p-4 flex flex-col gap-3">
+
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-yellow-500 text-lg">Quantum ASIC</h3>
-                  <p className="text-yellow-400 text-sm font-bold">Base Speed: 0.01 pts/sec</p>
+                  <h3 className="font-bold text-white text-lg">Quantum ASIC</h3>
+                  <p className="text-green-400 text-sm font-bold">Speed: 0.006 pts/sec</p>
                 </div>
                 <span className="text-2xl">🚀</span>
               </div>
-              <button onClick={() => buyUpgrade('GRAM', 0.50, 0.01)} disabled={dbMiningRate >= 0.01} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.01 ? 'bg-slate-700 text-gray-400' : 'bg-gradient-to-r from-yellow-600 to-orange-500 text-white'}`}>
-                {dbMiningRate >= 0.01 ? 'Owned ✓' : 'Buy for 0.50 GRAM'}
+              <button onClick={() => buyUpgrade('APXN', 20000, 0.006)} disabled={dbMiningRate >= 0.006} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.006 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
+                {dbMiningRate >= 0.006 ? 'Owned ✓' : 'Pay 20,000 Points'}
               </button>
             </div>
+
+            <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4 flex flex-col gap-3 opacity-60 grayscale relative overflow-hidden">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-gray-400 text-lg">Premium AI Node</h3>
+                  <p className="text-gray-500 text-sm font-bold">Extreme Speed (GRAM)</p>
+                </div>
+                <span className="text-2xl">💎</span>
+              </div>
+              <button disabled className="w-full py-2 rounded-xl text-sm font-bold bg-slate-800 text-gray-500 cursor-not-allowed border border-slate-700">
+                Locked - Coming Soon 🔒
+              </button>
+            </div>
+
           </div>
         </div>
       )}
