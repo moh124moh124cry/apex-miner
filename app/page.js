@@ -31,25 +31,73 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
 
-  // نظام المحافظ الجديد BSC - محاكاة احترافية
+  // نظام المحافظ الجديد BSC (اتصال حقيقي)
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState('');
 
-  const handleConnectWallet = (walletName) => {
+  const handleConnectWallet = async (walletName) => {
     setSelectedWallet(walletName);
     setIsConnecting(true);
-    
-    // محاكاة تأخير الاتصال الواقعي
-    setTimeout(() => {
-      const generateHex = () => Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-      const mockAddress = `0x${generateHex().substring(0,4)}...${generateHex().substring(0,4)}`.toLowerCase();
+
+    try {
+      let provider = null;
+
+      if (typeof window !== 'undefined') {
+        if (walletName === 'MetaMask' && window.ethereum) {
+          provider = window.ethereum;
+        } else if (walletName === 'Trust Wallet' && window.trustwallet) {
+          provider = window.trustwallet;
+        } else if (walletName === 'OKX Web3' && window.okxwallet) {
+          provider = window.okxwallet;
+        } else if (window.ethereum) {
+          provider = window.ethereum; 
+        }
+      }
+
+      if (!provider) {
+        alert(`❌ لم يتم العثور على ${walletName}! يرجى فتح التطبيق من متصفح المحفظة (dApp Browser) أو تثبيت الإضافة.`);
+        setIsConnecting(false);
+        return;
+      }
+
+      const accounts = await provider.request({ method: 'eth_requestAccounts' });
       
-      setWalletAddress(mockAddress);
+      if (accounts && accounts.length > 0) {
+        const address = accounts[0];
+        setWalletAddress(`0x${address.substring(2, 6)}...${address.substring(address.length - 4)}`);
+        setShowWalletModal(false);
+
+        // التحويل التلقائي لشبكة BSC
+        try {
+          await provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x38' }], // 0x38 هو الـ Chain ID لشبكة BSC
+          });
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            await provider.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: '0x38',
+                  chainName: 'Binance Smart Chain',
+                  nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                  rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                  blockExplorerUrls: ['https://bscscan.com/']
+                }
+              ],
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Connection error:", error);
+      alert("❌ تم إلغاء الاتصال أو حدث خطأ.");
+    } finally {
       setIsConnecting(false);
-      setShowWalletModal(false);
-    }, 1500);
+    }
   };
 
   useEffect(() => {
@@ -272,7 +320,6 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
-      {/* مودال ربط المحفظة (BSC) */}
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
@@ -328,7 +375,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* الهيدر مع زر المحفظة الجديد */}
       <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
@@ -362,14 +408,12 @@ export default function Home() {
              </h3>
           </div>
           
-          {/* الشعار بتصميم ثلاثي الأبعاد واحترافي */}
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
             <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
             
             <div className="w-56 h-56 rounded-full p-[4px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-800 shadow-[0_0_50px_rgba(234,179,8,0.4),inset_0_0_20px_rgba(255,255,255,0.5)] z-10 flex items-center justify-center">
               <div className="w-full h-full rounded-full border-[6px] border-slate-950 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] relative">
                  <Image src="/logo2.png" alt="Apex Coin" width={200} height={200} className="w-full h-full object-cover rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
-                 {/* طبقة إضاءة خفيفة فوق الصورة لتعزيز الواقعية */}
                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent rounded-full pointer-events-none"></div>
               </div>
             </div>
@@ -458,7 +502,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم الترقيات - مقفل بانتظار العقد الذكي */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
           
@@ -528,7 +571,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم الاكتشاف مع الهوية الجديدة BSC */}
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
           
@@ -548,7 +590,6 @@ export default function Home() {
                    </div>
                    <h1 className="text-4xl font-black text-white mb-2 z-10">Apex Network</h1>
                    
-                   {/* شارات الشبكة والمنصة */}
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
                         <span>🟡</span> POWERED BY BSC
