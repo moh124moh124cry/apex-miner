@@ -259,7 +259,7 @@ export default function Home() {
 
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
-    const shareText = "🚀 Join Apex Network and mine $APX Points! Early pioneer welcome bonus active:";
+    const shareText = "🚀 Join Apex Network and mine $APXN Points! Early pioneer welcome bonus active:";
     window.open(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
@@ -277,7 +277,7 @@ export default function Home() {
     const currentIsoTime = new Date().toISOString();
     const autoClaimedBalance = balance + miningDelta;
 
-    if (costType === 'APX') {
+    if (costType === 'APXN') {
       if (autoClaimedBalance >= costValue) {
         const newBalance = autoClaimedBalance - costValue;
         
@@ -522,7 +522,7 @@ export default function Home() {
                 </div>
                 <span className="text-2xl">⚙️</span>
               </div>
-              <button onClick={() => buyUpgrade('APX', 1000, 0.001)} disabled={dbMiningRate >= 0.001} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.001 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
+              <button onClick={() => buyUpgrade('APXN', 1000, 0.001)} disabled={dbMiningRate >= 0.001} className={`w-full py-2 rounded-xl text-sm font-bold active:scale-95 transition-colors ${dbMiningRate >= 0.001 ? 'bg-slate-700 text-gray-400' : 'bg-slate-800 text-white border border-slate-700'}`}>
                 {dbMiningRate >= 0.001 ? 'Owned ✓' : 'Pay 1,000 Points'}
               </button>
             </div>
@@ -624,7 +624,7 @@ export default function Home() {
                         <span className="text-gray-500 font-black text-sm">Apex Network</span>
                      </div>
                      <p className="text-gray-500 text-[10px] leading-relaxed">
-                        © 2026 Apex Network (APX). All rights reserved.<br/>
+                        © 2026 Apex Network (APXN). All rights reserved.<br/>
                         Built with ❤️ for the TON Ecosystem.
                      </p>
                    </footer>
@@ -637,37 +637,61 @@ export default function Home() {
                 <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Roadmap</h2>
                 
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
+                  
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>
-                    <h3 className="font-black text-blue-400 text-lg mb-1">Q4 2026: Genesis & Node Launch</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">Official launch of Apex Network Mini-App. Activation of mining nodes, referrals, and hardware boosts.</p>
+                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Internal Economy & P2P</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Launch of new mining speed upgrades purchasable via internal point balances. Activation of P2P transfers, allowing users to send points between accounts.
+                    </p>
                   </div>
+
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-purple-400 text-lg mb-1">H1 2027: Gamification & Squads</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">Launch of Leaderboards and Mining Guilds. First Halving event to increase token scarcity.</p>
+                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Brand Expansion & Utilities</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Official website launch. Expansion to X (Twitter) and dedicated Support center. Introduction of "Daily Activity/Streak Recovery" purchases using $GRAM.
+                    </p>
                   </div>
+
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-green-400 text-lg mb-1">H2 2027: Ecosystem Expansion</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">Integration of partner mini-games and decentralized ad-task verification protocol.</p>
+                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: TGE Preparation Phase</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Publication of TGE eligibility criteria. Launch of TGE Qualification Passes, purchasable using a combination of APEX Points and $GRAM.
+                    </p>
                   </div>
+
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-yellow-400 text-lg mb-1">2028: Network Staking</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">Internal APX Staking mechanism. Second Halving. Q4 closure of mining pools and Genesis snapshot.</p>
+                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2027: Phased Presale (ICO)</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Initiation of the multi-stage APXN Token Presale directly within the Mini-App, offering early adopters locked allocations at exclusive rates.
+                    </p>
                   </div>
+
                   <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
-                    <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2029: TGE & Global Listing</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">Token Generation Event (TGE). Airdrop claim distribution and official DEX/CEX listings.</p>
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-orange-400 text-lg mb-1">Q1 2028: Snapshot & Airdrop (TGE)</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Final snapshot of all eligible accounts. Token Generation Event (TGE), official Smart Contract deployment, and Airdrop distribution to the community.
+                    </p>
                   </div>
+
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-red-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
+                    <h3 className="font-black text-red-400 text-lg mb-1">Q2 2028: Public Listings & Staking</h3>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Liquidity pool injections and public trading on major DEXs (STON.fi) and CEXs. Launch of on-chain APXN Staking for passive yield.
+                    </p>
+                  </div>
+
                 </div>
 
                 <div className="mt-8 p-4 bg-slate-900/80 border border-slate-700 rounded-xl">
                    <h4 className="text-gray-300 font-bold text-sm mb-2">⚖️ Legal Disclaimer</h4>
                    <p className="text-gray-500 text-[10px] leading-relaxed">
-                     Please note that the timeline, roadmap phases, and whitepaper specifications are subject to modification or adjustment. The core team reserves the right to alter plans in the event of force majeure, unforeseen extreme market conditions, or major shifts in global regulatory and blockchain policies.
+                     Please note that the timeline, roadmap phases, and whitepaper specifications are subject to modification. The core team reserves the right to alter plans in the event of unforeseen market conditions or major shifts in global blockchain policies.
                    </p>
                 </div>
              </div>
