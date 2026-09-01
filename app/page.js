@@ -332,19 +332,20 @@ export default function Home() {
                   </h3>
                   <div className="flex flex-col gap-3">
                      <button onClick={() => handleConnectWallet('Binance Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Binance Web3' ? 'border-yellow-400 bg-slate-800/80' : 'border-slate-700 hover:border-yellow-400'} transition-all`}>
-                        <Image src="/binance-logo-1.png" alt="Binance" width={24} height={24} className="object-contain drop-shadow-md" /> 
+                        {/* استخدام الوسم img المباشر لتجنب تأخير التحميل */}
+                        <img src="/binance-logo-1.png" alt="Binance" className="w-7 h-7 object-contain drop-shadow-md" /> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
-                        <span className="text-2xl">🦊</span> 
+                        <span className="text-2xl w-7 text-center">🦊</span> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
-                        <span className="text-2xl">🛡️</span> 
+                        <span className="text-2xl w-7 text-center">🛡️</span> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
-                        <span className="text-2xl font-black text-white px-1">OKX</span> 
+                        <span className="text-xl font-black text-white w-7 text-center">OKX</span> 
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'OKX Web3' ? 'Connecting...' : 'OKX Web3'}</span>
                      </button>
                   </div>
@@ -613,7 +614,8 @@ export default function Home() {
                    
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
-                        <Image src="/binance-logo-1.png" alt="Binance" width={12} height={12} className="object-contain" /> BINANCE ECOSYSTEM
+                        {/* استخدام الصورة في شارة About */}
+                        <img src="/binance-logo-1.png" alt="Binance" className="w-3 h-3 object-contain" /> BINANCE ECOSYSTEM
                       </span>
                       <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
                         <span>🥞</span> PANCAKESWAP
