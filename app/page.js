@@ -597,7 +597,7 @@ export default function Home() {
           
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
              <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>About</button>
-             <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Roadmap</button>
+             <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Apex Roadmap</button>
              <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Tokenomics</button>
           </div>
 
@@ -665,57 +665,205 @@ export default function Home() {
 
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
-                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">BSC Roadmap</h2>
+                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Apex Roadmap</h2>
+                
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
                   
+                  {/* Q4 2026 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></span>
                     <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2026: Genesis Launch</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Official Launch of Apex Network Telegram application. Initial user onboarding and internal APXN points accumulation begins.
-                    </p>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Official Launch of Apex Network Telegram app</li>
+                      <li>Start mining and accumulating APXN points</li>
+                      <li>Daily Check-In & Social Tasks system</li>
+                      <li>Invite Friends & Referral rewards</li>
+                      <li>Wallet linking integration</li>
+                    </ul>
                   </div>
 
+                  {/* Q1 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Internal Economy</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Activation of point-burning hardware upgrades and ecosystem gamification to build robust daily active users (DAU).
-                    </p>
+                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Mining & Engagement</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Enhancing the point mining system & Mining Speed</li>
+                      <li>Daily Streak system improvements</li>
+                      <li>Additional tasks and rewards</li>
+                      <li>Referral system & activity tiers upgrades</li>
+                      <li>UI/UX improvements inside Telegram</li>
+                    </ul>
                   </div>
 
+                  {/* Q2 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Phased Presale Starts</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Initiation of the multi-stage APXN Token Presale. This phase will run continuously until the official listing announcement.
-                    </p>
+                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Rig Upgrades & Presale</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Launch of Rig Upgrades (GPU Overclock, Cloud Server, Quantum ASIC)</li>
+                      <li>Burning points for internal upgrades</li>
+                      <li><strong className="text-white">Initiation of the Phased Presale (Runs continuously until Listing)</strong></li>
+                    </ul>
                   </div>
 
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-orange-400 text-lg mb-1">Q4 2027: BEP-20 Contract & TGE</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Official Token Generation Event (TGE). Deployment of BEP-20 Contract, DEX/CEX Listings, and Airdrop distribution.
-                    </p>
-                  </div>
-
+                  {/* Q3 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-green-400 text-lg mb-1">Q1 2028: Apex Testnet & Staking</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Launch of the sovereign Apex Testnet. Continuation of on-chain APXN Staking mechanisms to ensure price stability.
-                    </p>
+                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: Community & Growth</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Expansion of the referral system & global community</li>
+                      <li>Advanced user tiers & continuous activity rewards</li>
+                      <li>Additional community campaigns</li>
+                      <li><strong className="text-white">Phased Presale ongoing</strong></li>
+                    </ul>
                   </div>
 
+                  {/* Q4 2027 */}
                   <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-cyan-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
-                    <h3 className="font-black text-cyan-400 text-lg mb-1">Q3 2028: Apex Mainnet Launch</h3>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Full migration to our own independent Apex Mainnet, cementing our position as a top-tier Web3 infrastructure provider.
-                    </p>
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-orange-400 text-lg mb-1">Q4 2027: Ecosystem Expansion</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Telegram Mini App optimization</li>
+                      <li>Mining & upgrades enhancements</li>
+                      <li>Security infrastructure development</li>
+                      <li>Technical preparation for upcoming phases</li>
+                    </ul>
+                  </div>
+
+                  {/* Q1 2028 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-cyan-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-cyan-400 text-lg mb-1">Q1 2028: Platform Optimization</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Enhancing app speed, stability, and point economy</li>
+                      <li>Security stress tests for current infrastructure</li>
+                      <li>Preparing the system for the token transition phase</li>
+                      <li><strong className="text-white">Phased Presale ongoing</strong></li>
+                    </ul>
+                  </div>
+
+                  {/* Q2 2028 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-red-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-red-400 text-lg mb-1">Q2 2028: Token Preparation</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Preparation for APXN Tokenomics</li>
+                      <li>Security systems final review</li>
+                      <li>Global community expansion</li>
+                      <li>Preparation for the major announcement</li>
+                    </ul>
+                  </div>
+
+                  {/* Q3 2028 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-pink-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-pink-400 text-lg mb-1">Q3 2028: Listing Announcement</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li><strong className="text-white">Conclusion of the Phased Presale</strong></li>
+                      <li>Official APXN Listing Announcement</li>
+                      <li>Announcement of supported trading platforms (DEX/CEX)</li>
+                      <li>Transition from Points phase to Token phase</li>
+                      <li>Announcement of Apex Testnet</li>
+                    </ul>
+                  </div>
+
+                  {/* Q4 2028 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-indigo-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-indigo-400 text-lg mb-1">Q4 2028: Apex Testnet</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Apex Network Testnet Launch</li>
+                      <li>Network, transaction, and security testing</li>
+                      <li>Opening the network for developers</li>
+                      <li>Testnet Explorer launch</li>
+                    </ul>
+                  </div>
+
+                  {/* Q1 2029 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-teal-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-teal-400 text-lg mb-1">Q1 2029: Testnet Expansion</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Testnet performance optimization</li>
+                      <li>Fixing bugs & scaling the network</li>
+                      <li>Developer support and stability metrics</li>
+                      <li>Preparation for Staking system</li>
+                    </ul>
+                  </div>
+
+                  {/* Q2 2029 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-lime-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-lime-400 text-lg mb-1">Q2 2029: Staking Implementation</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Launch of Apex Staking</li>
+                      <li>APXN staking rewards system</li>
+                      <li>Validators / Nodes testing</li>
+                      <li>Staking security audits</li>
+                    </ul>
+                  </div>
+
+                  {/* Q3 2029 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-amber-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-amber-400 text-lg mb-1">Q3 2029: Mainnet Preparation</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li>Final security audits</li>
+                      <li>Preparing Apex Mainnet & Mainnet Explorer</li>
+                      <li>Validators setup & final documentation</li>
+                      <li>Official readiness announcement</li>
+                    </ul>
+                  </div>
+
+                  {/* Q4 2029 */}
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-emerald-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
+                    <h3 className="font-black text-emerald-400 text-lg mb-1">Q4 2029: Apex Mainnet Launch</h3>
+                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
+                      <li><strong className="text-white">Apex Network Mainnet Official Launch</strong></li>
+                      <li>APXN running natively on Mainnet</li>
+                      <li>Activating Staking on Mainnet</li>
+                      <li>Mainnet Explorer launch</li>
+                      <li>Ecosystem and global partnerships expansion</li>
+                    </ul>
+                  </div>
+
+                </div>
+                
+                {/* Core Project Flow Section */}
+                <div className="mt-12 mb-4">
+                  <h3 className="text-center text-gray-400 font-black tracking-widest text-[10px] uppercase mb-6">Core Project Flow</h3>
+                  <div className="flex flex-col gap-2 items-center">
+                    
+                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Telegram App</div>
+                    <div className="h-4 w-[2px] bg-yellow-500"></div>
+                    
+                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Daily Activity & Mining Points</div>
+                    <div className="h-4 w-[2px] bg-yellow-500"></div>
+                    
+                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Tasks & Referrals</div>
+                    <div className="h-4 w-[2px] bg-yellow-500"></div>
+                    
+                    <div className="bg-slate-900 border border-yellow-600/50 px-4 py-2 rounded-lg text-xs font-bold text-yellow-500 shadow-md">Rig Upgrades & Phased Presale</div>
+                    <div className="h-4 w-[2px] bg-yellow-500"></div>
+                    
+                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Community Growth</div>
+                    <div className="h-4 w-[2px] bg-purple-500"></div>
+                    
+                    <div className="bg-gradient-to-r from-purple-900 to-indigo-900 border border-purple-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-[0_0_10px_rgba(168,85,247,0.4)]">Listing Announcement (Q3 2028)</div>
+                    <div className="h-4 w-[2px] bg-blue-500"></div>
+                    
+                    <div className="bg-gradient-to-r from-blue-900 to-cyan-900 border border-blue-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]">Apex Testnet (Q4 2028)</div>
+                    <div className="h-4 w-[2px] bg-green-500"></div>
+                    
+                    <div className="bg-slate-900 border border-green-500 px-4 py-2 rounded-lg text-xs font-bold text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.2)]">Staking (2029)</div>
+                    <div className="h-4 w-[2px] bg-emerald-500"></div>
+                    
+                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-400 px-6 py-3 rounded-xl text-sm font-black text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]">APEX MAINNET (Q4 2029)</div>
+                    
                   </div>
                 </div>
+
              </div>
           )}
 
