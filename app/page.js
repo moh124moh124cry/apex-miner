@@ -12,7 +12,7 @@ export default function Home() {
   
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
-  const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); // إضافة حالة مهمة تويتر
+  const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); 
   
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
@@ -143,7 +143,7 @@ export default function Home() {
           }
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
-          if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); // قراءة حالة مهمة تويتر
+          if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); 
 
           let currentStreak = data.checkin_streak || 0;
           let isCheckinAvailable = true;
@@ -220,7 +220,7 @@ export default function Home() {
               referred_by: referrerId, 
               channel_joined: false, 
               group_joined: false, 
-              twitter_joined: false, // إضافة حقل تويتر للمستخدم الجديد
+              twitter_joined: false,
               checkin_streak: 0, 
               last_checkin_date: null,
               last_claim: currentIsoTime
@@ -308,7 +308,6 @@ export default function Home() {
     }
   };
 
-  // دالة التعامل مع مهمة متابعة تويتر
   const handleFollowTwitter = async () => {
     if (twitterTaskCompleted) return;
     window.open('https://x.com/ApexNetworkApp', '_blank'); 
@@ -478,12 +477,12 @@ export default function Home() {
               </div>
             </div>
 
-            {/* --- زر تويتر (X) --- */}
+            {/* --- زر تويتر (X) تم إنزاله للأسفل لعدم التداخل --- */}
             <a 
               href="https://x.com/ApexNetworkApp" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="absolute right-0 z-20 flex flex-col items-center justify-center gap-1 group"
+              className="absolute right-2 bottom-0 translate-y-10 z-20 flex flex-col items-center justify-center gap-1 group"
             >
               <div className="w-12 h-12 bg-black border border-slate-700 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:bg-slate-900 group-hover:scale-110 transition-all duration-300">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-white">
@@ -527,7 +526,6 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-white mb-4">Social Tasks</h2>
           
           <div className="flex flex-col gap-4 mb-8">
-            {/* مهمة قناة تيليجرام */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
@@ -538,7 +536,6 @@ export default function Home() {
               </button>
             </div>
             
-            {/* مهمة مجموعة تيليجرام */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
@@ -549,7 +546,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* مهمة تويتر الجديدة */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
               <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
               <div>
@@ -707,12 +703,26 @@ export default function Home() {
                    </div>
 
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Join Our Community</h2>
-                   <div className="flex flex-col gap-3 w-full mb-10">
+                   <div className="flex flex-col gap-3 w-full mb-8">
                      <button onClick={() => window.open('https://t.me/ApexMiner_Official', '_blank')} className="w-full bg-[#2AABEE] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>📢</span> Official Channel
                      </button>
                      <button onClick={() => window.open('https://t.me/ApexMinerGroup', '_blank')} className="w-full bg-[#229ED9] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>💬</span> Global Group
+                     </button>
+                     <button onClick={() => window.open('https://x.com/ApexNetworkApp', '_blank')} className="w-full bg-black border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
+                        Official X (Twitter)
+                     </button>
+                   </div>
+
+                   <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Official Links</h2>
+                   <div className="flex flex-col gap-3 w-full mb-10">
+                     <button onClick={() => window.open('https://apxn.network', '_blank')} className="w-full bg-slate-900 border border-yellow-500/30 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                        <span>🌐</span> apxn.network
+                     </button>
+                     <button onClick={() => window.location.href = 'mailto:contact@apxn.network'} className="w-full bg-slate-900 border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                        <span>📧</span> Support : contact@apxn.network
                      </button>
                    </div>
                    
