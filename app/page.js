@@ -311,11 +311,21 @@ export default function Home() {
   const handleFollowTwitter = async () => {
     if (twitterTaskCompleted) return;
     window.open('https://x.com/ApexNetworkApp', '_blank'); 
+    
+    setTwitterTaskCompleted(true);
+    
     const newBalance = balance + 500; 
     setBalance(newBalance);
-    setTwitterTaskCompleted(true);
+    
     if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({ balance: newBalance, twitter_joined: true }).eq('telegram_id', userId);
+      try {
+        await supabase.from('users').update({ 
+          balance: newBalance, 
+          twitter_joined: true 
+        }).eq('telegram_id', userId);
+      } catch (err) {
+        console.error("Error updating twitter task:", err);
+      }
     }
   };
 
@@ -330,7 +340,6 @@ export default function Home() {
     alert("✅ Invite link copied!");
   };
 
-  // دالة نسخ الايميل لتفادي خطأ تيليجرام
   const handleCopyEmail = () => {
     navigator.clipboard.writeText("contact@apxn.network");
     alert("✅ Email address copied to clipboard!");
@@ -483,7 +492,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* --- زر تويتر تم رفعه للأعلى لتفادي التداخل (translate-y-4 بدلاً من 10) --- */}
             <a 
               href="https://x.com/ApexNetworkApp" 
               target="_blank" 
@@ -727,8 +735,6 @@ export default function Home() {
                      <button onClick={() => window.open('https://apxn.network', '_blank')} className="w-full bg-slate-900 border border-yellow-500/30 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>🌐</span> apxn.network
                      </button>
-                     
-                     {/* زر الايميل المحدث: ينسخ الايميل بدل محاولة فتح تطبيق غير مدعوم */}
                      <button onClick={handleCopyEmail} className="w-full bg-slate-900 border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>📧</span> Support : contact@apxn.network
                      </button>
