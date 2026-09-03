@@ -12,6 +12,7 @@ export default function Home() {
   
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
+  const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); // إضافة حالة مهمة تويتر
   
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
@@ -142,6 +143,7 @@ export default function Home() {
           }
           if (data.channel_joined) setTaskCompleted(data.channel_joined); 
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
+          if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); // قراءة حالة مهمة تويتر
 
           let currentStreak = data.checkin_streak || 0;
           let isCheckinAvailable = true;
@@ -218,6 +220,7 @@ export default function Home() {
               referred_by: referrerId, 
               channel_joined: false, 
               group_joined: false, 
+              twitter_joined: false, // إضافة حقل تويتر للمستخدم الجديد
               checkin_streak: 0, 
               last_checkin_date: null,
               last_claim: currentIsoTime
@@ -302,6 +305,18 @@ export default function Home() {
     setGroupTaskCompleted(true);
     if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newBalance, group_joined: true }).eq('telegram_id', userId);
+    }
+  };
+
+  // دالة التعامل مع مهمة متابعة تويتر
+  const handleFollowTwitter = async () => {
+    if (twitterTaskCompleted) return;
+    window.open('https://x.com/ApexNetworkApp', '_blank'); 
+    const newBalance = balance + 500; 
+    setBalance(newBalance);
+    setTwitterTaskCompleted(true);
+    if (userId && userId !== 'test_user') {
+      await supabase.from('users').update({ balance: newBalance, twitter_joined: true }).eq('telegram_id', userId);
     }
   };
 
@@ -456,13 +471,28 @@ export default function Home() {
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
             <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
             
-            <div className="w-56 h-56 rounded-full p-[4px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-800 shadow-[0_0_50px_rgba(234,179,8,0.4),inset_0_0_20px_rgba(255,255,255,0.5)] z-10 flex items-center justify-center">
+            <div className="w-56 h-56 rounded-full p-[4px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-800 shadow-[0_0_50px_rgba(234,179,8,0.4),inset_0_0_20px_rgba(255,255,255,0.5)] z-10 flex items-center justify-center relative">
               <div className="w-full h-full rounded-full border-[6px] border-slate-950 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] relative">
                  <Image src="/logo2.png" alt="Apex Coin" width={200} height={200} className="w-full h-full object-cover rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent rounded-full pointer-events-none"></div>
               </div>
             </div>
-            
+
+            {/* --- زر تويتر (X) --- */}
+            <a 
+              href="https://x.com/ApexNetworkApp" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="absolute right-0 z-20 flex flex-col items-center justify-center gap-1 group"
+            >
+              <div className="w-12 h-12 bg-black border border-slate-700 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:bg-slate-900 group-hover:scale-110 transition-all duration-300">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-white">
+                  <g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g>
+                </svg>
+              </div>
+              <span className="text-[10px] font-bold text-gray-400 group-hover:text-white transition-colors">Follow</span>
+            </a>
+
           </div>
           <button onClick={handleClaim} disabled={isSaving} className={`w-full py-4 mt-auto mb-4 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
             {isSaving ? 'SAVING...' : 'CLAIM POINTS'}
@@ -493,24 +523,44 @@ export default function Home() {
               </button>
             </div>
           </div>
+          
           <h2 className="text-2xl font-bold text-white mb-4">Social Tasks</h2>
+          
           <div className="flex flex-col gap-4 mb-8">
+            {/* مهمة قناة تيليجرام */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-yellow-600'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+              <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
                 {taskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
+            
+            {/* مهمة مجموعة تيليجرام */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleJoinGroup} disabled={groupTaskCompleted} className={`${groupTaskCompleted ? 'bg-green-600' : 'bg-blue-600'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+              <button onClick={handleJoinGroup} disabled={groupTaskCompleted} className={`${groupTaskCompleted ? 'bg-green-600' : 'bg-[#229ED9]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
                 {groupTaskCompleted ? 'Done ✓' : 'GO'}
+              </button>
+            </div>
+
+            {/* مهمة تويتر الجديدة */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
+              <div>
+                <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                  Follow us on X 
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
+                </h3>
+                <p className="text-yellow-400 text-xs">+500 APXN Points</p>
+              </div>
+              <button onClick={handleFollowTwitter} disabled={twitterTaskCompleted} className={`${twitterTaskCompleted ? 'bg-green-600' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+                {twitterTaskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
           </div>
