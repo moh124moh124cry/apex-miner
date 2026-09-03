@@ -330,6 +330,12 @@ export default function Home() {
     alert("✅ Invite link copied!");
   };
 
+  // دالة نسخ الايميل لتفادي خطأ تيليجرام
+  const handleCopyEmail = () => {
+    navigator.clipboard.writeText("contact@apxn.network");
+    alert("✅ Email address copied to clipboard!");
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
@@ -477,12 +483,12 @@ export default function Home() {
               </div>
             </div>
 
-            {/* --- زر تويتر (X) تم إنزاله للأسفل لعدم التداخل --- */}
+            {/* --- زر تويتر تم رفعه للأعلى لتفادي التداخل (translate-y-4 بدلاً من 10) --- */}
             <a 
               href="https://x.com/ApexNetworkApp" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="absolute right-2 bottom-0 translate-y-10 z-20 flex flex-col items-center justify-center gap-1 group"
+              className="absolute right-2 bottom-0 translate-y-4 z-20 flex flex-col items-center justify-center gap-1 group"
             >
               <div className="w-12 h-12 bg-black border border-slate-700 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:bg-slate-900 group-hover:scale-110 transition-all duration-300">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-white">
@@ -721,7 +727,9 @@ export default function Home() {
                      <button onClick={() => window.open('https://apxn.network', '_blank')} className="w-full bg-slate-900 border border-yellow-500/30 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>🌐</span> apxn.network
                      </button>
-                     <button onClick={() => window.location.href = 'mailto:contact@apxn.network'} className="w-full bg-slate-900 border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                     
+                     {/* زر الايميل المحدث: ينسخ الايميل بدل محاولة فتح تطبيق غير مدعوم */}
+                     <button onClick={handleCopyEmail} className="w-full bg-slate-900 border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <span>📧</span> Support : contact@apxn.network
                      </button>
                    </div>
