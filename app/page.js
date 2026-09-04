@@ -20,6 +20,8 @@ export default function Home() {
 
   const [friendsCount, setFriendsCount] = useState(0); 
   const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
+  const [friendsList, setFriendsList] = useState([]); // متغير لتخزين بيانات الأصدقاء
+  
   const [dbMiningRate, setDbMiningRate] = useState(0.00025); 
   const [totalMiningRate, setTotalMiningRate] = useState(0.00025); 
   
@@ -39,6 +41,21 @@ export default function Home() {
   
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
+
+  // دالة احترافية لجلب صورة العلم لتعمل على جميع الأجهزة (ويندوز، أندرويد، آيفون)
+  const getFlagIcon = (countryCode) => {
+    if (!countryCode || countryCode === 'Unknown') {
+      return <span className="text-2xl drop-shadow-md">👤</span>;
+    }
+    const lowerCode = countryCode.toLowerCase();
+    return (
+      <img 
+        src={`https://flagcdn.com/w40/${lowerCode}.png`} 
+        alt={countryCode} 
+        className="w-7 h-5 object-cover rounded shadow-[0_0_5px_rgba(0,0,0,0.5)]"
+      />
+    );
+  };
 
   const handleConnectWallet = async (walletName) => {
     setSelectedWallet(walletName);
@@ -126,7 +143,7 @@ export default function Home() {
     getTelegramUser();
   }, []);
 
-  // --- كود التقاط الدولة المستقل والآمن ---
+  // --- كود التقاط الدولة ---
   useEffect(() => {
     const saveUserCountry = async () => {
       if (!userId || userId === 'test_user') return; 
@@ -138,13 +155,13 @@ export default function Home() {
           body: JSON.stringify({ telegramId: userId })
         });
       } catch (error) {
-        // تجاهل الخطأ بصمت للحفاظ على استقرار التطبيق
+        // تجاهل الخطأ بصمت
       }
     };
     
     saveUserCountry();
   }, [userId]);
-  // ----------------------------------------
+  // -------------------------
 
   useEffect(() => {
     async function fetchUserData() {
@@ -187,13 +204,25 @@ export default function Home() {
           setCanCheckIn(isCheckinAvailable);
           setDailyRewardAmt(((currentStreak % 7) + 1) * 100); 
 
-          const { count: totalCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId);
-          setFriendsCount(totalCount || 0);
+          // --- التحديث الجديد: جلب بيانات الأصدقاء لعرضها مع الأعلام ---
+          const { data: friendsData } = await supabase
+            .from('users')
+            .select('first_name, country, last_claim')
+            .eq('referred_by', userId)
+            .order('last_claim', { ascending: false });
 
-          const yesterdayStr = new Date(Date.now() - 86400000).toISOString();
-          const { count: activeCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', userId).gte('last_claim', yesterdayStr);
-          activeFriends = activeCount || 0;
-          setActiveFriendsCount(activeFriends);
+          if (friendsData) {
+            setFriendsList(friendsData);
+            setFriendsCount(friendsData.length);
+            
+            const yesterdayStr = new Date(Date.now() - 86400000).toISOString();
+            activeFriends = friendsData.filter(f => f.last_claim >= yesterdayStr).length;
+            setActiveFriendsCount(activeFriends);
+          } else {
+            setFriendsCount(0);
+            setActiveFriendsCount(0);
+          }
+          // -----------------------------------------------------------------
 
           const friendsBonus = activeFriends * (currentDbRate * 0.05);
           const finalRate = currentDbRate + friendsBonus;
@@ -624,6 +653,31 @@ export default function Home() {
                Copy Invite Link
              </button>
           </div>
+
+          {/* --- قائمة الأصدقاء مع الأعلام --- */}
+          <div className="mt-8 w-full flex flex-col gap-3 pb-8">
+            <h3 className="text-white font-bold text-sm border-b border-slate-800 pb-2">My Referrals ({friendsList.length})</h3>
+            
+            {friendsList.length === 0 ? (
+              <p className="text-gray-500 text-xs text-center mt-4">You haven't invited anyone yet.</p>
+            ) : (
+              friendsList.map((friend, index) => {
+                const isActive = friend.last_claim >= new Date(Date.now() - 86400000).toISOString();
+                return (
+                  <div key={index} className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex justify-between items-center transition-all hover:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      {getFlagIcon(friend.country)}
+                      <span className="text-white font-bold text-sm">{friend.first_name || 'Miner'}</span>
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md ${isActive ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {/* ---------------------------------- */}
         </div>
       )}
 
