@@ -126,6 +126,26 @@ export default function Home() {
     getTelegramUser();
   }, []);
 
+  // --- كود التقاط الدولة المستقل والآمن ---
+  useEffect(() => {
+    const saveUserCountry = async () => {
+      if (!userId || userId === 'test_user') return; 
+      
+      try {
+        await fetch('/api/user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId: userId })
+        });
+      } catch (error) {
+        // تجاهل الخطأ بصمت للحفاظ على استقرار التطبيق
+      }
+    };
+    
+    saveUserCountry();
+  }, [userId]);
+  // ----------------------------------------
+
   useEffect(() => {
     async function fetchUserData() {
       if (!userId || userId === 'test_user') return;
