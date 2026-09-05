@@ -751,52 +751,88 @@ export default function Home() {
         </div>
       )}
 
+      {/* قسم المتجر المحدث بالكامل (مع الحفاظ على كلمة Boosts في شريط التنقل) */}
       {activeTab === 'boosts' && (
-        <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
-          <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
-          <p className="text-yellow-500/80 text-[11px] font-bold mb-6 uppercase tracking-wider">
-            ⚠️ All Upgrades are currently locked until Smart Contract Deployment.
-          </p>
-          <div className="flex flex-col gap-4 mb-8 opacity-60 grayscale">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-white text-lg">GPU Overclock</h3>
-                  <p className="text-yellow-400 text-sm font-bold">Speed: +0.001 pts/sec</p>
-                </div>
-                <span className="text-2xl">⚙️</span>
+        <div className="flex-1 w-full flex flex-col px-4 pt-4 overflow-y-auto">
+          <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store 🛒</h2>
+          
+          <div className="mt-2 mb-6 bg-red-900/40 border border-red-500/50 rounded-lg p-4 shadow-lg shadow-red-900/20">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h3 className="text-red-400 font-bold text-sm tracking-wide uppercase mb-1">
+                  Mandatory KYC Requirement
+                </h3>
+                <p className="text-gray-300 text-[11px] leading-relaxed">
+                  As stated in our official Whitepaper, purchasing at least one upgrade is a strict condition to pass KYC verification and qualify for the <span className="text-white font-bold">$APXN Airdrop</span> withdrawal.
+                </p>
               </div>
-              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
-                Locked (Awaiting Contract)
-              </button>
-            </div>
-            
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-white text-lg">Cloud Server Rig</h3>
-                  <p className="text-purple-400 text-sm font-bold">Speed: +0.0025 pts/sec</p>
-                </div>
-                <span className="text-2xl">☁️</span>
-              </div>
-              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
-                Locked (Awaiting Contract)
-              </button>
-            </div>
-
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-white text-lg">Quantum ASIC</h3>
-                  <p className="text-green-400 text-sm font-bold">Speed: +0.006 pts/sec</p>
-                </div>
-                <span className="text-2xl">🚀</span>
-              </div>
-              <button disabled className="w-full py-2 rounded-xl text-xs font-bold bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed">
-                Locked (Awaiting Contract)
-              </button>
             </div>
           </div>
+
+          {[
+            {
+              title: "Level 1: APXN Miners",
+              currency: "APXN",
+              items: [
+                { name: "Nano Miner", price: "5,000", boost: "+0.2/sec" },
+                { name: "Micro Rig", price: "10,000", boost: "+0.5/sec" },
+                { name: "Mini Core", price: "15,000", boost: "+0.8/sec" },
+                { name: "Eco Miner", price: "20,000", boost: "+1.2/sec" }
+              ]
+            },
+            {
+              title: "Level 2: Telegram Stars",
+              currency: "⭐️ Stars",
+              items: [
+                { name: "Stellar Rig", price: "10", boost: "+2.0/sec" },
+                { name: "Nova Core", price: "20", boost: "+4.5/sec" },
+                { name: "Pulsar Miner", price: "30", boost: "+7.0/sec" },
+                { name: "Nebula Unit", price: "40", boost: "+10.0/sec" }
+              ]
+            },
+            {
+              title: "Level 3: TON Elite",
+              currency: "💎 TON",
+              items: [
+                { name: "Apex Quantum", price: "0.1", boost: "+25.0/sec" },
+                { name: "Titan Node", price: "0.2", boost: "+55.0/sec" },
+                { name: "Cyber Miner", price: "0.3", boost: "+90.0/sec" },
+                { name: "Genesis Rig", price: "0.4", boost: "+150.0/sec" }
+              ]
+            }
+          ].map((level, index) => (
+            <div key={index} className="mb-8 w-full">
+              <h2 className="text-lg font-semibold mb-4 border-b border-slate-700 pb-2 text-white flex items-center gap-2">
+                {level.title}
+              </h2>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {level.items.map((item, idx) => (
+                  <div 
+                    key={idx} 
+                    className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 overflow-hidden grayscale opacity-75 transition-all hover:grayscale-0 hover:opacity-100 shadow-md"
+                  >
+                    <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold text-gray-300 backdrop-blur-sm z-10 flex items-center gap-1">
+                      🔒 Soon
+                    </div>
+
+                    <div className="text-center mt-4">
+                      <h3 className="font-bold text-sm text-gray-200">{item.name}</h3>
+                      <div className="text-green-400 text-[11px] font-bold mt-1">{item.boost}</div>
+                      
+                      <button 
+                        disabled 
+                        className="mt-3 w-full bg-slate-800 text-gray-400 py-2 rounded-lg text-xs font-bold cursor-not-allowed border border-slate-700"
+                      >
+                        {item.price} {level.currency}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
