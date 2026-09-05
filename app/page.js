@@ -192,11 +192,11 @@ export default function Home() {
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
           if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); 
 
-          // --- التحقق من المهام اليومية للمستخدم ---
+          // --- التحقق من المهام اليومية للمستخدم (إعادة الضبط التلقائي كل يوم) ---
           const todayStr = new Date().toISOString().split('T')[0];
-          if (data.last_twitter_task === todayStr) setDailyTwitterDone(true);
-          if (data.last_telegram_task === todayStr) setDailyTelegramDone(true);
-          // ----------------------------------------
+          setDailyTwitterDone(data.last_twitter_task === todayStr);
+          setDailyTelegramDone(data.last_telegram_task === todayStr);
+          // ------------------------------------------------------------------------
 
           let currentStreak = data.checkin_streak || 0;
           let isCheckinAvailable = true;
@@ -347,14 +347,14 @@ export default function Home() {
     setTimeout(() => setIsSaving(false), 1000); 
   };
 
-  // --- دوال المهام اليومية الجديدة ---
+  // --- دوال المهام اليومية الجديدة (معدلة إلى 100 نقطة) ---
   const handleDailyTwitter = async () => {
     if (dailyTwitterDone || verifyingTwitter || !dailyTwitterLink) return;
     window.open(dailyTwitterLink, '_blank');
     setVerifyingTwitter(true);
     setTimeout(async () => {
       const today = new Date().toISOString().split('T')[0];
-      const newBalance = balance + 200;
+      const newBalance = balance + 100; // تم التعديل إلى 100 نقطة
       const { error } = await supabase.from('users').update({ last_twitter_task: today, balance: newBalance }).eq('telegram_id', userId);
       if (!error) {
         setBalance(newBalance);
@@ -370,7 +370,7 @@ export default function Home() {
     setVerifyingTelegram(true);
     setTimeout(async () => {
       const today = new Date().toISOString().split('T')[0];
-      const newBalance = balance + 200;
+      const newBalance = balance + 100; // تم التعديل إلى 100 نقطة
       const { error } = await supabase.from('users').update({ last_telegram_task: today, balance: newBalance }).eq('telegram_id', userId);
       if (!error) {
         setBalance(newBalance);
@@ -622,7 +622,6 @@ export default function Home() {
             </div>
           </div>
           
-          {/* --- المهام اليومية الجديدة (بنفس التصميم والألوان) --- */}
           {(dailyTelegramLink || dailyTwitterLink) && (
             <>
               <h2 className="text-2xl font-bold text-white mb-4">Daily Tasks</h2>
@@ -632,7 +631,7 @@ export default function Home() {
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-white text-lg">Like Today's Post</h3>
-                    <p className="text-yellow-400 text-xs">+200 APXN Points</p>
+                    <p className="text-yellow-400 text-xs">+100 APXN Points</p>
                   </div>
                   <button onClick={handleDailyTelegram} disabled={dailyTelegramDone || verifyingTelegram} className={`${dailyTelegramDone ? 'bg-green-600' : verifyingTelegram ? 'bg-slate-700 animate-pulse' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                     {dailyTelegramDone ? 'Done ✓' : verifyingTelegram ? 'Wait..' : 'GO'}
@@ -648,7 +647,7 @@ export default function Home() {
                       Like Today's X Post 
                       <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
                     </h3>
-                    <p className="text-yellow-400 text-xs">+200 APXN Points</p>
+                    <p className="text-yellow-400 text-xs">+100 APXN Points</p>
                   </div>
                   <button onClick={handleDailyTwitter} disabled={dailyTwitterDone || verifyingTwitter} className={`${dailyTwitterDone ? 'bg-green-600' : verifyingTwitter ? 'bg-slate-700 animate-pulse' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                     {dailyTwitterDone ? 'Done ✓' : verifyingTwitter ? 'Wait..' : 'GO'}
