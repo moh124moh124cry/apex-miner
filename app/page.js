@@ -14,13 +14,22 @@ export default function Home() {
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
   const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); 
   
+  // --- متغيرات المهام اليومية الديناميكية ---
+  const [dailyTwitterLink, setDailyTwitterLink] = useState('');
+  const [dailyTelegramLink, setDailyTelegramLink] = useState('');
+  const [dailyTwitterDone, setDailyTwitterDone] = useState(false);
+  const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
+  const [verifyingTwitter, setVerifyingTwitter] = useState(false);
+  const [verifyingTelegram, setVerifyingTelegram] = useState(false);
+  // ------------------------------------------
+
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
   const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
 
   const [friendsCount, setFriendsCount] = useState(0); 
   const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
-  const [friendsList, setFriendsList] = useState([]); // متغير لتخزين بيانات الأصدقاء
+  const [friendsList, setFriendsList] = useState([]); 
   
   const [dbMiningRate, setDbMiningRate] = useState(0.00025); 
   const [totalMiningRate, setTotalMiningRate] = useState(0.00025); 
@@ -42,7 +51,6 @@ export default function Home() {
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
 
-  // دالة احترافية لجلب صورة العلم لتعمل على جميع الأجهزة (ويندوز، أندرويد، آيفون)
   const getFlagIcon = (countryCode) => {
     if (!countryCode || countryCode === 'Unknown') {
       return <span className="text-2xl drop-shadow-md">👤</span>;
@@ -143,25 +151,19 @@ export default function Home() {
     getTelegramUser();
   }, []);
 
-  // --- كود التقاط الدولة ---
   useEffect(() => {
     const saveUserCountry = async () => {
       if (!userId || userId === 'test_user') return; 
-      
       try {
         await fetch('/api/user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ telegramId: userId })
         });
-      } catch (error) {
-        // تجاهل الخطأ بصمت
-      }
+      } catch (error) { }
     };
-    
     saveUserCountry();
   }, [userId]);
-  // -------------------------
 
   useEffect(() => {
     async function fetchUserData() {
@@ -169,6 +171,14 @@ export default function Home() {
       try {
         let currentDbRate = 0.00025; 
         let activeFriends = 0;
+
+        // --- جلب روابط المهام اليومية من الإعدادات ---
+        const { data: settings } = await supabase.from('app_settings').select('daily_twitter_link, daily_telegram_link').eq('id', 1).single();
+        if (settings) {
+          setDailyTwitterLink(settings.daily_twitter_link);
+          setDailyTelegramLink(settings.daily_telegram_link);
+        }
+        // ----------------------------------------------
 
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         
@@ -182,14 +192,20 @@ export default function Home() {
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
           if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); 
 
+          // --- التحقق من المهام اليومية للمستخدم ---
+          const todayStr = new Date().toISOString().split('T')[0];
+          if (data.last_twitter_task === todayStr) setDailyTwitterDone(true);
+          if (data.last_telegram_task === todayStr) setDailyTelegramDone(true);
+          // ----------------------------------------
+
           let currentStreak = data.checkin_streak || 0;
           let isCheckinAvailable = true;
           const now = new Date();
-          const todayStr = now.toDateString();
+          const todayStrFull = now.toDateString();
 
           if (data.last_checkin_date) {
             const lastDate = new Date(data.last_checkin_date);
-            if (lastDate.toDateString() === todayStr) {
+            if (lastDate.toDateString() === todayStrFull) {
               isCheckinAvailable = false; 
             } else {
               const yesterday = new Date();
@@ -204,7 +220,6 @@ export default function Home() {
           setCanCheckIn(isCheckinAvailable);
           setDailyRewardAmt(((currentStreak % 7) + 1) * 100); 
 
-          // --- التحديث الجديد: جلب بيانات الأصدقاء لعرضها مع الأعلام ---
           const { data: friendsData } = await supabase
             .from('users')
             .select('first_name, country, last_claim')
@@ -222,7 +237,6 @@ export default function Home() {
             setFriendsCount(0);
             setActiveFriendsCount(0);
           }
-          // -----------------------------------------------------------------
 
           const friendsBonus = activeFriends * (currentDbRate * 0.05);
           const finalRate = currentDbRate + friendsBonus;
@@ -242,7 +256,6 @@ export default function Home() {
           }
 
         } else if (error && error.code === 'PGRST116') {
-          
           const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
           let currentTotal = totalUsers || 0;
           
@@ -280,7 +293,6 @@ export default function Home() {
             setTotalMiningRate(0.00025);
             setCanCheckIn(true);
             setDailyRewardAmt(100);
-            
             setWelcomeAmount(welcomeBonus);
             setShowWelcome(true);
           }
@@ -335,6 +347,40 @@ export default function Home() {
     setTimeout(() => setIsSaving(false), 1000); 
   };
 
+  // --- دوال المهام اليومية الجديدة ---
+  const handleDailyTwitter = async () => {
+    if (dailyTwitterDone || verifyingTwitter || !dailyTwitterLink) return;
+    window.open(dailyTwitterLink, '_blank');
+    setVerifyingTwitter(true);
+    setTimeout(async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const newBalance = balance + 200;
+      const { error } = await supabase.from('users').update({ last_twitter_task: today, balance: newBalance }).eq('telegram_id', userId);
+      if (!error) {
+        setBalance(newBalance);
+        setDailyTwitterDone(true);
+        setVerifyingTwitter(false);
+      }
+    }, 10000);
+  };
+
+  const handleDailyTelegram = async () => {
+    if (dailyTelegramDone || verifyingTelegram || !dailyTelegramLink) return;
+    window.open(dailyTelegramLink, '_blank');
+    setVerifyingTelegram(true);
+    setTimeout(async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const newBalance = balance + 200;
+      const { error } = await supabase.from('users').update({ last_telegram_task: today, balance: newBalance }).eq('telegram_id', userId);
+      if (!error) {
+        setBalance(newBalance);
+        setDailyTelegramDone(true);
+        setVerifyingTelegram(false);
+      }
+    }, 10000);
+  };
+  // ------------------------------------
+
   const handleJoinChannel = async () => {
     if (taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank'); 
@@ -360,21 +406,13 @@ export default function Home() {
   const handleFollowTwitter = async () => {
     if (twitterTaskCompleted) return;
     window.open('https://x.com/ApexNetworkApp', '_blank'); 
-    
     setTwitterTaskCompleted(true);
-    
     const newBalance = balance + 500; 
     setBalance(newBalance);
-    
     if (userId && userId !== 'test_user') {
       try {
-        await supabase.from('users').update({ 
-          balance: newBalance, 
-          twitter_joined: true 
-        }).eq('telegram_id', userId);
-      } catch (err) {
-        console.error("Error updating twitter task:", err);
-      }
+        await supabase.from('users').update({ balance: newBalance, twitter_joined: true }).eq('telegram_id', userId);
+      } catch (err) {}
     }
   };
 
@@ -492,7 +530,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* شريط الهيدر */}
       <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
         <div className="flex items-center gap-2">
           <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
@@ -554,7 +591,6 @@ export default function Home() {
               </div>
               <span className="text-[10px] font-bold text-gray-400 group-hover:text-white transition-colors">Follow</span>
             </a>
-
           </div>
           <button onClick={handleClaim} disabled={isSaving} className={`w-full py-4 mt-auto mb-4 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-wait' : ''}`}>
             {isSaving ? 'SAVING...' : 'CLAIM POINTS'}
@@ -586,7 +622,45 @@ export default function Home() {
             </div>
           </div>
           
-          <h2 className="text-2xl font-bold text-white mb-4">Social Tasks</h2>
+          {/* --- المهام اليومية الجديدة (بنفس التصميم والألوان) --- */}
+          {(dailyTelegramLink || dailyTwitterLink) && (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-4">Daily Tasks</h2>
+              <div className="flex flex-col gap-4 mb-6">
+                
+                {dailyTelegramLink && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-white text-lg">Like Today's Post</h3>
+                    <p className="text-yellow-400 text-xs">+200 APXN Points</p>
+                  </div>
+                  <button onClick={handleDailyTelegram} disabled={dailyTelegramDone || verifyingTelegram} className={`${dailyTelegramDone ? 'bg-green-600' : verifyingTelegram ? 'bg-slate-700 animate-pulse' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                    {dailyTelegramDone ? 'Done ✓' : verifyingTelegram ? 'Wait..' : 'GO'}
+                  </button>
+                </div>
+                )}
+
+                {dailyTwitterLink && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
+                  <div>
+                    <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                      Like Today's X Post 
+                      <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
+                    </h3>
+                    <p className="text-yellow-400 text-xs">+200 APXN Points</p>
+                  </div>
+                  <button onClick={handleDailyTwitter} disabled={dailyTwitterDone || verifyingTwitter} className={`${dailyTwitterDone ? 'bg-green-600' : verifyingTwitter ? 'bg-slate-700 animate-pulse' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                    {dailyTwitterDone ? 'Done ✓' : verifyingTwitter ? 'Wait..' : 'GO'}
+                  </button>
+                </div>
+                )}
+
+              </div>
+            </>
+          )}
+          
+          <h2 className="text-2xl font-bold text-white mb-4">One-Time Social Tasks</h2>
           
           <div className="flex flex-col gap-4 mb-8">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
@@ -594,7 +668,7 @@ export default function Home() {
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+              <button onClick={handleJoinChannel} disabled={taskCompleted} className={`${taskCompleted ? 'bg-green-600' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                 {taskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
@@ -604,7 +678,7 @@ export default function Home() {
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleJoinGroup} disabled={groupTaskCompleted} className={`${groupTaskCompleted ? 'bg-green-600' : 'bg-[#229ED9]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+              <button onClick={handleJoinGroup} disabled={groupTaskCompleted} className={`${groupTaskCompleted ? 'bg-green-600' : 'bg-[#229ED9]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                 {groupTaskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
@@ -618,7 +692,7 @@ export default function Home() {
                 </h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleFollowTwitter} disabled={twitterTaskCompleted} className={`${twitterTaskCompleted ? 'bg-green-600' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors`}>
+              <button onClick={handleFollowTwitter} disabled={twitterTaskCompleted} className={`${twitterTaskCompleted ? 'bg-green-600' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                 {twitterTaskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
@@ -654,10 +728,8 @@ export default function Home() {
              </button>
           </div>
 
-          {/* --- قائمة الأصدقاء مع الأعلام --- */}
           <div className="mt-8 w-full flex flex-col gap-3 pb-8">
             <h3 className="text-white font-bold text-sm border-b border-slate-800 pb-2">My Referrals ({friendsList.length})</h3>
-            
             {friendsList.length === 0 ? (
               <p className="text-gray-500 text-xs text-center mt-4">You haven't invited anyone yet.</p>
             ) : (
@@ -677,18 +749,15 @@ export default function Home() {
               })
             )}
           </div>
-          {/* ---------------------------------- */}
         </div>
       )}
 
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4 overflow-y-auto">
-          
           <h2 className="text-2xl font-bold text-white mb-2">Rig Upgrades</h2>
           <p className="text-yellow-500/80 text-[11px] font-bold mb-6 uppercase tracking-wider">
             ⚠️ All Upgrades are currently locked until Smart Contract Deployment.
           </p>
-          
           <div className="flex flex-col gap-4 mb-8 opacity-60 grayscale">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
@@ -734,7 +803,6 @@ export default function Home() {
 
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
-          
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
              <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>About</button>
              <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Apex Roadmap</button>
@@ -743,14 +811,12 @@ export default function Home() {
 
           {discoverView === 'about' && (
              <div className="w-full flex flex-col items-center pb-6">
-                
                 <div className="w-full py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-b border-yellow-500/30 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                    <div className="absolute inset-0 bg-black/40 mix-blend-overlay"></div>
                    <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-400/50 shadow-[0_0_30px_rgba(234,179,8,0.5)] z-10">
                       <Image src="/logo2.png" alt="Apex Logo" width={60} height={60} className="rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] object-cover w-full h-full" />
                    </div>
                    <h1 className="text-4xl font-black text-white mb-2 z-10">Apex Network</h1>
-                   
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
                         <img src="/binance-logo-1.png" alt="Binance" className="w-3 h-3 object-contain" /> BINANCE ECOSYSTEM
@@ -765,7 +831,6 @@ export default function Home() {
                    <p className="text-gray-300 text-sm leading-relaxed mb-8 font-medium text-center">
                      Welcome to the next generation of cloud infrastructure. Built natively on the <strong className="text-yellow-500">Binance Smart Chain (BSC)</strong> for extreme scalability and ultra-low fees, Apex Network offers a seamless Web3 mining ecosystem directly inside Telegram.
                    </p>
-
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Core Features</h2>
                    <div className="grid grid-cols-2 gap-3 mb-8">
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
@@ -814,7 +879,6 @@ export default function Home() {
                      </button>
                    </div>
                    
-                   {/* فقرة إخلاء المسؤولية (Legal Disclaimer) */}
                    <div className="bg-gradient-to-br from-red-950/60 to-black p-5 rounded-2xl border border-red-900/50 shadow-[0_10px_30px_rgba(153,27,27,0.3)] mb-8 relative overflow-hidden">
                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900"></div>
                      <div className="flex items-center gap-2 mb-3">
@@ -835,9 +899,7 @@ export default function Home() {
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
                 <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Apex Roadmap</h2>
-                
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
-                  
                   {/* Q4 2026 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></span>
@@ -999,40 +1061,28 @@ export default function Home() {
 
                 </div>
                 
-                {/* Core Project Flow Section */}
                 <div className="mt-12 mb-4">
                   <h3 className="text-center text-gray-400 font-black tracking-widest text-[10px] uppercase mb-6">Core Project Flow</h3>
                   <div className="flex flex-col gap-2 items-center">
-                    
                     <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Telegram App</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    
                     <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Daily Activity & Mining Points</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    
                     <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Tasks & Referrals</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    
                     <div className="bg-slate-900 border border-yellow-600/50 px-4 py-2 rounded-lg text-xs font-bold text-yellow-500 shadow-md">Rig Upgrades & Phased Presale</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    
                     <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Community Growth</div>
                     <div className="h-4 w-[2px] bg-purple-500"></div>
-                    
                     <div className="bg-gradient-to-r from-purple-900 to-indigo-900 border border-purple-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-[0_0_10px_rgba(168,85,247,0.4)]">Listing Announcement (Q3 2028)</div>
                     <div className="h-4 w-[2px] bg-blue-500"></div>
-                    
                     <div className="bg-gradient-to-r from-blue-900 to-cyan-900 border border-blue-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]">Apex Testnet (Q4 2028)</div>
                     <div className="h-4 w-[2px] bg-green-500"></div>
-                    
                     <div className="bg-slate-900 border border-green-500 px-4 py-2 rounded-lg text-xs font-bold text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.2)]">Staking (2029)</div>
                     <div className="h-4 w-[2px] bg-emerald-500"></div>
-                    
                     <div className="bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-400 px-6 py-3 rounded-xl text-sm font-black text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]">APEX MAINNET (Q4 2029)</div>
-                    
                   </div>
                 </div>
-
              </div>
           )}
 
@@ -1040,7 +1090,6 @@ export default function Home() {
              <div className="px-6 pt-6 w-full">
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Tokenomics & Security</h1>
 
-                {/* --- NEW ADDITION: SECURITY & TRANSPARENCY --- */}
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Smart Contract & Transparency</h2>
                 <div className="bg-slate-900/80 p-4 rounded-xl border border-emerald-500/50 mb-6 flex flex-col gap-3 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
                   <div className="flex items-center gap-2">
@@ -1059,7 +1108,6 @@ export default function Home() {
                   </a>
                 </div>
 
-                {/* --- NEW ADDITION: ICO TICKETS --- */}
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Initial Coin Offering (ICO)</h2>
                 <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-500/50 mb-8 relative overflow-hidden">
                   <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[9px] font-black px-2 py-1 rounded-bl-lg uppercase">Active Phase</div>
@@ -1088,7 +1136,6 @@ export default function Home() {
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Distribution Details (100M Total)</h2>
                 
                 <div className="space-y-4 mb-8">
-                  {/* البطاقة 1 */}
                   <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Community & Airdrop</span>
@@ -1099,7 +1146,6 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* البطاقة 2 */}
                   <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">DEX & CEX Liquidity</span>
@@ -1110,7 +1156,6 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* البطاقة 3 */}
                   <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Marketing & Partners</span>
@@ -1121,7 +1166,6 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* البطاقة 4 */}
                   <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Core Team</span>
@@ -1132,7 +1176,6 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* البطاقة 5 */}
                   <div className="bg-slate-900/80 p-4 rounded-xl border border-yellow-700/50 flex flex-col gap-2 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-1 h-full bg-yellow-500"></div>
                     <div className="flex justify-between items-center">
