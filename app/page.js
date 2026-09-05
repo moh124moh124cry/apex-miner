@@ -172,13 +172,11 @@ export default function Home() {
         let currentDbRate = 0.00025; 
         let activeFriends = 0;
 
-        // --- جلب روابط المهام اليومية من الإعدادات ---
         const { data: settings } = await supabase.from('app_settings').select('daily_twitter_link, daily_telegram_link').eq('id', 1).single();
         if (settings) {
           setDailyTwitterLink(settings.daily_twitter_link);
           setDailyTelegramLink(settings.daily_telegram_link);
         }
-        // ----------------------------------------------
 
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         
@@ -192,11 +190,9 @@ export default function Home() {
           if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
           if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); 
 
-          // --- التحقق من المهام اليومية للمستخدم (إعادة الضبط التلقائي كل يوم) ---
           const todayStr = new Date().toISOString().split('T')[0];
           setDailyTwitterDone(data.last_twitter_task === todayStr);
           setDailyTelegramDone(data.last_telegram_task === todayStr);
-          // ------------------------------------------------------------------------
 
           let currentStreak = data.checkin_streak || 0;
           let isCheckinAvailable = true;
@@ -347,14 +343,13 @@ export default function Home() {
     setTimeout(() => setIsSaving(false), 1000); 
   };
 
-  // --- دوال المهام اليومية الجديدة (معدلة إلى 100 نقطة) ---
   const handleDailyTwitter = async () => {
     if (dailyTwitterDone || verifyingTwitter || !dailyTwitterLink) return;
     window.open(dailyTwitterLink, '_blank');
     setVerifyingTwitter(true);
     setTimeout(async () => {
       const today = new Date().toISOString().split('T')[0];
-      const newBalance = balance + 100; // تم التعديل إلى 100 نقطة
+      const newBalance = balance + 100;
       const { error } = await supabase.from('users').update({ last_twitter_task: today, balance: newBalance }).eq('telegram_id', userId);
       if (!error) {
         setBalance(newBalance);
@@ -370,7 +365,7 @@ export default function Home() {
     setVerifyingTelegram(true);
     setTimeout(async () => {
       const today = new Date().toISOString().split('T')[0];
-      const newBalance = balance + 100; // تم التعديل إلى 100 نقطة
+      const newBalance = balance + 100;
       const { error } = await supabase.from('users').update({ last_telegram_task: today, balance: newBalance }).eq('telegram_id', userId);
       if (!error) {
         setBalance(newBalance);
@@ -379,7 +374,6 @@ export default function Home() {
       }
     }, 10000);
   };
-  // ------------------------------------
 
   const handleJoinChannel = async () => {
     if (taskCompleted) return;
@@ -751,7 +745,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم المتجر المحدث بالكامل (مع الحفاظ على كلمة Boosts في شريط التنقل والسرعات الجديدة) */}
+      {/* قسم المتجر مع رسالة الـ KYC المحدثة والسرعات الجديدة */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-4 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store 🛒</h2>
@@ -764,7 +758,7 @@ export default function Home() {
                   Mandatory KYC Requirement
                 </h3>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  As stated in our official Whitepaper, purchasing at least one upgrade is a strict condition to pass KYC verification and qualify for the <span className="text-white font-bold">$APXN Airdrop</span> withdrawal.
+                  To protect our ecosystem from fraud and prove you are a human entitled to an account, based on our Whitepaper, you must unlock at least <strong className="text-white bg-red-500/20 px-1 rounded">2 stages in EVERY level</strong>. This is a strict condition to pass <strong className="text-red-400">KYC</strong> verification and qualify for the <span className="text-white font-bold">$APXN Airdrop</span> withdrawal.
                 </p>
               </div>
             </div>
