@@ -751,7 +751,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم المتجر المحدث بالكامل (مع الحفاظ على كلمة Boosts في شريط التنقل) */}
+      {/* قسم المتجر المحدث بالكامل (مع الحفاظ على كلمة Boosts في شريط التنقل والسرعات الجديدة) */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-4 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store 🛒</h2>
@@ -775,30 +775,30 @@ export default function Home() {
               title: "Level 1: APXN Miners",
               currency: "APXN",
               items: [
-                { name: "Nano Miner", price: "5,000", boost: "+0.2/sec" },
-                { name: "Micro Rig", price: "10,000", boost: "+0.5/sec" },
-                { name: "Mini Core", price: "15,000", boost: "+0.8/sec" },
-                { name: "Eco Miner", price: "20,000", boost: "+1.2/sec" }
+                { name: "Nano Miner", price: "5,000", boost: "+0.001/sec" },
+                { name: "Micro Rig", price: "10,000", boost: "+0.002/sec" },
+                { name: "Mini Core", price: "15,000", boost: "+0.003/sec" },
+                { name: "Eco Miner", price: "20,000", boost: "+0.004/sec" }
               ]
             },
             {
               title: "Level 2: Telegram Stars",
               currency: "⭐️ Stars",
               items: [
-                { name: "Stellar Rig", price: "10", boost: "+2.0/sec" },
-                { name: "Nova Core", price: "20", boost: "+4.5/sec" },
-                { name: "Pulsar Miner", price: "30", boost: "+7.0/sec" },
-                { name: "Nebula Unit", price: "40", boost: "+10.0/sec" }
+                { name: "Stellar Rig", price: "10", boost: "+0.006/sec" },
+                { name: "Nova Core", price: "20", boost: "+0.007/sec" },
+                { name: "Pulsar Miner", price: "30", boost: "+0.008/sec" },
+                { name: "Nebula Unit", price: "40", boost: "+0.01/sec" }
               ]
             },
             {
               title: "Level 3: TON Elite",
               currency: "💎 TON",
               items: [
-                { name: "Apex Quantum", price: "0.1", boost: "+25.0/sec" },
-                { name: "Titan Node", price: "0.2", boost: "+55.0/sec" },
-                { name: "Cyber Miner", price: "0.3", boost: "+90.0/sec" },
-                { name: "Genesis Rig", price: "0.4", boost: "+150.0/sec" }
+                { name: "Apex Quantum", price: "0.1", boost: "+0.03/sec" },
+                { name: "Titan Node", price: "0.2", boost: "+0.04/sec" },
+                { name: "Cyber Miner", price: "0.3", boost: "+0.05/sec" },
+                { name: "Genesis Rig", price: "0.4", boost: "+0.06/sec" }
               ]
             }
           ].map((level, index) => (
