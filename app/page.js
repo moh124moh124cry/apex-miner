@@ -5,8 +5,9 @@ import Image from 'next/image';
 
 export default function Home() {
   const [balance, setBalance] = useState(0); 
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // ✅ تمت إضافة متغير التحميل هنا
+  const [isDataLoaded, setIsDataLoaded] = useState(false); 
   const [miningDelta, setMiningDelta] = useState(0);
+  const [claimCooldown, setClaimCooldown] = useState(0); // ✅ إضافة متغير العداد التنازلي للمطالبة
   const [activeTab, setActiveTab] = useState('mine');
   
   const [discoverView, setDiscoverView] = useState('about'); 
@@ -15,14 +16,14 @@ export default function Home() {
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
   const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); 
   
-  // --- متغيرات المهام اليومية الديناميكية ---
-  const [dailyTwitterLink, setDailyTwitterLink] = useState('');
-  const [dailyTelegramLink, setDailyTelegramLink] = useState('');
+  // ✅ قراءة روابط المهام اليومية مباشرة من Vercel Environment Variables
+  const dailyTwitterLink = process.env.NEXT_PUBLIC_DAILY_TWITTER_LINK || '';
+  const dailyTelegramLink = process.env.NEXT_PUBLIC_DAILY_TELEGRAM_LINK || '';
+  
   const [dailyTwitterDone, setDailyTwitterDone] = useState(false);
   const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
   const [verifyingTwitter, setVerifyingTwitter] = useState(false);
   const [verifyingTelegram, setVerifyingTelegram] = useState(false);
-  // ------------------------------------------
 
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
@@ -173,11 +174,7 @@ export default function Home() {
         let currentDbRate = 0.00025; 
         let activeFriends = 0;
 
-        const { data: settings } = await supabase.from('app_settings').select('daily_twitter_link, daily_telegram_link').eq('id', 1).single();
-        if (settings) {
-          setDailyTwitterLink(settings.daily_twitter_link);
-          setDailyTelegramLink(settings.daily_telegram_link);
-        }
+        // ❌ تم حذف الاستعلام البطيء عن الروابط من قاعدة البيانات هنا لتخفيف الضغط
 
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         
@@ -246,13 +243,18 @@ export default function Home() {
             if (diffSeconds > 0) {
               setMiningDelta(diffSeconds * finalRate);
             }
+            
+            // ✅ حساب العداد الزمني (إذا مر أقل من 10 دقائق (600 ثانية) على آخر مطالبة)
+            if (diffSeconds < 600) {
+              setClaimCooldown(Math.floor(600 - diffSeconds));
+            }
           }
 
           if (data.username !== userName || data.first_name !== firstName) {
             await supabase.from('users').update({ first_name: firstName, username: userName }).eq('telegram_id', userId);
           }
 
-          setIsDataLoaded(true); // ✅ التأكيد على أن البيانات تم تحميلها بنجاح
+          setIsDataLoaded(true); 
 
         } else if (error && error.code === 'PGRST116') {
           const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
@@ -294,7 +296,7 @@ export default function Home() {
             setDailyRewardAmt(100);
             setWelcomeAmount(welcomeBonus);
             setShowWelcome(true);
-            setIsDataLoaded(true); // ✅ التأكيد على أن المستخدم الجديد تم إنشاؤه وتحميل بياناته
+            setIsDataLoaded(true); 
           }
         }
       } catch (err) {
@@ -304,14 +306,15 @@ export default function Home() {
     if (firstName || userName) fetchUserData();
   }, [userId, firstName, userName, startParam]);
 
+  // ✅ تحديث عداد التعدين وعداد الانتظار معاً كل ثانية
   useEffect(() => {
     const interval = setInterval(() => {
       setMiningDelta(prev => prev + totalMiningRate);
+      setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
   }, [totalMiningRate]);
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
   const handleDailyCheckIn = async () => {
     if (!isDataLoaded || !canCheckIn || isSaving) return;
     setIsSaving(true);
@@ -334,14 +337,15 @@ export default function Home() {
     setIsSaving(false);
   };
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
+  // ✅ منع المطالبة إذا كان العداد الزمني لم ينتهي
   const handleClaim = async () => {
-    if (!isDataLoaded || isSaving || miningDelta < 0.0001) return; 
+    if (!isDataLoaded || isSaving || claimCooldown > 0 || miningDelta < 0.0001) return; 
     setIsSaving(true);
     const newTotalBalance = balance + miningDelta;
     const currentIsoTime = new Date().toISOString();
     setBalance(newTotalBalance);
     setMiningDelta(0);
+    setClaimCooldown(600); // ✅ ضبط العداد على 10 دقائق (600 ثانية) فور المطالبة
     
     if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
@@ -349,7 +353,6 @@ export default function Home() {
     setTimeout(() => setIsSaving(false), 1000); 
   };
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
   const handleDailyTwitter = async () => {
     if (!isDataLoaded || dailyTwitterDone || verifyingTwitter || !dailyTwitterLink) return;
     window.open(dailyTwitterLink, '_blank');
@@ -366,7 +369,6 @@ export default function Home() {
     }, 10000);
   };
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
   const handleDailyTelegram = async () => {
     if (!isDataLoaded || dailyTelegramDone || verifyingTelegram || !dailyTelegramLink) return;
     window.open(dailyTelegramLink, '_blank');
@@ -383,7 +385,6 @@ export default function Home() {
     }, 10000);
   };
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
   const handleJoinChannel = async () => {
     if (!isDataLoaded || taskCompleted) return;
     window.open('https://t.me/ApexMiner_Official', '_blank'); 
@@ -395,7 +396,6 @@ export default function Home() {
     }
   };
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
   const handleJoinGroup = async () => {
     if (!isDataLoaded || groupTaskCompleted) return;
     window.open('https://t.me/ApexMinerGroup', '_blank'); 
@@ -407,7 +407,6 @@ export default function Home() {
     }
   };
 
-  // ✅ تمت حماية الدالة للعمل فقط بعد تحميل البيانات
   const handleFollowTwitter = async () => {
     if (!isDataLoaded || twitterTaskCompleted) return;
     window.open('https://x.com/ApexNetworkApp', '_blank'); 
@@ -435,6 +434,13 @@ export default function Home() {
   const handleCopyEmail = () => {
     navigator.clipboard.writeText("contact@apxn.network");
     alert("✅ Email address copied to clipboard!");
+  };
+
+  // ✅ تنسيق الثواني للعداد (مثال: 09:59)
+  const formatTime = (totalSeconds) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -597,8 +603,25 @@ export default function Home() {
               <span className="text-[10px] font-bold text-gray-400 group-hover:text-white transition-colors">Follow</span>
             </a>
           </div>
-          <button onClick={handleClaim} disabled={!isDataLoaded || isSaving} className={`w-full py-4 mt-auto mb-4 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-600 text-lg font-bold text-white shadow-[0_4px_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all ${(!isDataLoaded || isSaving) ? 'opacity-70 cursor-wait' : ''}`}>
-            {!isDataLoaded ? 'LOADING...' : (isSaving ? 'SAVING...' : 'CLAIM POINTS')}
+          
+          {/* ✅ تحديث واجهة زر المطالبة ليعرض العداد الزمني */}
+          <button 
+            onClick={handleClaim} 
+            disabled={!isDataLoaded || isSaving || claimCooldown > 0} 
+            className={`w-full py-4 mt-auto mb-4 rounded-2xl text-lg font-bold shadow-[0_4px_20px_rgba(245,158,11,0.4)] transition-all ${
+              !isDataLoaded 
+                ? 'bg-slate-800 text-gray-500 cursor-wait' 
+                : claimCooldown > 0
+                ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
+                : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white active:scale-95'
+            }`}
+          >
+            {!isDataLoaded 
+              ? 'LOADING...' 
+              : claimCooldown > 0 
+                ? `WAIT ${formatTime(claimCooldown)}` 
+                : (isSaving ? 'SAVING...' : 'CLAIM POINTS')
+            }
           </button>
         </div>
       )}
@@ -704,6 +727,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* باقي الأقسام (الأصدقاء، المتجر، اكتشف) تبقى كما هي بدون تغيير */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -756,7 +780,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم المتجر */}
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-4 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store 🛒</h2>
@@ -841,7 +864,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* قسم ديسكفر (أبوت/رؤية/الخ) */}
       {activeTab === 'discover' && (
         <div className="flex-1 w-full flex flex-col overflow-y-auto pb-10">
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
@@ -940,14 +962,14 @@ export default function Home() {
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
                 <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Apex Roadmap</h2>
-                {/* ... (نفس كود Roadmap لم يتغير) ... */}
+                {/* ... (نفس الكود الخاص بالـ Roadmap) ... */}
              </div>
           )}
 
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Tokenomics & Security</h1>
-                {/* ... (نفس كود Whitepaper لم يتغير) ... */}
+                {/* ... (نفس الكود الخاص بالـ Whitepaper) ... */}
              </div>
           )}
         </div>
