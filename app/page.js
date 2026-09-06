@@ -7,7 +7,7 @@ export default function Home() {
   const [balance, setBalance] = useState(0); 
   const [isDataLoaded, setIsDataLoaded] = useState(false); 
   const [miningDelta, setMiningDelta] = useState(0);
-  const [claimCooldown, setClaimCooldown] = useState(0); // ✅ إضافة متغير العداد التنازلي للمطالبة
+  const [claimCooldown, setClaimCooldown] = useState(0); 
   const [activeTab, setActiveTab] = useState('mine');
   
   const [discoverView, setDiscoverView] = useState('about'); 
@@ -16,7 +16,6 @@ export default function Home() {
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
   const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); 
   
-  // ✅ قراءة روابط المهام اليومية مباشرة من Vercel Environment Variables
   const dailyTwitterLink = process.env.NEXT_PUBLIC_DAILY_TWITTER_LINK || '';
   const dailyTelegramLink = process.env.NEXT_PUBLIC_DAILY_TELEGRAM_LINK || '';
   
@@ -174,8 +173,6 @@ export default function Home() {
         let currentDbRate = 0.00025; 
         let activeFriends = 0;
 
-        // ❌ تم حذف الاستعلام البطيء عن الروابط من قاعدة البيانات هنا لتخفيف الضغط
-
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
         
         if (data) {
@@ -244,7 +241,6 @@ export default function Home() {
               setMiningDelta(diffSeconds * finalRate);
             }
             
-            // ✅ حساب العداد الزمني (إذا مر أقل من 10 دقائق (600 ثانية) على آخر مطالبة)
             if (diffSeconds < 600) {
               setClaimCooldown(Math.floor(600 - diffSeconds));
             }
@@ -306,7 +302,6 @@ export default function Home() {
     if (firstName || userName) fetchUserData();
   }, [userId, firstName, userName, startParam]);
 
-  // ✅ تحديث عداد التعدين وعداد الانتظار معاً كل ثانية
   useEffect(() => {
     const interval = setInterval(() => {
       setMiningDelta(prev => prev + totalMiningRate);
@@ -337,7 +332,6 @@ export default function Home() {
     setIsSaving(false);
   };
 
-  // ✅ منع المطالبة إذا كان العداد الزمني لم ينتهي
   const handleClaim = async () => {
     if (!isDataLoaded || isSaving || claimCooldown > 0 || miningDelta < 0.0001) return; 
     setIsSaving(true);
@@ -345,7 +339,7 @@ export default function Home() {
     const currentIsoTime = new Date().toISOString();
     setBalance(newTotalBalance);
     setMiningDelta(0);
-    setClaimCooldown(600); // ✅ ضبط العداد على 10 دقائق (600 ثانية) فور المطالبة
+    setClaimCooldown(600); 
     
     if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
@@ -436,7 +430,6 @@ export default function Home() {
     alert("✅ Email address copied to clipboard!");
   };
 
-  // ✅ تنسيق الثواني للعداد (مثال: 09:59)
   const formatTime = (totalSeconds) => {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
@@ -446,7 +439,6 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
 
-      {/* مودال ربط المحفظة */}
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
@@ -604,7 +596,6 @@ export default function Home() {
             </a>
           </div>
           
-          {/* ✅ تحديث واجهة زر المطالبة ليعرض العداد الزمني */}
           <button 
             onClick={handleClaim} 
             disabled={!isDataLoaded || isSaving || claimCooldown > 0} 
@@ -727,7 +718,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* باقي الأقسام (الأصدقاء، المتجر، اكتشف) تبقى كما هي بدون تغيير */}
       {activeTab === 'friends' && (
         <div className="flex-1 w-full flex flex-col px-6 pt-4">
           <div className="text-center mb-6 mt-2">
@@ -961,15 +951,65 @@ export default function Home() {
 
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
-                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Apex Roadmap</h2>
-                {/* ... (نفس الكود الخاص بالـ Roadmap) ... */}
+                <h2 className="text-2xl font-black text-white mb-6 text-center uppercase tracking-widest">Apex Roadmap</h2>
+                <div className="flex flex-col gap-4 mb-10">
+                   <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                      <span className="text-yellow-400 font-bold text-xs uppercase">Phase 1 (Completed)</span>
+                      <h3 className="text-white font-bold text-base mt-1">Foundation & Launch</h3>
+                      <p className="text-gray-400 text-xs mt-1">Smart contract deployment on BSC, Telegram Mini App release, community growth, and initial point mining system.</p>
+                   </div>
+                   <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                      <span className="text-yellow-400 font-bold text-xs uppercase">Phase 2 (Current)</span>
+                      <h3 className="text-white font-bold text-base mt-1">Ecosystem Expansion</h3>
+                      <p className="text-gray-400 text-xs mt-1">Integration of daily tasks, referral tiers, wallet binding for TGE, and strategic influencer partnerships.</p>
+                   </div>
+                   <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                      <span className="text-yellow-400 font-bold text-xs uppercase">Phase 3 (Upcoming)</span>
+                      <h3 className="text-white font-bold text-base mt-1">Presale & KYC</h3>
+                      <p className="text-gray-400 text-xs mt-1">PinkSale launch, mandatory KYC implementation, VIP Presale ticket distribution, and community governance rollout.</p>
+                   </div>
+                   <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                      <span className="text-yellow-400 font-bold text-xs uppercase">Phase 4 (Future)</span>
+                      <h3 className="text-white font-bold text-base mt-1">Token Listing & DEX</h3>
+                      <p className="text-gray-400 text-xs mt-1">$APXN token listing on PancakeSwap, liquidity pool locking, and advanced staking utility.</p>
+                   </div>
+                </div>
              </div>
           )}
 
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Tokenomics & Security</h1>
-                {/* ... (نفس الكود الخاص بالـ Whitepaper) ... */}
+                <div className="flex flex-col gap-4 mb-10">
+                   <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-center">
+                      <span className="text-gray-400 text-xs uppercase">Total Supply</span>
+                      <h3 className="text-2xl font-black text-white mt-1">1,000,000,000 $APXN</h3>
+                   </div>
+                   <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-center">
+                         <span className="text-yellow-400 text-xs uppercase font-bold">Mining & Rewards</span>
+                         <h4 className="text-xl font-bold text-white mt-1">40%</h4>
+                      </div>
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-center">
+                         <span className="text-yellow-400 text-xs uppercase font-bold">Liquidity Pool</span>
+                         <h4 className="text-xl font-bold text-white mt-1">25%</h4>
+                      </div>
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-center">
+                         <span className="text-yellow-400 text-xs uppercase font-bold">Presale (PinkSale)</span>
+                         <h4 className="text-xl font-bold text-white mt-1">20%</h4>
+                      </div>
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-center">
+                         <span className="text-yellow-400 text-xs uppercase font-bold">Team & Advisors</span>
+                         <h4 className="text-xl font-bold text-white mt-1">15%</h4>
+                      </div>
+                   </div>
+                   <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 mt-2">
+                      <h3 className="text-white font-bold text-sm mb-1">BEP-20 Standard</h3>
+                      <p className="text-gray-400 text-xs leading-relaxed">
+                        Built on Binance Smart Chain ensuring low transaction fees, high speed, and absolute compatibility with decentralized wallets like MetaMask, Trust Wallet, and Binance Web3 Wallet.
+                      </p>
+                   </div>
+                </div>
              </div>
           )}
         </div>
