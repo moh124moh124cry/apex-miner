@@ -65,6 +65,7 @@ const ADMIN_CACHE_MS = 5 * 60_000;
 // On serverless deployments, memory is best-effort and may reset
 // between instances. Link/spam deletion remains stateless and reliable.
 // ======================================================
+
 const floodState = new Map();
 const repeatState = new Map();
 const violationState = new Map();
@@ -202,8 +203,8 @@ function extractUrls(message) {
   // ====================================================
   // Inline keyboard buttons
   //
-  // This is the important fix for advertisements such as:
-  // photo + BINANCE / AIRDROP / CLAIM buttons.
+  // Detect advertisements containing buttons such as:
+  // BINANCE / AIRDROP / CLAIM / BONUS etc.
   // ====================================================
 
   const inlineKeyboard =
@@ -566,8 +567,9 @@ async function isAdmin(ctx) {
       error
     );
 
-    // Fail-safe: do not punish someone if Telegram
-    // cannot confirm their role.
+    // Fail-safe:
+    // do not punish someone if Telegram cannot
+    // confirm their role.
     return true;
   }
 }
@@ -921,24 +923,39 @@ bot.on(
         return;
       }
 
-      // Unauthorized links are removed immediately.
+      // ==================================================
+      // Unauthorized links:
       //
-      // This now also checks links hidden in
-      // inline keyboard buttons.
+      // DELETE MESSAGE ONLY.
+      //
+      // The member is NOT muted.
+      // The member is NOT banned.
+      // No violation is recorded for posting a link.
+      // Repeated unauthorized links are simply deleted.
+      // Admins are exempt.
+      // ==================================================
+
       if (
         containsUnauthorizedLink(
           message
         )
       ) {
-        await moderateViolation(
-          ctx,
-          'UNAUTHORIZED_LINK'
-        );
+        if (
+          !(await isAdmin(ctx))
+        ) {
+          await safeDelete(ctx);
+
+          console.log(
+            `Moderation: UNAUTHORIZED_LINK_DELETED_ONLY; chat=${ctx.chat?.id}; user=${ctx.from?.id}`
+          );
+        }
 
         return;
       }
 
       // High-confidence spam phrases / mass mentions.
+      //
+      // This remains separate from link moderation.
       if (
         looksLikeSpam(
           message
@@ -952,7 +969,7 @@ bot.on(
         return;
       }
 
-      // Same message repeated several times.
+      // Same non-link message repeated several times.
       if (
         isRepeatedMessage(ctx)
       ) {
@@ -965,7 +982,7 @@ bot.on(
         return;
       }
 
-      // Too many messages in a short period.
+      // Too many non-link messages in a short period.
       if (isFlooding(ctx)) {
         await moderateViolation(
           ctx,
