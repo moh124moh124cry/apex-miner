@@ -5,7 +5,7 @@ import { validateTelegramInitData } from '../../../../lib/telegram-auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CLAIM_COOLDOWN_SECONDS = 600;
+const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const ACTIVE_FRIEND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function jsonResponse(body, status = 200) {
