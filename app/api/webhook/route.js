@@ -3,7 +3,12 @@ import { NextResponse } from 'next/server';
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// الروابط المسموح بها اختيارية عبر متغير البيئة ALLOWED_LINK_DOMAINS
+// ======================================================
+// Allowed link domains (optional)
+// Example:
+// ALLOWED_LINK_DOMAINS=apexnetwork.com,telegram.org
+// ======================================================
+
 const allowedLinkDomains = (process.env.ALLOWED_LINK_DOMAINS || '')
     .split(',')
     .map((domain) =>
@@ -16,21 +21,64 @@ const allowedLinkDomains = (process.env.ALLOWED_LINK_DOMAINS || '')
     )
     .filter(Boolean);
 
-// فحص وجود رابط
-function containsLink(text = '') {
-    return /(?:https?:\/\/|www\.|t\.me\/|telegram\.me\/)/i.test(text);
+// ======================================================
+// Check if a message contains a link
+// ======================================================
+
+function containsLink(message) {
+    const text = message?.text || message?.caption || '';
+
+    const entities = [
+        ...(message?.entities || []),
+        ...(message?.caption_entities || [])
+    ];
+
+    // Visible links
+    if (/(?:https?:\/\/|www\.|t\.me\/|telegram\.me\/)/i.test(text)) {
+        return true;
+    }
+
+    // Telegram clickable URL entities
+    return entities.some(
+        (entity) =>
+            entity.type === 'url' ||
+            entity.type === 'text_link'
+    );
 }
 
-// التحقق من أن الرابط مسموح
-function isAllowedLink(text = '') {
-    if (allowedLinkDomains.length === 0) return false;
+// ======================================================
+// Check if links are allowed
+// ======================================================
+
+function isAllowedLink(message) {
+    // If no whitelist is configured,
+    // all links from normal members are blocked.
+    if (allowedLinkDomains.length === 0) {
+        return false;
+    }
+
+    const text = message?.text || message?.caption || '';
 
     const urls =
         text.match(/(?:https?:\/\/|www\.)[^\s]+/gi) || [];
 
-    if (urls.length === 0) return false;
+    const entities = [
+        ...(message?.entities || []),
+        ...(message?.caption_entities || [])
+    ];
 
-    return urls.every((rawUrl) => {
+    const entityUrls = entities
+        .filter((entity) => entity.type === 'text_link')
+        .map((entity) => entity.url)
+        .filter(Boolean);
+
+    const allUrls = [...urls, ...entityUrls];
+
+    if (allUrls.length === 0) {
+        return false;
+    }
+
+    return allUrls.every((rawUrl) => {
         try {
             const normalized = rawUrl.startsWith('http')
                 ? rawUrl
@@ -52,12 +100,10 @@ function isAllowedLink(text = '') {
     });
 }
 
-// الحصول على النص أو وصف الصورة/الفيديو
-function getMessageText(message) {
-    return message?.text || message?.caption || '';
-}
+// ======================================================
+// Check if user is an administrator or owner
+// ======================================================
 
-// التحقق من أن صاحب الرسالة مشرف أو مالك
 async function isAdmin(ctx) {
     try {
         if (!ctx.chat?.id || !ctx.from?.id) {
@@ -76,13 +122,15 @@ async function isAdmin(ctx) {
     } catch (error) {
         console.error('Admin check error:', error);
 
-        // حماية من حذف رسالة إذا تعذر التحقق من صلاحية العضو
+        // Fail-safe:
+        // If Telegram cannot confirm the user's status,
+        // do not delete the message.
         return true;
     }
 }
 
 // ======================================================
-// ترحيب بالأعضاء الجدد
+// Welcome new members
 // ======================================================
 
 bot.on('new_chat_members', async (ctx) => {
@@ -101,14 +149,14 @@ bot.on('new_chat_members', async (ctx) => {
                 .filter(Boolean)
                 .join(' ');
 
-            return name || 'عضو جديد';
+            return name || 'New member';
         });
 
         await ctx.reply(
-            `👋 مرحبًا ${names.join(' و')}!\n\n` +
-            `أهلًا بكم في مجموعة Apex Network 🚀\n` +
-            `نتمنى لكم مشاركة مفيدة وممتعة.\n\n` +
-            `📌 يرجى احترام قوانين المجموعة وعدم نشر الروابط أو الإعلانات غير المسموح بها.`
+            `👋 Welcome ${names.join(' and ')}!\n\n` +
+            `Welcome to the Apex Network community 🚀\n` +
+            `We’re glad to have you here. We hope you enjoy the community and find it useful.\n\n` +
+            `📌 Please respect the community rules and do not post unauthorized links or advertisements.`
         );
     } catch (error) {
         console.error('Welcome message error:', error);
@@ -116,34 +164,44 @@ bot.on('new_chat_members', async (ctx) => {
 });
 
 // ======================================================
-// حذف الروابط من الأعضاء العاديين
+// Moderate links
+// Only group and supergroup messages are moderated.
+// Private bot messages are NOT affected.
 // ======================================================
 
 bot.on('message', async (ctx) => {
     try {
         const message = ctx.message;
-        const text = getMessageText(message);
+        const chatType = ctx.chat?.type;
 
-        // الرسائل العادية بدون روابط لا يتم لمسها
-        if (!text || !containsLink(text)) {
+        // Only moderate groups and supergroups
+        if (
+            chatType !== 'group' &&
+            chatType !== 'supergroup'
+        ) {
             return;
         }
 
-        // المشرفون والمالك مستثنون
+        // Ignore messages without links
+        if (!containsLink(message)) {
+            return;
+        }
+
+        // Administrators and owner are exempt
         if (await isAdmin(ctx)) {
             return;
         }
 
-        // إذا كان الرابط ضمن النطاقات المسموح بها
-        if (isAllowedLink(text)) {
+        // Allowed domains are exempt
+        if (isAllowedLink(message)) {
             return;
         }
 
-        // حذف رسالة العضو العادي
+        // Delete unauthorized link message
         await ctx.deleteMessage();
 
         console.log(
-            `Deleted link message from user ${ctx.from?.id}`
+            `Deleted unauthorized link message from user ${ctx.from?.id}`
         );
     } catch (error) {
         console.error('Moderation error:', error);
@@ -151,13 +209,12 @@ bot.on('message', async (ctx) => {
 });
 
 // ======================================================
-// /start - وظيفة Apex Miner الأصلية
+// /start - Original Apex Miner function
 // ======================================================
 
 bot.command('start', async (ctx) => {
     try {
-        const appUrl =
-            process.env.NEXT_PUBLIC_APP_URL;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
         if (!appUrl) {
             await ctx.reply(
@@ -230,7 +287,7 @@ export async function POST(req) {
 }
 
 // ======================================================
-// اختبار الاتصال
+// Health check
 // ======================================================
 
 export async function GET() {
