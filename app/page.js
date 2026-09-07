@@ -769,51 +769,122 @@ export default function Home() {
     }, 10000);
   };
 
-  const handleJoinChannel = async () => {
-    if (!isDataLoaded || taskCompleted) return;
-    window.open('https://t.me/ApexMiner_Official', '_blank');
-    const newBalance = balance + 500;
-    setBalance(newBalance);
-    setTaskCompleted(true);
-    if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({ balance: newBalance, channel_joined: true }).eq('telegram_id', userId);
+  const claimSocialTask = async ({
+    task,
+    url,
+    completed,
+    setCompleted,
+    cacheField,
+  }) => {
+    if (
+      !isDataLoaded ||
+      completed ||
+      isSaving
+    ) {
+      return;
+    }
+
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
+    window.open(url, '_blank');
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/tasks/social', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          initData,
+          task,
+        }),
+        cache: 'no-store',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (
+          response.status === 409 &&
+          data.completed
+        ) {
+          const syncedBalance = Number(data.balance);
+
+          if (Number.isFinite(syncedBalance)) {
+            setBalance(syncedBalance);
+          }
+
+          setCompleted(true);
+
+          patchUserCache(userId, {
+            ...(Number.isFinite(syncedBalance)
+              ? { balance: syncedBalance }
+              : {}),
+            [cacheField]: true,
+          });
+
+          return;
+        }
+
+        throw new Error(
+          data.error || 'Task claim failed'
+        );
+      }
+
+      const newBalance = Number(data.balance || 0);
+
+      setBalance(newBalance);
+      setCompleted(true);
+
       patchUserCache(userId, {
         balance: newBalance,
-        channelJoined: true,
+        [cacheField]: true,
       });
+    } catch (error) {
+      console.error('Social task failed:', error);
+      alert('❌ Task failed. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  const handleJoinChannel = async () => {
+    await claimSocialTask({
+      task: 'channel',
+      url: 'https://t.me/ApexMiner_Official',
+      completed: taskCompleted,
+      setCompleted: setTaskCompleted,
+      cacheField: 'channelJoined',
+    });
   };
 
   const handleJoinGroup = async () => {
-    if (!isDataLoaded || groupTaskCompleted) return;
-    window.open('https://t.me/ApexMinerGroup', '_blank');
-    const newBalance = balance + 500;
-    setBalance(newBalance);
-    setGroupTaskCompleted(true);
-    if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({ balance: newBalance, group_joined: true }).eq('telegram_id', userId);
-      patchUserCache(userId, {
-        balance: newBalance,
-        groupJoined: true,
-      });
-    }
+    await claimSocialTask({
+      task: 'group',
+      url: 'https://t.me/ApexMinerGroup',
+      completed: groupTaskCompleted,
+      setCompleted: setGroupTaskCompleted,
+      cacheField: 'groupJoined',
+    });
   };
 
   const handleFollowTwitter = async () => {
-    if (!isDataLoaded || twitterTaskCompleted) return;
-    window.open('https://x.com/ApexNetworkApp', '_blank');
-    setTwitterTaskCompleted(true);
-    const newBalance = balance + 500;
-    setBalance(newBalance);
-    if (userId && userId !== 'test_user') {
-      try {
-        await supabase.from('users').update({ balance: newBalance, twitter_joined: true }).eq('telegram_id', userId);
-        patchUserCache(userId, {
-          balance: newBalance,
-          twitterJoined: true,
-        });
-      } catch (err) {}
-    }
+    await claimSocialTask({
+      task: 'twitter',
+      url: 'https://x.com/ApexNetworkApp',
+      completed: twitterTaskCompleted,
+      setCompleted: setTwitterTaskCompleted,
+      cacheField: 'twitterJoined',
+    });
   };
 
   const handleInviteFriend = () => {
