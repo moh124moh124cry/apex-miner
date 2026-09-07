@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// الروابط المسموح بها، يمكن إضافتها لاحقًا من متغيرات البيئة
+// الروابط المسموح بها اختيارية عبر متغير البيئة ALLOWED_LINK_DOMAINS
 const allowedLinkDomains = (process.env.ALLOWED_LINK_DOMAINS || '')
     .split(',')
     .map((domain) =>
@@ -12,6 +12,7 @@ const allowedLinkDomains = (process.env.ALLOWED_LINK_DOMAINS || '')
             .toLowerCase()
             .replace(/^https?:\/\//, '')
             .replace(/^www\./, '')
+            .replace(/\/$/, '')
     )
     .filter(Boolean);
 
@@ -51,7 +52,12 @@ function isAllowedLink(text = '') {
     });
 }
 
-// التحقق من صلاحيات صاحب الرسالة
+// الحصول على النص أو وصف الصورة/الفيديو
+function getMessageText(message) {
+    return message?.text || message?.caption || '';
+}
+
+// التحقق من أن صاحب الرسالة مشرف أو مالك
 async function isAdmin(ctx) {
     try {
         if (!ctx.chat?.id || !ctx.from?.id) {
@@ -70,7 +76,7 @@ async function isAdmin(ctx) {
     } catch (error) {
         console.error('Admin check error:', error);
 
-        // في حالة فشل التحقق، لا نحذف الرسالة
+        // حماية من حذف رسالة إذا تعذر التحقق من صلاحية العضو
         return true;
     }
 }
@@ -82,6 +88,10 @@ async function isAdmin(ctx) {
 bot.on('new_chat_members', async (ctx) => {
     try {
         const members = ctx.message.new_chat_members || [];
+
+        if (members.length === 0) {
+            return;
+        }
 
         const names = members.map((member) => {
             const name = [
@@ -112,14 +122,9 @@ bot.on('new_chat_members', async (ctx) => {
 bot.on('message', async (ctx) => {
     try {
         const message = ctx.message;
+        const text = getMessageText(message);
 
-        // النص أو وصف الصورة/الفيديو
-        const text =
-            message.text ||
-            message.caption ||
-            '';
-
-        // لا يوجد نص أو رابط
+        // الرسائل العادية بدون روابط لا يتم لمسها
         if (!text || !containsLink(text)) {
             return;
         }
@@ -129,27 +134,24 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // الرابط مسموح
+        // إذا كان الرابط ضمن النطاقات المسموح بها
         if (isAllowedLink(text)) {
             return;
         }
 
-        // حذف الرسالة
+        // حذف رسالة العضو العادي
         await ctx.deleteMessage();
 
         console.log(
             `Deleted link message from user ${ctx.from?.id}`
         );
     } catch (error) {
-        console.error(
-            'Moderation error:',
-            error
-        );
+        console.error('Moderation error:', error);
     }
 });
 
 // ======================================================
-// أمر /start الموجود في Apex Miner
+// /start - وظيفة Apex Miner الأصلية
 // ======================================================
 
 bot.command('start', async (ctx) => {
