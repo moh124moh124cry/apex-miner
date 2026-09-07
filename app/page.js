@@ -567,31 +567,88 @@ export default function Home() {
 
   const handleDailyCheckIn = async () => {
     if (!isDataLoaded || !canCheckIn || isSaving) return;
+
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
     setIsSaving(true);
 
-    const newStreak = checkinStreak + 1;
-    const newBalance = balance + dailyRewardAmt;
-    const todayIso = new Date().toISOString();
+    try {
+      const response = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initData }),
+        cache: 'no-store',
+      });
 
-    setBalance(newBalance);
-    setCheckinStreak(newStreak);
-    setCanCheckIn(false);
+      const data = await response.json();
 
-    if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({
-        balance: newBalance,
-        checkin_streak: newStreak,
-        last_checkin_date: todayIso
-      }).eq('telegram_id', userId);
+      if (!response.ok) {
+        if (response.status === 409) {
+          const syncedBalance = Number(data.balance);
+          const syncedStreak = Number(data.checkinStreak);
+
+          if (Number.isFinite(syncedBalance)) {
+            setBalance(syncedBalance);
+          }
+
+          if (Number.isFinite(syncedStreak)) {
+            setCheckinStreak(syncedStreak);
+            setDailyRewardAmt(
+              ((syncedStreak % 7) + 1) * 100
+            );
+          }
+
+          setCanCheckIn(false);
+
+          patchUserCache(userId, {
+            ...(Number.isFinite(syncedBalance)
+              ? { balance: syncedBalance }
+              : {}),
+            ...(Number.isFinite(syncedStreak)
+              ? { checkinStreak: syncedStreak }
+              : {}),
+            lastCheckinDate: new Date().toISOString(),
+          });
+
+          return;
+        }
+
+        throw new Error(data.error || 'Check-in failed');
+      }
+
+      const newBalance = Number(data.balance || 0);
+      const newStreak = Number(data.checkinStreak || 0);
+      const lastCheckinDate =
+        data.lastCheckinDate || new Date().toISOString();
+
+      setBalance(newBalance);
+      setCheckinStreak(newStreak);
+      setCanCheckIn(false);
+      setDailyRewardAmt(
+        ((newStreak % 7) + 1) * 100
+      );
 
       patchUserCache(userId, {
         balance: newBalance,
         checkinStreak: newStreak,
-        lastCheckinDate: todayIso,
+        lastCheckinDate,
       });
+    } catch (error) {
+      console.error('Check-in failed:', error);
+      alert('❌ Check-in failed. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsSaving(false);
   };
 
   const handleClaim = async () => {
