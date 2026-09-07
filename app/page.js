@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Image from 'next/image';
 
+const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
+
 export default function Home() {
   const [balance, setBalance] = useState(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -271,9 +273,9 @@ export default function Home() {
                 setMiningDelta(diffSeconds * finalRate);
               }
 
-              if (diffSeconds < 600) {
+              if (diffSeconds < CLAIM_COOLDOWN_SECONDS) {
                 setClaimCooldown(
-                  Math.floor(600 - diffSeconds)
+                  Math.floor(CLAIM_COOLDOWN_SECONDS - diffSeconds)
                 );
               }
             }
@@ -439,21 +441,72 @@ export default function Home() {
   };
 
   const handleClaim = async () => {
-    if (!isDataLoaded || isSaving || claimCooldown > 0 || miningDelta < 0.0001) return;
-    setIsSaving(true);
-
-    const newTotalBalance = balance + miningDelta;
-    const currentIsoTime = new Date().toISOString();
-
-    setBalance(newTotalBalance);
-    setMiningDelta(0);
-    setClaimCooldown(600);
-
-    if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
+    if (
+      !isDataLoaded ||
+      isSaving ||
+      claimCooldown > 0 ||
+      miningDelta < 0.0001
+    ) {
+      return;
     }
 
-    setTimeout(() => setIsSaving(false), 1000);
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/mining/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initData }),
+        cache: 'no-store',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (
+          (response.status === 429 || response.status === 409) &&
+          data.retryAfter
+        ) {
+          setClaimCooldown(Number(data.retryAfter));
+        }
+
+        throw new Error(data.error || 'Claim failed');
+      }
+
+      setBalance(Number(data.balance || 0));
+      setMiningDelta(0);
+      setClaimCooldown(
+        Number(data.cooldown || CLAIM_COOLDOWN_SECONDS)
+      );
+
+      if (Number.isFinite(Number(data.miningRate))) {
+        setTotalMiningRate(Number(data.miningRate));
+      }
+
+      if (Number.isFinite(Number(data.activeFriends))) {
+        setActiveFriendsCount(Number(data.activeFriends));
+      }
+    } catch (error) {
+      console.error('Claim failed:', error);
+
+      if (error?.message && error.message !== 'Claim cooldown active') {
+        alert('❌ Claim failed. Please try again.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDailyTwitter = async () => {
@@ -542,9 +595,18 @@ export default function Home() {
   };
 
   const formatTime = (totalSeconds) => {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const safeSeconds = Math.max(
+      0,
+      Math.floor(Number(totalSeconds) || 0)
+    );
+
+    const h = Math.floor(safeSeconds / 3600);
+    const m = Math.floor((safeSeconds % 3600) / 60);
+    const s = safeSeconds % 60;
+
+    return `${h.toString().padStart(2, '0')}:${m
+      .toString()
+      .padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
