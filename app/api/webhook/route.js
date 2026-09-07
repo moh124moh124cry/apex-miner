@@ -96,6 +96,7 @@ function cleanupMap(map, maxAgeMs) {
 // ======================================================
 // Text / URL helpers
 // ======================================================
+
 function getMessageText(message) {
   return (message?.text || message?.caption || '').trim();
 }
@@ -114,13 +115,33 @@ function normalizeText(text) {
     .trim();
 }
 
-function extractUrls(message) {
-  const text = getMessageText(message);
-  const entities = getMessageEntities(message);
+// ======================================================
+// Extract every link surface from a Telegram message
+//
+// Includes:
+// - visible text URLs
+// - caption URLs
+// - url entities
+// - text_link entities
+// - inline keyboard URL buttons
+// - login_url buttons
+// - web_app buttons
+// ======================================================
 
+function extractUrls(message) {
   const found = new Set();
 
-  // http(s), www, Telegram schemes, and common bare domains.
+  const sources = [
+    {
+      text: message?.text || '',
+      entities: message?.entities || [],
+    },
+    {
+      text: message?.caption || '',
+      entities: message?.caption_entities || [],
+    },
+  ];
+
   const patterns = [
     /https?:\/\/[^\s<>()]+/gi,
     /www\.[^\s<>()]+/gi,
@@ -129,33 +150,115 @@ function extractUrls(message) {
     /\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>()]*)?/gi,
   ];
 
-  for (const pattern of patterns) {
-    const matches = text.match(pattern) || [];
+  for (const source of sources) {
+    const text = source.text;
 
-    for (const match of matches) {
-      found.add(
-        match.replace(/[),.;!?]+$/g, '')
-      );
+    for (const pattern of patterns) {
+      const matches =
+        text.match(pattern) || [];
+
+      for (const match of matches) {
+        found.add(
+          match.replace(
+            /[),.;!?]+$/g,
+            ''
+          )
+        );
+      }
+    }
+
+    for (const entity of source.entities) {
+      // Hidden clickable text:
+      // Example: "Click here" -> https://example.com
+      if (
+        entity.type === 'text_link' &&
+        entity.url
+      ) {
+        found.add(entity.url);
+      }
+
+      // Telegram URL entity.
+      // JS string slicing uses UTF-16 code units,
+      // which matches Telegram entity offsets.
+      if (
+        entity.type === 'url' &&
+        Number.isInteger(entity.offset) &&
+        Number.isInteger(entity.length)
+      ) {
+        const entityUrl =
+          text.slice(
+            entity.offset,
+            entity.offset +
+              entity.length
+          );
+
+        if (entityUrl) {
+          found.add(entityUrl);
+        }
+      }
     }
   }
 
-  for (const entity of entities) {
-    if (entity.type === 'text_link' && entity.url) {
-      found.add(entity.url);
+  // ====================================================
+  // Inline keyboard buttons
+  //
+  // This is the important fix for advertisements such as:
+  // photo + BINANCE / AIRDROP / CLAIM buttons.
+  // ====================================================
+
+  const inlineKeyboard =
+    message?.reply_markup
+      ?.inline_keyboard || [];
+
+  for (const row of inlineKeyboard) {
+    if (!Array.isArray(row)) {
+      continue;
+    }
+
+    for (const button of row) {
+      if (!button) {
+        continue;
+      }
+
+      // Standard URL button
+      if (button.url) {
+        found.add(button.url);
+      }
+
+      // Telegram login button containing an external URL
+      if (button.login_url?.url) {
+        found.add(
+          button.login_url.url
+        );
+      }
+
+      // Telegram Web App button
+      if (button.web_app?.url) {
+        found.add(
+          button.web_app.url
+        );
+      }
     }
   }
 
-  return [...found];
+  return [
+    ...found,
+  ].filter(Boolean);
 }
 
 function normalizeUrl(rawUrl) {
-  const value = String(rawUrl || '').trim();
+  const value =
+    String(rawUrl || '').trim();
 
   if (!value) {
     return null;
   }
 
-  if (value.toLowerCase().startsWith('tg://')) {
+  if (
+    value
+      .toLowerCase()
+      .startsWith('tg://')
+  ) {
     return value.toLowerCase();
   }
 
@@ -172,36 +275,50 @@ function normalizeUrl(rawUrl) {
 }
 
 function isAllowedUrl(rawUrl) {
-  const lowerRaw = String(rawUrl || '').trim().toLowerCase();
+  const lowerRaw =
+    String(rawUrl || '')
+      .trim()
+      .toLowerCase();
 
   // Exact/partial official link prefix whitelist.
   if (
-    allowedLinkPrefixes.some((prefix) =>
-      lowerRaw.startsWith(prefix)
+    allowedLinkPrefixes.some(
+      (prefix) =>
+        lowerRaw.startsWith(prefix)
     )
   ) {
     return true;
   }
 
-  const parsed = normalizeUrl(rawUrl);
+  const parsed =
+    normalizeUrl(rawUrl);
 
-  if (!parsed || typeof parsed === 'string') {
+  if (
+    !parsed ||
+    typeof parsed === 'string'
+  ) {
     return false;
   }
 
-  const hostname = parsed.hostname
-    .toLowerCase()
-    .replace(/^www\./, '');
+  const hostname =
+    parsed.hostname
+      .toLowerCase()
+      .replace(/^www\./, '');
 
   return allowedLinkDomains.some(
     (domain) =>
       hostname === domain ||
-      hostname.endsWith(`.${domain}`)
+      hostname.endsWith(
+        `.${domain}`
+      )
   );
 }
 
-function containsUnauthorizedLink(message) {
-  const urls = extractUrls(message);
+function containsUnauthorizedLink(
+  message
+) {
+  const urls =
+    extractUrls(message);
 
   if (urls.length === 0) {
     return false;
@@ -209,18 +326,23 @@ function containsUnauthorizedLink(message) {
 
   // If no whitelist exists, normal members may not post links.
   if (
-    allowedLinkPrefixes.length === 0 &&
-    allowedLinkDomains.length === 0
+    allowedLinkPrefixes.length ===
+      0 &&
+    allowedLinkDomains.length ===
+      0
   ) {
     return true;
   }
 
-  return urls.some((url) => !isAllowedUrl(url));
+  return urls.some(
+    (url) => !isAllowedUrl(url)
+  );
 }
 
 // ======================================================
 // Spam heuristics
 // ======================================================
+
 const defaultSpamKeywords = [
   'guaranteed profit',
   'guaranteed returns',
@@ -256,10 +378,13 @@ const spamKeywords = [
 ];
 
 function countMentions(message) {
-  return getMessageEntities(message).filter(
+  return getMessageEntities(
+    message
+  ).filter(
     (entity) =>
       entity.type === 'mention' ||
-      entity.type === 'text_mention'
+      entity.type ===
+        'text_mention'
   ).length;
 }
 
@@ -272,16 +397,20 @@ function looksLikeSpam(message) {
     return false;
   }
 
-  const keywordHit = spamKeywords.some(
-    (keyword) => text.includes(keyword)
-  );
+  const keywordHit =
+    spamKeywords.some(
+      (keyword) =>
+        text.includes(keyword)
+    );
 
   if (keywordHit) {
     return true;
   }
 
   // Mass tagging is usually promotional/flood behavior.
-  if (countMentions(message) >= 5) {
+  if (
+    countMentions(message) >= 5
+  ) {
     return true;
   }
 
@@ -296,24 +425,35 @@ function looksLikeSpam(message) {
 // ======================================================
 // Flood / duplicate-message detection
 // ======================================================
+
 function isFlooding(ctx) {
   const key = userKey(ctx);
   const timestamp = now();
 
-  const current = floodState.get(key) || {
-    timestamps: [],
-    updatedAt: timestamp,
-  };
+  const current =
+    floodState.get(key) || {
+      timestamps: [],
+      updatedAt: timestamp,
+    };
 
-  current.timestamps = current.timestamps.filter(
-    (item) =>
-      timestamp - item <= FLOOD_WINDOW_MS
+  current.timestamps =
+    current.timestamps.filter(
+      (item) =>
+        timestamp - item <=
+        FLOOD_WINDOW_MS
+    );
+
+  current.timestamps.push(
+    timestamp
   );
 
-  current.timestamps.push(timestamp);
-  current.updatedAt = timestamp;
+  current.updatedAt =
+    timestamp;
 
-  floodState.set(key, current);
+  floodState.set(
+    key,
+    current
+  );
 
   return (
     current.timestamps.length >
@@ -334,16 +474,18 @@ function isRepeatedMessage(ctx) {
   const key = userKey(ctx);
   const timestamp = now();
 
-  const current = repeatState.get(key) || {
-    text,
-    count: 0,
-    firstAt: timestamp,
-    updatedAt: timestamp,
-  };
+  const current =
+    repeatState.get(key) || {
+      text,
+      count: 0,
+      firstAt: timestamp,
+      updatedAt: timestamp,
+    };
 
   if (
     current.text !== text ||
-    timestamp - current.firstAt >
+    timestamp -
+      current.firstAt >
       REPEAT_WINDOW_MS
   ) {
     repeatState.set(key, {
@@ -357,9 +499,13 @@ function isRepeatedMessage(ctx) {
   }
 
   current.count += 1;
-  current.updatedAt = timestamp;
+  current.updatedAt =
+    timestamp;
 
-  repeatState.set(key, current);
+  repeatState.set(
+    key,
+    current
+  );
 
   return (
     current.count >=
@@ -370,14 +516,21 @@ function isRepeatedMessage(ctx) {
 // ======================================================
 // Admin check with short cache
 // ======================================================
+
 async function isAdmin(ctx) {
   try {
-    if (!ctx.chat?.id || !ctx.from?.id) {
+    if (
+      !ctx.chat?.id ||
+      !ctx.from?.id
+    ) {
       return false;
     }
 
-    const key = userKey(ctx);
-    const cached = adminCache.get(key);
+    const key =
+      userKey(ctx);
+
+    const cached =
+      adminCache.get(key);
 
     if (
       cached &&
@@ -387,18 +540,23 @@ async function isAdmin(ctx) {
     }
 
     const member =
-      await ctx.telegram.getChatMember(
-        ctx.chat.id,
-        ctx.from.id
-      );
+      await ctx.telegram
+        .getChatMember(
+          ctx.chat.id,
+          ctx.from.id
+        );
 
     const result =
-      member.status === 'creator' ||
-      member.status === 'administrator';
+      member.status ===
+        'creator' ||
+      member.status ===
+        'administrator';
 
     adminCache.set(key, {
       isAdmin: result,
-      expiresAt: now() + ADMIN_CACHE_MS,
+      expiresAt:
+        now() +
+        ADMIN_CACHE_MS,
     });
 
     return result;
@@ -417,52 +575,97 @@ async function isAdmin(ctx) {
 // ======================================================
 // Moderation actions
 // ======================================================
+
 async function safeDelete(ctx) {
   try {
     await ctx.deleteMessage();
+
     return true;
   } catch (error) {
     console.error(
       'Delete message error:',
       error
     );
+
     return false;
   }
 }
 
-async function muteUser(ctx, seconds = MUTE_SECONDS) {
+async function muteUser(
+  ctx,
+  seconds = MUTE_SECONDS
+) {
   try {
-    if (!ctx.chat?.id || !ctx.from?.id) {
+    if (
+      !ctx.chat?.id ||
+      !ctx.from?.id
+    ) {
       return false;
     }
 
     const untilDate =
-      Math.floor(Date.now() / 1000) +
-      seconds;
+      Math.floor(
+        Date.now() / 1000
+      ) + seconds;
 
     await ctx.telegram.callApi(
       'restrictChatMember',
       {
-        chat_id: ctx.chat.id,
-        user_id: ctx.from.id,
+        chat_id:
+          ctx.chat.id,
+
+        user_id:
+          ctx.from.id,
+
         permissions: {
-          can_send_messages: false,
-          can_send_audios: false,
-          can_send_documents: false,
-          can_send_photos: false,
-          can_send_videos: false,
-          can_send_video_notes: false,
-          can_send_voice_notes: false,
-          can_send_polls: false,
-          can_send_other_messages: false,
-          can_add_web_page_previews: false,
-          can_change_info: false,
-          can_invite_users: false,
-          can_pin_messages: false,
-          can_manage_topics: false,
+          can_send_messages:
+            false,
+
+          can_send_audios:
+            false,
+
+          can_send_documents:
+            false,
+
+          can_send_photos:
+            false,
+
+          can_send_videos:
+            false,
+
+          can_send_video_notes:
+            false,
+
+          can_send_voice_notes:
+            false,
+
+          can_send_polls:
+            false,
+
+          can_send_other_messages:
+            false,
+
+          can_add_web_page_previews:
+            false,
+
+          can_change_info:
+            false,
+
+          can_invite_users:
+            false,
+
+          can_pin_messages:
+            false,
+
+          can_manage_topics:
+            false,
         },
-        use_independent_chat_permissions: true,
-        until_date: untilDate,
+
+        use_independent_chat_permissions:
+          true,
+
+        until_date:
+          untilDate,
       }
     );
 
@@ -472,18 +675,23 @@ async function muteUser(ctx, seconds = MUTE_SECONDS) {
       'Mute user error:',
       error
     );
+
     return false;
   }
 }
 
 function recordViolation(ctx) {
-  const key = userKey(ctx);
-  const timestamp = now();
+  const key =
+    userKey(ctx);
 
-  const current = violationState.get(key) || {
-    timestamps: [],
-    updatedAt: timestamp,
-  };
+  const timestamp =
+    now();
+
+  const current =
+    violationState.get(key) || {
+      timestamps: [],
+      updatedAt: timestamp,
+    };
 
   current.timestamps =
     current.timestamps.filter(
@@ -492,12 +700,21 @@ function recordViolation(ctx) {
         VIOLATION_WINDOW_MS
     );
 
-  current.timestamps.push(timestamp);
-  current.updatedAt = timestamp;
+  current.timestamps.push(
+    timestamp
+  );
 
-  violationState.set(key, current);
+  current.updatedAt =
+    timestamp;
 
-  return current.timestamps.length;
+  violationState.set(
+    key,
+    current
+  );
+
+  return (
+    current.timestamps.length
+  );
 }
 
 async function moderateViolation(
@@ -530,99 +747,122 @@ async function moderateViolation(
 // ======================================================
 // Bot commands
 // ======================================================
-bot.command('start', async (ctx) => {
-  try {
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL;
 
-    if (!appUrl) {
-      await ctx.reply(
-        'Welcome to ApexMiner! 🚀'
-      );
-      return;
-    }
+bot.command(
+  'start',
+  async (ctx) => {
+    try {
+      const appUrl =
+        process.env
+          .NEXT_PUBLIC_APP_URL;
 
-    await ctx.reply(
-      'Welcome to ApexMiner! 🚀\n\n' +
-        'Start mining APXN points directly from Telegram. ' +
-        'Click below to open your mining dashboard.',
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: 'Start Mining ⛏️',
-                web_app: {
-                  url: appUrl,
-                },
-              },
-            ],
-          ],
-        },
+      if (!appUrl) {
+        await ctx.reply(
+          'Welcome to ApexMiner! 🚀'
+        );
+
+        return;
       }
-    );
-  } catch (error) {
-    console.error(
-      'Start command error:',
-      error
-    );
-  }
-});
 
-bot.command('rules', async (ctx) => {
-  try {
-    await ctx.reply(
-      '📌 Apex Network Community Rules\n\n' +
-        '1. No spam or repeated messages.\n' +
-        '2. No unauthorized links or advertisements.\n' +
-        '3. Never share seed phrases or private keys.\n' +
-        '4. Respect members and moderators.\n' +
-        '5. Official admins will never ask for your wallet private key.'
-    );
-  } catch (error) {
-    console.error(
-      'Rules command error:',
-      error
-    );
+      await ctx.reply(
+        'Welcome to ApexMiner! 🚀\n\n' +
+          'Start mining APXN points directly from Telegram. ' +
+          'Click below to open your mining dashboard.',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text:
+                    'Start Mining ⛏️',
+
+                  web_app: {
+                    url:
+                      appUrl,
+                  },
+                },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (error) {
+      console.error(
+        'Start command error:',
+        error
+      );
+    }
   }
-});
+);
+
+bot.command(
+  'rules',
+  async (ctx) => {
+    try {
+      await ctx.reply(
+        '📌 Apex Network Community Rules\n\n' +
+          '1. No spam or repeated messages.\n' +
+          '2. No unauthorized links or advertisements.\n' +
+          '3. Never share seed phrases or private keys.\n' +
+          '4. Respect members and moderators.\n' +
+          '5. Official admins will never ask for your wallet private key.'
+      );
+    } catch (error) {
+      console.error(
+        'Rules command error:',
+        error
+      );
+    }
+  }
+);
 
 // ======================================================
 // Welcome new members
 // ======================================================
+
 bot.on(
   'new_chat_members',
   async (ctx) => {
     try {
       const members =
         ctx.message
-          ?.new_chat_members || [];
+          ?.new_chat_members ||
+        [];
 
       const humanMembers =
         members.filter(
-          (member) => !member.is_bot
+          (member) =>
+            !member.is_bot
         );
 
       if (
-        humanMembers.length === 0
+        humanMembers.length ===
+        0
       ) {
         return;
       }
 
       const names =
-        humanMembers.map((member) => {
-          const name = [
-            member.first_name,
-            member.last_name,
-          ]
-            .filter(Boolean)
-            .join(' ');
+        humanMembers.map(
+          (member) => {
+            const name = [
+              member.first_name,
+              member.last_name,
+            ]
+              .filter(Boolean)
+              .join(' ');
 
-          return name || 'New member';
-        });
+            return (
+              name ||
+              'New member'
+            );
+          }
+        );
 
       await ctx.reply(
-        `👋 Welcome ${names.join(' and ')}!\n\n` +
+        `👋 Welcome ${names.join(
+          ' and '
+        )}!\n\n` +
           'Welcome to the Apex Network community 🚀\n' +
           'Please respect the community rules.\n\n' +
           '🔒 Never share your seed phrase or private key.\n' +
@@ -641,136 +881,179 @@ bot.on(
 // ======================================================
 // Group moderation
 // ======================================================
-bot.on('message', async (ctx) => {
-  try {
-    const chatType =
-      ctx.chat?.type;
 
-    if (
-      chatType !== 'group' &&
-      chatType !== 'supergroup'
-    ) {
-      return;
-    }
+bot.on(
+  'message',
+  async (ctx) => {
+    try {
+      const chatType =
+        ctx.chat?.type;
 
-    const message = ctx.message;
-
-    if (!message || !ctx.from) {
-      return;
-    }
-
-    // Optional protection from third-party bots.
-    if (
-      blockOtherBots &&
-      ctx.from.is_bot
-    ) {
-      await moderateViolation(
-        ctx,
-        'OTHER_BOT',
-        true
-      );
-      return;
-    }
-
-    // Unauthorized links are removed immediately.
-    if (
-      containsUnauthorizedLink(
-        message
-      )
-    ) {
-      await moderateViolation(
-        ctx,
-        'UNAUTHORIZED_LINK'
-      );
-      return;
-    }
-
-    // High-confidence spam phrases / mass mentions.
-    if (looksLikeSpam(message)) {
-      await moderateViolation(
-        ctx,
-        'SPAM_CONTENT'
-      );
-      return;
-    }
-
-    // Same message repeated several times.
-    if (isRepeatedMessage(ctx)) {
-      await moderateViolation(
-        ctx,
-        'REPEATED_MESSAGE',
-        true
-      );
-      return;
-    }
-
-    // Too many messages in a short period.
-    if (isFlooding(ctx)) {
-      await moderateViolation(
-        ctx,
-        'FLOOD',
-        true
-      );
-      return;
-    }
-  } catch (error) {
-    console.error(
-      'Moderation error:',
-      error
-    );
-  } finally {
-    // Periodic lightweight cleanup.
-    if (Math.random() < 0.02) {
-      cleanupMap(
-        floodState,
-        FLOOD_WINDOW_MS * 3
-      );
-      cleanupMap(
-        repeatState,
-        REPEAT_WINDOW_MS * 3
-      );
-      cleanupMap(
-        violationState,
-        VIOLATION_WINDOW_MS * 2
-      );
-
-      const timestamp = now();
-
-      for (
-        const [key, value]
-        of adminCache.entries()
+      if (
+        chatType !== 'group' &&
+        chatType !==
+          'supergroup'
       ) {
-        if (
-          value.expiresAt <
-          timestamp
+        return;
+      }
+
+      const message =
+        ctx.message;
+
+      if (
+        !message ||
+        !ctx.from
+      ) {
+        return;
+      }
+
+      // Optional protection from third-party bots.
+      if (
+        blockOtherBots &&
+        ctx.from.is_bot
+      ) {
+        await moderateViolation(
+          ctx,
+          'OTHER_BOT',
+          true
+        );
+
+        return;
+      }
+
+      // Unauthorized links are removed immediately.
+      //
+      // This now also checks links hidden in
+      // inline keyboard buttons.
+      if (
+        containsUnauthorizedLink(
+          message
+        )
+      ) {
+        await moderateViolation(
+          ctx,
+          'UNAUTHORIZED_LINK'
+        );
+
+        return;
+      }
+
+      // High-confidence spam phrases / mass mentions.
+      if (
+        looksLikeSpam(
+          message
+        )
+      ) {
+        await moderateViolation(
+          ctx,
+          'SPAM_CONTENT'
+        );
+
+        return;
+      }
+
+      // Same message repeated several times.
+      if (
+        isRepeatedMessage(ctx)
+      ) {
+        await moderateViolation(
+          ctx,
+          'REPEATED_MESSAGE',
+          true
+        );
+
+        return;
+      }
+
+      // Too many messages in a short period.
+      if (isFlooding(ctx)) {
+        await moderateViolation(
+          ctx,
+          'FLOOD',
+          true
+        );
+
+        return;
+      }
+    } catch (error) {
+      console.error(
+        'Moderation error:',
+        error
+      );
+    } finally {
+      // Periodic lightweight cleanup.
+      if (
+        Math.random() <
+        0.02
+      ) {
+        cleanupMap(
+          floodState,
+          FLOOD_WINDOW_MS *
+            3
+        );
+
+        cleanupMap(
+          repeatState,
+          REPEAT_WINDOW_MS *
+            3
+        );
+
+        cleanupMap(
+          violationState,
+          VIOLATION_WINDOW_MS *
+            2
+        );
+
+        const timestamp =
+          now();
+
+        for (
+          const [
+            key,
+            value,
+          ] of adminCache.entries()
         ) {
-          adminCache.delete(key);
+          if (
+            value.expiresAt <
+            timestamp
+          ) {
+            adminCache.delete(
+              key
+            );
+          }
         }
       }
     }
   }
-});
+);
 
 // ======================================================
 // Global Telegraf error handler
 // ======================================================
-bot.catch((error, ctx) => {
-  console.error(
-    'Telegram bot error:',
-    error,
-    'update:',
-    ctx?.update?.update_id
-  );
-});
+
+bot.catch(
+  (error, ctx) => {
+    console.error(
+      'Telegram bot error:',
+      error,
+      'update:',
+      ctx?.update?.update_id
+    );
+  }
+);
 
 // ======================================================
 // Secure webhook helper
 // ======================================================
+
 function safeEqualSecret(
   received,
   expected
 ) {
-  if (!received || !expected) {
+  if (
+    !received ||
+    !expected
+  ) {
     return false;
   }
 
@@ -796,11 +1079,15 @@ function safeEqualSecret(
 // ======================================================
 // Telegram Webhook
 // ======================================================
-export async function POST(req) {
+
+export async function POST(
+  req
+) {
   try {
     const webhookSecret =
       process.env
-        .TELEGRAM_WEBHOOK_SECRET || '';
+        .TELEGRAM_WEBHOOK_SECRET ||
+      '';
 
     // Protection activates only after you configure
     // TELEGRAM_WEBHOOK_SECRET in Vercel and register
@@ -819,7 +1106,8 @@ export async function POST(req) {
       ) {
         return NextResponse.json(
           {
-            error: 'Unauthorized',
+            error:
+              'Unauthorized',
           },
           {
             status: 401,
@@ -828,9 +1116,12 @@ export async function POST(req) {
       }
     }
 
-    const body = await req.json();
+    const body =
+      await req.json();
 
-    await bot.handleUpdate(body);
+    await bot.handleUpdate(
+      body
+    );
 
     return NextResponse.json(
       {
@@ -861,6 +1152,7 @@ export async function POST(req) {
 // ======================================================
 // Health check
 // ======================================================
+
 export async function GET() {
   return NextResponse.json({
     ok: true,
@@ -869,4 +1161,3 @@ export async function GET() {
     moderation: true,
   });
 }
-
