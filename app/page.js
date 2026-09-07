@@ -410,77 +410,66 @@ export default function Home() {
           return;
         }
 
-        // Temporary new-user path. We will move this server-side later.
-        const { count: totalUsers, error: countError } = await supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true });
-
-        if (countError) throw countError;
-
-        const currentTotal = totalUsers || 0;
-        let welcomeBonus = 1000;
-
-        if (currentTotal < 10000) welcomeBonus = 10000;
-        else if (currentTotal < 50000) welcomeBonus = 5000;
-        else if (currentTotal < 100000) welcomeBonus = 2500;
-
-        let initialBalance = welcomeBonus;
-
-        const referrerId =
-          verifiedStartParam &&
-          verifiedStartParam !== verifiedUserId
-            ? verifiedStartParam
-            : null;
-
-        if (referrerId) initialBalance += 1000;
-
-        const currentIsoTime = new Date().toISOString();
-
-        const { error: insertError } = await supabase.from('users').insert([
-          {
-            telegram_id: verifiedUserId,
-            first_name: verifiedFirstName,
-            username: verifiedUsername,
-            balance: initialBalance,
-            mining_rate: 0.00025,
-            referred_by: referrerId,
-            channel_joined: false,
-            group_joined: false,
-            twitter_joined: false,
-            checkin_streak: 0,
-            last_checkin_date: null,
-            last_claim: currentIsoTime,
+        // New user registration is handled securely on the server.
+        const registerResponse = await fetch('/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        ]);
+          body: JSON.stringify({ initData }),
+          cache: 'no-store',
+        });
 
-        if (insertError) throw insertError;
+        if (!registerResponse.ok) {
+          throw new Error('Registration failed');
+        }
 
-        if (!cancelled) {
-          applyUserState({
-            verifiedUserId,
-            verifiedFirstName,
-            verifiedUsername,
-            verifiedStartParam,
-            userData: {
-              balance: initialBalance,
-              miningRate: 0.00025,
-              totalMiningRate: 0.00025,
-              friendsCount: 0,
-              activeFriendsCount: 0,
-              channelJoined: false,
-              groupJoined: false,
-              twitterJoined: false,
-              lastTwitterTask: null,
-              lastTelegramTask: null,
-              checkinStreak: 0,
-              lastCheckinDate: null,
-              lastClaim: currentIsoTime,
-            },
-          });
+        const registerData = await registerResponse.json();
 
-          setWelcomeAmount(welcomeBonus);
+        if (cancelled) return;
+
+        if (!registerData.success || !registerData.user) {
+          throw new Error('Invalid registration result');
+        }
+
+        const registeredUser = registerData.user;
+
+        applyUserState({
+          verifiedUserId,
+          verifiedFirstName,
+          verifiedUsername,
+          verifiedStartParam,
+          userData: {
+            balance: Number(registeredUser.balance || 0),
+            miningRate: Number(
+              registeredUser.miningRate || 0.00025
+            ),
+            totalMiningRate: Number(
+              registeredUser.miningRate || 0.00025
+            ),
+            friendsCount: 0,
+            activeFriendsCount: 0,
+            channelJoined: false,
+            groupJoined: false,
+            twitterJoined: false,
+            lastTwitterTask: null,
+            lastTelegramTask: null,
+            checkinStreak: 0,
+            lastCheckinDate: null,
+            lastClaim:
+              registeredUser.lastClaim ||
+              new Date().toISOString(),
+          },
+        });
+
+        if (registerData.created) {
+          setWelcomeAmount(
+            Number(registerData.welcomeBonus || 0)
+          );
+
           setShowWelcome(true);
         }
+
       } catch (error) {
         console.error('App start failed');
 
