@@ -5,10 +5,7 @@ import { validateTelegramInitData } from '../../../../lib/telegram-auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
-const ACTIVE_FRIEND_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-function jsonResponse(body, status = 200) {
+function response(body, status = 200) {
   return NextResponse.json(body, {
     status,
     headers: {
@@ -23,162 +20,129 @@ export async function POST(request) {
     const initData = body?.initData;
 
     if (!initData || typeof initData !== 'string') {
-      return jsonResponse(
+      return response(
         { error: 'Telegram init data is required' },
         400
       );
     }
 
     if (initData.length > 8192) {
-      return jsonResponse(
+      return response(
         { error: 'Invalid Telegram init data' },
         400
       );
     }
 
-    const telegram = validateTelegramInitData(initData);
-    const telegramId = String(telegram.user.id);
+    const telegram =
+      validateTelegramInitData(initData);
 
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('balance, mining_rate, last_claim')
-      .eq('telegram_id', telegramId)
-      .maybeSingle();
+    const telegramId =
+      String(telegram.user.id);
 
-    if (userError) {
-      console.error('Mining claim user read error:', userError.code);
-      return jsonResponse({ error: 'Database error' }, 500);
-    }
-
-    if (!user) {
-      return jsonResponse({ error: 'User not found' }, 404);
-    }
-
-    const now = new Date();
-    const nowMs = now.getTime();
-
-    const lastClaimMs = user.last_claim
-      ? new Date(user.last_claim).getTime()
-      : nowMs;
-
-    if (!Number.isFinite(lastClaimMs)) {
-      console.error('Mining claim invalid last_claim:', telegramId);
-      return jsonResponse({ error: 'Invalid mining state' }, 500);
-    }
-
-    const elapsedSeconds = Math.max(
-      0,
-      (nowMs - lastClaimMs) / 1000
-    );
-
-    if (elapsedSeconds < CLAIM_COOLDOWN_SECONDS) {
-      const retryAfter = Math.ceil(
-        CLAIM_COOLDOWN_SECONDS - elapsedSeconds
-      );
-
-      return jsonResponse(
+    // عملية واحدة فقط إلى Supabase
+    const { data, error } =
+      await supabaseAdmin.rpc(
+        'apex_mining_claim',
         {
-          error: 'Claim cooldown active',
-          retryAfter,
-        },
-        429
+          p_telegram_id: telegramId,
+        }
       );
-    }
 
-    const baseRate = Number(user.mining_rate ?? 0.00025);
-    const currentBalance = Number(user.balance ?? 0);
-
-    if (
-      !Number.isFinite(baseRate) ||
-      baseRate < 0 ||
-      !Number.isFinite(currentBalance) ||
-      currentBalance < 0
-    ) {
-      console.error('Mining claim invalid numeric state:', telegramId);
-      return jsonResponse({ error: 'Invalid mining state' }, 500);
-    }
-
-    const activeSince = new Date(
-      nowMs - ACTIVE_FRIEND_WINDOW_MS
-    ).toISOString();
-
-    const {
-      count: activeFriendsCount,
-      error: friendsError,
-    } = await supabaseAdmin
-      .from('users')
-      .select('telegram_id', {
-        count: 'exact',
-        head: true,
-      })
-      .eq('referred_by', telegramId)
-      .gte('last_claim', activeSince);
-
-    if (friendsError) {
+    if (error) {
       console.error(
-        'Mining claim active friends error:',
-        friendsError.code
+        'Mining claim RPC error:',
+        error.code
       );
-      return jsonResponse({ error: 'Database error' }, 500);
-    }
 
-    const activeFriends = Number(activeFriendsCount || 0);
-
-    const friendsBonusRate =
-      activeFriends * (baseRate * 0.05);
-
-    const totalRate = baseRate + friendsBonusRate;
-    const claimedAmount = elapsedSeconds * totalRate;
-    const newBalance = currentBalance + claimedAmount;
-    const claimedAt = now.toISOString();
-
-    if (
-      !Number.isFinite(totalRate) ||
-      !Number.isFinite(claimedAmount) ||
-      claimedAmount < 0 ||
-      !Number.isFinite(newBalance)
-    ) {
-      console.error('Mining claim calculation error:', telegramId);
-      return jsonResponse({ error: 'Invalid mining calculation' }, 500);
-    }
-
-    const { data: updatedUser, error: updateError } =
-      await supabaseAdmin
-        .from('users')
-        .update({
-          balance: newBalance,
-          last_claim: claimedAt,
-        })
-        .eq('telegram_id', telegramId)
-        .eq('last_claim', user.last_claim)
-        .select('balance, last_claim')
-        .maybeSingle();
-
-    if (updateError) {
-      console.error('Mining claim update error:', updateError.code);
-      return jsonResponse({ error: 'Database error' }, 500);
-    }
-
-    if (!updatedUser) {
-      return jsonResponse(
-        {
-          error: 'Claim already processed',
-          retryAfter: CLAIM_COOLDOWN_SECONDS,
-        },
-        409
+      return response(
+        { error: 'Database error' },
+        500
       );
     }
 
-    return jsonResponse({
+    const result = Array.isArray(data)
+      ? data[0]
+      : data;
+
+    if (!result) {
+      return response(
+        { error: 'Invalid mining claim result' },
+        500
+      );
+    }
+
+    if (!result.success) {
+      if (result.error_code === 'COOLDOWN') {
+        return response(
+          {
+            error: 'Claim cooldown active',
+
+            balance: Number(
+              result.balance || 0
+            ),
+
+            retryAfter: Number(
+              result.retry_after || 0
+            ),
+
+            cooldown: Number(
+              result.cooldown || 43200
+            ),
+
+            lastClaim:
+              result.last_claim || null,
+          },
+          429
+        );
+      }
+
+      if (
+        result.error_code ===
+        'USER_NOT_FOUND'
+      ) {
+        return response(
+          { error: 'User not found' },
+          404
+        );
+      }
+
+      return response(
+        { error: 'Claim failed' },
+        400
+      );
+    }
+
+    return response({
       success: true,
-      balance: Number(updatedUser.balance),
-      claimed: claimedAmount,
-      miningRate: totalRate,
-      baseMiningRate: baseRate,
-      activeFriends,
-      lastClaim: updatedUser.last_claim,
-      cooldown: CLAIM_COOLDOWN_SECONDS,
+
+      balance: Number(
+        result.balance || 0
+      ),
+
+      claimed: Number(
+        result.claimed || 0
+      ),
+
+      miningRate: Number(
+        result.mining_rate || 0.00025
+      ),
+
+      baseMiningRate: Number(
+        result.base_mining_rate || 0.00025
+      ),
+
+      activeFriends: Number(
+        result.active_friends || 0
+      ),
+
+      lastClaim:
+        result.last_claim || null,
+
+      cooldown: Number(
+        result.cooldown || 43200
+      ),
     });
+
   } catch (error) {
     const message =
       error instanceof Error
@@ -191,10 +155,13 @@ export async function POST(request) {
       message.includes('Expired');
 
     if (!isAuthError) {
-      console.error('Mining claim API error:', message);
+      console.error(
+        'Mining claim API error:',
+        message
+      );
     }
 
-    return jsonResponse(
+    return response(
       {
         error: isAuthError
           ? 'Invalid Telegram authentication'
@@ -204,4 +171,3 @@ export async function POST(request) {
     );
   }
 }
-
