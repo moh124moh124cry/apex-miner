@@ -125,7 +125,7 @@ export default function Home() {
     let timer = null;
     let cancelled = false;
 
-    const authenticateTelegram = async () => {
+    const bootstrapTelegram = async () => {
       if (typeof window === 'undefined') return;
 
       const telegram = window.Telegram?.WebApp;
@@ -134,7 +134,7 @@ export default function Home() {
         attempts += 1;
 
         if (attempts < 10) {
-          timer = setTimeout(authenticateTelegram, 500);
+          timer = setTimeout(bootstrapTelegram, 500);
         } else if (!cancelled) {
           setUserId('test_user');
         }
@@ -155,28 +155,218 @@ export default function Home() {
       }
 
       try {
-        const response = await fetch('/api/auth/telegram', {
+        const response = await fetch('/api/bootstrap', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ initData }),
+          cache: 'no-store',
         });
 
         if (!response.ok) {
-          throw new Error('Telegram authentication failed');
+          throw new Error('Bootstrap failed');
         }
 
         const data = await response.json();
 
         if (cancelled) return;
 
-        setUserId(String(data.user.id));
-        setFirstName(data.user.firstName || 'Unknown');
-        setUserName(data.user.username || 'No Username');
-        setStartParam(data.startParam || null);
+        const telegramUser = data.telegram;
+        const verifiedUserId = String(telegramUser.id);
+        const verifiedFirstName = telegramUser.firstName || 'Unknown';
+        const verifiedUsername = telegramUser.username || 'No Username';
+        const verifiedStartParam = data.startParam || null;
+
+        setUserId(verifiedUserId);
+        setFirstName(verifiedFirstName);
+        setUserName(verifiedUsername);
+        setStartParam(verifiedStartParam);
+
+        if (data.exists && data.user) {
+          const dbUser = data.user;
+
+          let currentDbRate = Number(dbUser.miningRate || 0.00025);
+          let activeFriends = 0;
+
+          setBalance(Number(dbUser.balance || 0));
+          setDbMiningRate(currentDbRate);
+          setTaskCompleted(Boolean(dbUser.channelJoined));
+          setGroupTaskCompleted(Boolean(dbUser.groupJoined));
+          setTwitterTaskCompleted(Boolean(dbUser.twitterJoined));
+
+          const todayStr = new Date().toISOString().split('T')[0];
+
+          setDailyTwitterDone(dbUser.lastTwitterTask === todayStr);
+          setDailyTelegramDone(dbUser.lastTelegramTask === todayStr);
+
+          let currentStreak = Number(dbUser.checkinStreak || 0);
+          let isCheckinAvailable = true;
+          const now = new Date();
+          const todayStrFull = now.toDateString();
+
+          if (dbUser.lastCheckinDate) {
+            const lastDate = new Date(dbUser.lastCheckinDate);
+
+            if (lastDate.toDateString() === todayStrFull) {
+              isCheckinAvailable = false;
+            } else {
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+
+              if (lastDate.toDateString() !== yesterday.toDateString()) {
+                currentStreak = 0;
+              }
+            }
+          }
+
+          setCheckinStreak(currentStreak);
+          setCanCheckIn(isCheckinAvailable);
+          setDailyRewardAmt(((currentStreak % 7) + 1) * 100);
+
+          const { data: friendsData, error: friendsError } = await supabase
+            .from('users')
+            .select('first_name, country, last_claim')
+            .eq('referred_by', verifiedUserId)
+            .order('last_claim', { ascending: false });
+
+          if (!cancelled) {
+            if (!friendsError && friendsData) {
+              setFriendsList(friendsData);
+              setFriendsCount(friendsData.length);
+
+              const yesterdayStr = new Date(
+                Date.now() - 86400000
+              ).toISOString();
+
+              activeFriends = friendsData.filter(
+                (friend) =>
+                  friend.last_claim &&
+                  friend.last_claim >= yesterdayStr
+              ).length;
+
+              setActiveFriendsCount(activeFriends);
+            } else {
+              setFriendsList([]);
+              setFriendsCount(0);
+              setActiveFriendsCount(0);
+            }
+
+            const friendsBonus =
+              activeFriends * (currentDbRate * 0.05);
+
+            const finalRate = currentDbRate + friendsBonus;
+
+            setTotalMiningRate(finalRate);
+
+            if (dbUser.lastClaim) {
+              const lastTime = new Date(dbUser.lastClaim).getTime();
+              const nowTime = Date.now();
+              const diffSeconds = Math.max(
+                0,
+                (nowTime - lastTime) / 1000
+              );
+
+              if (diffSeconds > 0) {
+                setMiningDelta(diffSeconds * finalRate);
+              }
+
+              if (diffSeconds < 600) {
+                setClaimCooldown(
+                  Math.floor(600 - diffSeconds)
+                );
+              }
+            }
+
+            setIsDataLoaded(true);
+          }
+
+          if (
+            dbUser.username !== verifiedUsername ||
+            dbUser.firstName !== verifiedFirstName
+          ) {
+            await supabase
+              .from('users')
+              .update({
+                first_name: verifiedFirstName,
+                username: verifiedUsername,
+              })
+              .eq('telegram_id', verifiedUserId);
+          }
+
+          return;
+        }
+
+        const { count: totalUsers, error: countError } =
+          await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true });
+
+        if (countError) {
+          throw countError;
+        }
+
+        const currentTotal = totalUsers || 0;
+
+        let welcomeBonus = 1000;
+
+        if (currentTotal < 10000) {
+          welcomeBonus = 10000;
+        } else if (currentTotal < 50000) {
+          welcomeBonus = 5000;
+        } else if (currentTotal < 100000) {
+          welcomeBonus = 2500;
+        }
+
+        let initialBalance = welcomeBonus;
+
+        const referrerId =
+          verifiedStartParam &&
+          verifiedStartParam !== verifiedUserId
+            ? verifiedStartParam
+            : null;
+
+        if (referrerId) {
+          initialBalance += 1000;
+        }
+
+        const currentIsoTime = new Date().toISOString();
+
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([
+            {
+              telegram_id: verifiedUserId,
+              first_name: verifiedFirstName,
+              username: verifiedUsername,
+              balance: initialBalance,
+              mining_rate: 0.00025,
+              referred_by: referrerId,
+              channel_joined: false,
+              group_joined: false,
+              twitter_joined: false,
+              checkin_streak: 0,
+              last_checkin_date: null,
+              last_claim: currentIsoTime,
+            },
+          ]);
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        if (!cancelled) {
+          setBalance(initialBalance);
+          setDbMiningRate(0.00025);
+          setTotalMiningRate(0.00025);
+          setCanCheckIn(true);
+          setDailyRewardAmt(100);
+          setWelcomeAmount(welcomeBonus);
+          setShowWelcome(true);
+          setIsDataLoaded(true);
+        }
       } catch (error) {
-        console.error('Telegram authentication failed');
+        console.error('App bootstrap failed');
 
         if (!cancelled) {
           setUserId('test_user');
@@ -184,7 +374,7 @@ export default function Home() {
       }
     };
 
-    authenticateTelegram();
+    bootstrapTelegram();
 
     return () => {
       cancelled = true;
@@ -198,147 +388,24 @@ export default function Home() {
   useEffect(() => {
     const saveUserCountry = async () => {
       if (!userId || userId === 'test_user') return;
+
       try {
         await fetch('/api/user', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId: userId })
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            telegramId: userId,
+          }),
         });
-      } catch (error) { }
+      } catch (error) {
+        console.error('Country update failed');
+      }
     };
+
     saveUserCountry();
   }, [userId]);
-
-  useEffect(() => {
-    async function fetchUserData() {
-      if (!userId || userId === 'test_user') return;
-      try {
-        let currentDbRate = 0.00025;
-        let activeFriends = 0;
-        const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
-
-        if (data) {
-          setBalance(Number(data.balance || 0));
-          if (data.mining_rate !== undefined && data.mining_rate !== null) {
-            currentDbRate = Number(data.mining_rate);
-            setDbMiningRate(currentDbRate);
-          }
-          if (data.channel_joined) setTaskCompleted(data.channel_joined);
-          if (data.group_joined) setGroupTaskCompleted(data.group_joined);
-          if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined);
-          const todayStr = new Date().toISOString().split('T')[0];
-          setDailyTwitterDone(data.last_twitter_task === todayStr);
-          setDailyTelegramDone(data.last_telegram_task === todayStr);
-
-          let currentStreak = data.checkin_streak || 0;
-          let isCheckinAvailable = true;
-          const now = new Date();
-          const todayStrFull = now.toDateString();
-          if (data.last_checkin_date) {
-            const lastDate = new Date(data.last_checkin_date);
-            if (lastDate.toDateString() === todayStrFull) {
-              isCheckinAvailable = false;
-            } else {
-              const yesterday = new Date();
-              yesterday.setDate(yesterday.getDate() - 1);
-              if (lastDate.toDateString() !== yesterday.toDateString()) {
-                currentStreak = 0;
-              }
-            }
-          }
-          setCheckinStreak(currentStreak);
-          setCanCheckIn(isCheckinAvailable);
-          setDailyRewardAmt(((currentStreak % 7) + 1) * 100);
-
-          const { data: friendsData } = await supabase
-            .from('users')
-            .select('first_name, country, last_claim')
-            .eq('referred_by', userId)
-            .order('last_claim', { ascending: false });
-
-          if (friendsData) {
-            setFriendsList(friendsData);
-            setFriendsCount(friendsData.length);
-
-            const yesterdayStr = new Date(Date.now() - 86400000).toISOString();
-            activeFriends = friendsData.filter(f => f.last_claim >= yesterdayStr).length;
-            setActiveFriendsCount(activeFriends);
-          } else {
-            setFriendsCount(0);
-            setActiveFriendsCount(0);
-          }
-
-          const friendsBonus = activeFriends * (currentDbRate * 0.05);
-          const finalRate = currentDbRate + friendsBonus;
-          setTotalMiningRate(finalRate);
-
-          if (data.last_claim) {
-            const lastTime = new Date(data.last_claim).getTime();
-            const nowTime = new Date().getTime();
-            const diffSeconds = (nowTime - lastTime) / 1000;
-            if (diffSeconds > 0) {
-              setMiningDelta(diffSeconds * finalRate);
-            }
-            if (diffSeconds < 600) {
-              setClaimCooldown(Math.floor(600 - diffSeconds));
-            }
-          }
-
-          if (data.username !== userName || data.first_name !== firstName) {
-            await supabase.from('users').update({ first_name: firstName, username: userName }).eq('telegram_id', userId);
-          }
-
-          setIsDataLoaded(true);
-        } else if (error && error.code === 'PGRST116') {
-          const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
-          let currentTotal = totalUsers || 0;
-
-          let welcomeBonus = 1000;
-          if (currentTotal < 10000) welcomeBonus = 10000;
-          else if (currentTotal < 50000) welcomeBonus = 5000;
-          else if (currentTotal < 100000) welcomeBonus = 2500;
-          else welcomeBonus = 1000;
-
-          let initialBalance = welcomeBonus;
-          let referrerId = (startParam && startParam !== userId) ? startParam : null;
-
-          if (referrerId) {
-             initialBalance += 1000;
-          }
-
-          const currentIsoTime = new Date().toISOString();
-          const { error: insertError } = await supabase.from('users').insert([{
-              telegram_id: userId,
-              first_name: firstName,
-              username: userName,
-              balance: initialBalance,
-              mining_rate: 0.00025,
-              referred_by: referrerId,
-              channel_joined: false,
-              group_joined: false,
-              twitter_joined: false,
-              checkin_streak: 0,
-              last_checkin_date: null,
-              last_claim: currentIsoTime
-          }]);
-
-          if (!insertError) {
-            setBalance(initialBalance);
-            setTotalMiningRate(0.00025);
-            setCanCheckIn(true);
-            setDailyRewardAmt(100);
-            setWelcomeAmount(welcomeBonus);
-            setShowWelcome(true);
-            setIsDataLoaded(true);
-          }
-        }
-      } catch (err) {
-        console.error('System Error');
-      }
-    }
-
-    if (firstName || userName) fetchUserData();
-  }, [userId, firstName, userName, startParam]);
 
   useEffect(() => {
     const interval = setInterval(() => {
