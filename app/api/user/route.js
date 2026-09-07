@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { supabaseAdmin } from '../../../lib/supabase-admin';
 
 export async function POST(request) {
   try {
@@ -12,22 +7,34 @@ export async function POST(request) {
     const { telegramId } = body;
 
     if (!telegramId) {
-      return NextResponse.json({ error: 'Telegram ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Telegram ID is required' },
+        { status: 400 }
+      );
     }
 
-    // التقاط دولة المستخدم من سيرفرات Vercel
-    const country = request.headers.get('x-vercel-ip-country') || 'Unknown';
+    const country =
+      request.headers.get('x-vercel-ip-country') || 'Unknown';
 
-    // تحديث عمود الدولة في قاعدة البيانات
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('users')
-      .update({ country: country })
+      .update({ country })
       .eq('telegram_id', telegramId);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
-    return NextResponse.json({ success: true, country });
+    return NextResponse.json({
+      success: true,
+      country,
+    });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('API user error:', error);
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
