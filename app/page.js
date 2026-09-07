@@ -727,46 +727,130 @@ export default function Home() {
     }
   };
 
-  const handleDailyTwitter = async () => {
-    if (!isDataLoaded || dailyTwitterDone || verifyingTwitter || !dailyTwitterLink) return;
-    window.open(dailyTwitterLink, '_blank');
-    setVerifyingTwitter(true);
+  const claimDailyTask = async ({
+    task,
+    link,
+    completed,
+    verifying,
+    setCompleted,
+    setVerifying,
+    cacheField,
+  }) => {
+    if (
+      !isDataLoaded ||
+      completed ||
+      verifying ||
+      !link
+    ) {
+      return;
+    }
+
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
+    window.open(link, '_blank');
+    setVerifying(true);
 
     setTimeout(async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const newBalance = balance + 100;
-      const { error } = await supabase.from('users').update({ last_twitter_task: today, balance: newBalance }).eq('telegram_id', userId);
-      if (!error) {
+      try {
+        const response = await fetch('/api/tasks/daily', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            initData,
+            task,
+          }),
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (
+            response.status === 409 &&
+            data.completed
+          ) {
+            const syncedBalance = Number(
+              data.balance
+            );
+
+            if (Number.isFinite(syncedBalance)) {
+              setBalance(syncedBalance);
+            }
+
+            const taskDate =
+              data.lastTaskDate ||
+              new Date().toISOString().split('T')[0];
+
+            setCompleted(true);
+
+            patchUserCache(userId, {
+              ...(Number.isFinite(syncedBalance)
+                ? { balance: syncedBalance }
+                : {}),
+              [cacheField]: taskDate,
+            });
+
+            return;
+          }
+
+          throw new Error(
+            data.error || 'Daily task failed'
+          );
+        }
+
+        const newBalance = Number(data.balance || 0);
+        const taskDate =
+          data.lastTaskDate ||
+          new Date().toISOString().split('T')[0];
+
         setBalance(newBalance);
-        setDailyTwitterDone(true);
+        setCompleted(true);
+
         patchUserCache(userId, {
           balance: newBalance,
-          lastTwitterTask: today,
+          [cacheField]: taskDate,
         });
-        setVerifyingTwitter(false);
+      } catch (error) {
+        console.error('Daily task failed:', error);
+        alert('❌ Daily task failed. Please try again.');
+      } finally {
+        setVerifying(false);
       }
     }, 10000);
   };
 
-  const handleDailyTelegram = async () => {
-    if (!isDataLoaded || dailyTelegramDone || verifyingTelegram || !dailyTelegramLink) return;
-    window.open(dailyTelegramLink, '_blank');
-    setVerifyingTelegram(true);
+  const handleDailyTwitter = async () => {
+    await claimDailyTask({
+      task: 'twitter',
+      link: dailyTwitterLink,
+      completed: dailyTwitterDone,
+      verifying: verifyingTwitter,
+      setCompleted: setDailyTwitterDone,
+      setVerifying: setVerifyingTwitter,
+      cacheField: 'lastTwitterTask',
+    });
+  };
 
-    setTimeout(async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const newBalance = balance + 100;
-      const { error } = await supabase.from('users').update({ last_telegram_task: today, balance: newBalance }).eq('telegram_id', userId);
-      if (!error) {
-        setBalance(newBalance);
-        setDailyTelegramDone(true);
-        patchUserCache(userId, {
-          balance: newBalance,
-          lastTelegramTask: today,
-        });
-        setVerifyingTelegram(false);
-      }
-    }, 10000);
+  const handleDailyTelegram = async () => {
+    await claimDailyTask({
+      task: 'telegram',
+      link: dailyTelegramLink,
+      completed: dailyTelegramDone,
+      verifying: verifyingTelegram,
+      setCompleted: setDailyTelegramDone,
+      setVerifying: setVerifyingTelegram,
+      cacheField: 'lastTelegramTask',
+    });
   };
 
   const claimSocialTask = async ({
