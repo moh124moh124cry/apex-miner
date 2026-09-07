@@ -1,46 +1,43 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; 
+import { supabase } from '../lib/supabase';
 import Image from 'next/image';
 
 export default function Home() {
-  const [balance, setBalance] = useState(0); 
-  const [isDataLoaded, setIsDataLoaded] = useState(false); 
+  const [balance, setBalance] = useState(0);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [miningDelta, setMiningDelta] = useState(0);
-  const [claimCooldown, setClaimCooldown] = useState(0); 
+  const [claimCooldown, setClaimCooldown] = useState(0);
   const [activeTab, setActiveTab] = useState('mine');
-  
-  const [discoverView, setDiscoverView] = useState('about'); 
-  
+
+  const [discoverView, setDiscoverView] = useState('about');
+
   const [taskCompleted, setTaskCompleted] = useState(false);
-  const [groupTaskCompleted, setGroupTaskCompleted] = useState(false); 
-  const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false); 
-  
+  const [groupTaskCompleted, setGroupTaskCompleted] = useState(false);
+  const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false);
+
   const dailyTwitterLink = process.env.NEXT_PUBLIC_DAILY_TWITTER_LINK || '';
   const dailyTelegramLink = process.env.NEXT_PUBLIC_DAILY_TELEGRAM_LINK || '';
-  
+
   const [dailyTwitterDone, setDailyTwitterDone] = useState(false);
   const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
   const [verifyingTwitter, setVerifyingTwitter] = useState(false);
   const [verifyingTelegram, setVerifyingTelegram] = useState(false);
-
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
   const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
+  const [friendsCount, setFriendsCount] = useState(0);
+  const [activeFriendsCount, setActiveFriendsCount] = useState(0);
+  const [friendsList, setFriendsList] = useState([]);
 
-  const [friendsCount, setFriendsCount] = useState(0); 
-  const [activeFriendsCount, setActiveFriendsCount] = useState(0); 
-  const [friendsList, setFriendsList] = useState([]); 
-  
-  const [dbMiningRate, setDbMiningRate] = useState(0.00025); 
-  const [totalMiningRate, setTotalMiningRate] = useState(0.00025); 
-  
+  const [dbMiningRate, setDbMiningRate] = useState(0.00025);
+  const [totalMiningRate, setTotalMiningRate] = useState(0.00025);
+
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
   const [userName, setUserName] = useState('');
   const [startParam, setStartParam] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
 
@@ -48,7 +45,7 @@ export default function Home() {
   const [walletAddress, setWalletAddress] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState('');
-  
+
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
 
@@ -58,9 +55,9 @@ export default function Home() {
     }
     const lowerCode = countryCode.toLowerCase();
     return (
-      <img 
-        src={`https://flagcdn.com/w40/${lowerCode}.png`} 
-        alt={countryCode} 
+      <img
+        src={`https://flagcdn.com/w40/${lowerCode}.png`}
+        alt={countryCode}
         className="w-7 h-5 object-cover rounded shadow-[0_0_5px_rgba(0,0,0,0.5)]"
       />
     );
@@ -72,7 +69,6 @@ export default function Home() {
 
     try {
       let provider = null;
-
       if (typeof window !== 'undefined') {
         if (walletName === 'MetaMask' && window.ethereum) {
           provider = window.ethereum;
@@ -83,18 +79,16 @@ export default function Home() {
         } else if (walletName === 'Binance Web3' && window.BinanceChain) {
           provider = window.BinanceChain;
         } else if (window.ethereum) {
-          provider = window.ethereum; 
+          provider = window.ethereum;
         }
       }
-
       if (!provider) {
         setManualWalletInput(true);
         setIsConnecting(false);
         return;
       }
-
       const accounts = await provider.request({ method: 'eth_requestAccounts' });
-      
+
       if (accounts && accounts.length > 0) {
         const address = accounts[0];
         setWalletAddress(`0x${address.substring(2, 6)}...${address.substring(address.length - 4)}`);
@@ -128,33 +122,82 @@ export default function Home() {
 
   useEffect(() => {
     let attempts = 0;
-    const getTelegramUser = () => {
-      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand(); 
-        
-        const user = window.Telegram.WebApp.initDataUnsafe?.user;
-        const param = window.Telegram.WebApp.initDataUnsafe?.start_param;
-        if (user) {
-          setUserId(user.id.toString());
-          setFirstName(user.first_name || 'Unknown');
-          setUserName(user.username || 'No Username');
-          setStartParam(param);
-        } else {
+    let timer = null;
+    let cancelled = false;
+
+    const authenticateTelegram = async () => {
+      if (typeof window === 'undefined') return;
+
+      const telegram = window.Telegram?.WebApp;
+
+      if (!telegram) {
+        attempts += 1;
+
+        if (attempts < 10) {
+          timer = setTimeout(authenticateTelegram, 500);
+        } else if (!cancelled) {
           setUserId('test_user');
         }
-      } else {
-        attempts++;
-        if (attempts < 10) setTimeout(getTelegramUser, 500);
-        else setUserId('test_user');
+
+        return;
+      }
+
+      telegram.ready();
+      telegram.expand();
+
+      const initData = telegram.initData;
+
+      if (!initData) {
+        if (!cancelled) {
+          setUserId('test_user');
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/telegram', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ initData }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Telegram authentication failed');
+        }
+
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        setUserId(String(data.user.id));
+        setFirstName(data.user.firstName || 'Unknown');
+        setUserName(data.user.username || 'No Username');
+        setStartParam(data.startParam || null);
+      } catch (error) {
+        console.error('Telegram authentication failed');
+
+        if (!cancelled) {
+          setUserId('test_user');
+        }
       }
     };
-    getTelegramUser();
+
+    authenticateTelegram();
+
+    return () => {
+      cancelled = true;
+
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
   }, []);
 
   useEffect(() => {
     const saveUserCountry = async () => {
-      if (!userId || userId === 'test_user') return; 
+      if (!userId || userId === 'test_user') return;
       try {
         await fetch('/api/user', {
           method: 'POST',
@@ -170,21 +213,19 @@ export default function Home() {
     async function fetchUserData() {
       if (!userId || userId === 'test_user') return;
       try {
-        let currentDbRate = 0.00025; 
+        let currentDbRate = 0.00025;
         let activeFriends = 0;
-
         const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
-        
+
         if (data) {
           setBalance(Number(data.balance || 0));
           if (data.mining_rate !== undefined && data.mining_rate !== null) {
             currentDbRate = Number(data.mining_rate);
-            setDbMiningRate(currentDbRate); 
+            setDbMiningRate(currentDbRate);
           }
-          if (data.channel_joined) setTaskCompleted(data.channel_joined); 
-          if (data.group_joined) setGroupTaskCompleted(data.group_joined); 
-          if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined); 
-
+          if (data.channel_joined) setTaskCompleted(data.channel_joined);
+          if (data.group_joined) setGroupTaskCompleted(data.group_joined);
+          if (data.twitter_joined) setTwitterTaskCompleted(data.twitter_joined);
           const todayStr = new Date().toISOString().split('T')[0];
           setDailyTwitterDone(data.last_twitter_task === todayStr);
           setDailyTelegramDone(data.last_telegram_task === todayStr);
@@ -193,23 +234,21 @@ export default function Home() {
           let isCheckinAvailable = true;
           const now = new Date();
           const todayStrFull = now.toDateString();
-
           if (data.last_checkin_date) {
             const lastDate = new Date(data.last_checkin_date);
             if (lastDate.toDateString() === todayStrFull) {
-              isCheckinAvailable = false; 
+              isCheckinAvailable = false;
             } else {
               const yesterday = new Date();
               yesterday.setDate(yesterday.getDate() - 1);
               if (lastDate.toDateString() !== yesterday.toDateString()) {
-                currentStreak = 0; 
+                currentStreak = 0;
               }
             }
           }
-          
           setCheckinStreak(currentStreak);
           setCanCheckIn(isCheckinAvailable);
-          setDailyRewardAmt(((currentStreak % 7) + 1) * 100); 
+          setDailyRewardAmt(((currentStreak % 7) + 1) * 100);
 
           const { data: friendsData } = await supabase
             .from('users')
@@ -220,7 +259,7 @@ export default function Home() {
           if (friendsData) {
             setFriendsList(friendsData);
             setFriendsCount(friendsData.length);
-            
+
             const yesterdayStr = new Date(Date.now() - 86400000).toISOString();
             activeFriends = friendsData.filter(f => f.last_claim >= yesterdayStr).length;
             setActiveFriendsCount(activeFriends);
@@ -232,7 +271,7 @@ export default function Home() {
           const friendsBonus = activeFriends * (currentDbRate * 0.05);
           const finalRate = currentDbRate + friendsBonus;
           setTotalMiningRate(finalRate);
-          
+
           if (data.last_claim) {
             const lastTime = new Date(data.last_claim).getTime();
             const nowTime = new Date().getTime();
@@ -240,7 +279,6 @@ export default function Home() {
             if (diffSeconds > 0) {
               setMiningDelta(diffSeconds * finalRate);
             }
-            
             if (diffSeconds < 600) {
               setClaimCooldown(Math.floor(600 - diffSeconds));
             }
@@ -250,12 +288,11 @@ export default function Home() {
             await supabase.from('users').update({ first_name: firstName, username: userName }).eq('telegram_id', userId);
           }
 
-          setIsDataLoaded(true); 
-
+          setIsDataLoaded(true);
         } else if (error && error.code === 'PGRST116') {
           const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
           let currentTotal = totalUsers || 0;
-          
+
           let welcomeBonus = 1000;
           if (currentTotal < 10000) welcomeBonus = 10000;
           else if (currentTotal < 50000) welcomeBonus = 5000;
@@ -264,23 +301,23 @@ export default function Home() {
 
           let initialBalance = welcomeBonus;
           let referrerId = (startParam && startParam !== userId) ? startParam : null;
-          
+
           if (referrerId) {
-             initialBalance += 1000; 
+             initialBalance += 1000;
           }
 
           const currentIsoTime = new Date().toISOString();
-          const { error: insertError } = await supabase.from('users').insert([{ 
-              telegram_id: userId, 
-              first_name: firstName, 
+          const { error: insertError } = await supabase.from('users').insert([{
+              telegram_id: userId,
+              first_name: firstName,
               username: userName,
-              balance: initialBalance, 
-              mining_rate: 0.00025, 
-              referred_by: referrerId, 
-              channel_joined: false, 
-              group_joined: false, 
+              balance: initialBalance,
+              mining_rate: 0.00025,
+              referred_by: referrerId,
+              channel_joined: false,
+              group_joined: false,
               twitter_joined: false,
-              checkin_streak: 0, 
+              checkin_streak: 0,
               last_checkin_date: null,
               last_claim: currentIsoTime
           }]);
@@ -292,13 +329,14 @@ export default function Home() {
             setDailyRewardAmt(100);
             setWelcomeAmount(welcomeBonus);
             setShowWelcome(true);
-            setIsDataLoaded(true); 
+            setIsDataLoaded(true);
           }
         }
       } catch (err) {
         console.error('System Error');
       }
     }
+
     if (firstName || userName) fetchUserData();
   }, [userId, firstName, userName, startParam]);
 
@@ -313,7 +351,7 @@ export default function Home() {
   const handleDailyCheckIn = async () => {
     if (!isDataLoaded || !canCheckIn || isSaving) return;
     setIsSaving(true);
-    
+
     const newStreak = checkinStreak + 1;
     const newBalance = balance + dailyRewardAmt;
     const todayIso = new Date().toISOString();
@@ -323,34 +361,39 @@ export default function Home() {
     setCanCheckIn(false);
 
     if (userId && userId !== 'test_user') {
-      await supabase.from('users').update({ 
-        balance: newBalance, 
-        checkin_streak: newStreak, 
-        last_checkin_date: todayIso 
+      await supabase.from('users').update({
+        balance: newBalance,
+        checkin_streak: newStreak,
+        last_checkin_date: todayIso
       }).eq('telegram_id', userId);
     }
+
     setIsSaving(false);
   };
 
   const handleClaim = async () => {
-    if (!isDataLoaded || isSaving || claimCooldown > 0 || miningDelta < 0.0001) return; 
+    if (!isDataLoaded || isSaving || claimCooldown > 0 || miningDelta < 0.0001) return;
     setIsSaving(true);
+
     const newTotalBalance = balance + miningDelta;
     const currentIsoTime = new Date().toISOString();
+
     setBalance(newTotalBalance);
     setMiningDelta(0);
-    setClaimCooldown(600); 
-    
+    setClaimCooldown(600);
+
     if (userId && userId !== 'test_user') {
       await supabase.from('users').update({ balance: newTotalBalance, last_claim: currentIsoTime }).eq('telegram_id', userId);
     }
-    setTimeout(() => setIsSaving(false), 1000); 
+
+    setTimeout(() => setIsSaving(false), 1000);
   };
 
   const handleDailyTwitter = async () => {
     if (!isDataLoaded || dailyTwitterDone || verifyingTwitter || !dailyTwitterLink) return;
     window.open(dailyTwitterLink, '_blank');
     setVerifyingTwitter(true);
+
     setTimeout(async () => {
       const today = new Date().toISOString().split('T')[0];
       const newBalance = balance + 100;
@@ -367,6 +410,7 @@ export default function Home() {
     if (!isDataLoaded || dailyTelegramDone || verifyingTelegram || !dailyTelegramLink) return;
     window.open(dailyTelegramLink, '_blank');
     setVerifyingTelegram(true);
+
     setTimeout(async () => {
       const today = new Date().toISOString().split('T')[0];
       const newBalance = balance + 100;
@@ -381,8 +425,8 @@ export default function Home() {
 
   const handleJoinChannel = async () => {
     if (!isDataLoaded || taskCompleted) return;
-    window.open('https://t.me/ApexMiner_Official', '_blank'); 
-    const newBalance = balance + 500; 
+    window.open('https://t.me/ApexMiner_Official', '_blank');
+    const newBalance = balance + 500;
     setBalance(newBalance);
     setTaskCompleted(true);
     if (userId && userId !== 'test_user') {
@@ -392,8 +436,8 @@ export default function Home() {
 
   const handleJoinGroup = async () => {
     if (!isDataLoaded || groupTaskCompleted) return;
-    window.open('https://t.me/ApexMinerGroup', '_blank'); 
-    const newBalance = balance + 500; 
+    window.open('https://t.me/ApexMinerGroup', '_blank');
+    const newBalance = balance + 500;
     setBalance(newBalance);
     setGroupTaskCompleted(true);
     if (userId && userId !== 'test_user') {
@@ -403,9 +447,9 @@ export default function Home() {
 
   const handleFollowTwitter = async () => {
     if (!isDataLoaded || twitterTaskCompleted) return;
-    window.open('https://x.com/ApexNetworkApp', '_blank'); 
+    window.open('https://x.com/ApexNetworkApp', '_blank');
     setTwitterTaskCompleted(true);
-    const newBalance = balance + 500; 
+    const newBalance = balance + 500;
     setBalance(newBalance);
     if (userId && userId !== 'test_user') {
       try {
@@ -438,12 +482,11 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
-
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
               <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✖</button>
-              
+
               {!manualWalletInput ? (
                 <>
                   <h3 className="text-xl font-black text-white mb-6 text-center flex items-center justify-center gap-2">
@@ -451,19 +494,19 @@ export default function Home() {
                   </h3>
                   <div className="flex flex-col gap-3">
                      <button onClick={() => handleConnectWallet('Binance Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Binance Web3' ? 'border-yellow-400 bg-slate-800/80' : 'border-slate-700 hover:border-yellow-400'} transition-all`}>
-                        <img src="/binance-logo-1.png" alt="Binance" className="w-7 h-7 object-contain drop-shadow-md" /> 
+                        <img src="/binance-logo-1.png" alt="Binance" className="w-7 h-7 object-contain drop-shadow-md" />
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
-                        <span className="text-2xl w-7 text-center">🦊</span> 
+                        <span className="text-2xl w-7 text-center">🦊</span>
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
-                        <span className="text-2xl w-7 text-center">🛡️</span> 
+                        <span className="text-2xl w-7 text-center">🛡️</span>
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
-                        <span className="text-xl font-black text-white w-7 text-center">OKX</span> 
+                        <span className="text-xl font-black text-white w-7 text-center">OKX</span>
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'OKX Web3' ? 'Connecting...' : 'OKX Web3'}</span>
                      </button>
                   </div>
@@ -477,28 +520,27 @@ export default function Home() {
                    <p className="text-xs text-gray-400 text-center mb-6 leading-relaxed">
                      Telegram browser does not support direct connections. Please paste your <strong className="text-yellow-400">BSC (BEP-20)</strong> address below to link it to your account for future Airdrops.
                    </p>
-                   
+
                    <div className="w-full mb-4">
                      <label className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1 block">Your BEP-20 Address</label>
-                     <input 
-                       type="text" 
+                     <input
+                       type="text"
                        value={tempAddress}
                        onChange={(e) => setTempAddress(e.target.value)}
-                       placeholder="0x..." 
+                       placeholder="0x..."
                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-all font-mono"
                      />
                    </div>
-                   
+
                    <button onClick={handleManualBind} className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
                      Bind Address
                    </button>
-                   
+
                    <button onClick={() => setManualWalletInput(false)} className="w-full mt-3 py-2 text-gray-500 text-xs font-bold hover:text-white transition-colors">
                      Cancel
                    </button>
                 </div>
               )}
-              
               {!manualWalletInput && <p className="text-[10px] font-bold text-yellow-500 text-center mt-6 uppercase tracking-wider">Supports Binance Smart Chain (BEP-20)</p>}
            </div>
         </div>
@@ -556,6 +598,7 @@ export default function Home() {
               {balance.toFixed(4)} <span className="text-xl text-yellow-400 font-black">APXN</span>
             </h2>
           </div>
+
           <div className="w-full flex flex-col gap-3 mt-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex justify-between items-center">
                <div className="flex flex-col">
@@ -565,15 +608,16 @@ export default function Home() {
                <span className="font-semibold text-yellow-400 text-xs">+{totalMiningRate.toFixed(5)} APXN/sec</span>
             </div>
           </div>
+
           <div className="mt-8 text-center">
              <h3 className="text-5xl font-black text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)] tabular-nums">
                +{miningDelta.toFixed(4)}
              </h3>
           </div>
-          
+
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
             <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
-            
+
             <div className="w-56 h-56 rounded-full p-[4px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-800 shadow-[0_0_50px_rgba(234,179,8,0.4),inset_0_0_20px_rgba(255,255,255,0.5)] z-10 flex items-center justify-center relative">
               <div className="w-full h-full rounded-full border-[6px] border-slate-950 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] relative">
                  <Image src="/logo2.png" alt="Apex Coin" width={200} height={200} className="w-full h-full object-cover rounded-full drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
@@ -581,9 +625,9 @@ export default function Home() {
               </div>
             </div>
 
-            <a 
-              href="https://x.com/ApexNetworkApp" 
-              target="_blank" 
+            <a
+              href="https://x.com/ApexNetworkApp"
+              target="_blank"
               rel="noopener noreferrer"
               className="absolute right-2 bottom-0 translate-y-4 z-20 flex flex-col items-center justify-center gap-1 group"
             >
@@ -595,22 +639,22 @@ export default function Home() {
               <span className="text-[10px] font-bold text-gray-400 group-hover:text-white transition-colors">Follow</span>
             </a>
           </div>
-          
-          <button 
-            onClick={handleClaim} 
-            disabled={!isDataLoaded || isSaving || claimCooldown > 0} 
+
+          <button
+            onClick={handleClaim}
+            disabled={!isDataLoaded || isSaving || claimCooldown > 0}
             className={`w-full py-4 mt-auto mb-4 rounded-2xl text-lg font-bold shadow-[0_4px_20px_rgba(245,158,11,0.4)] transition-all ${
-              !isDataLoaded 
-                ? 'bg-slate-800 text-gray-500 cursor-wait' 
+              !isDataLoaded
+                ? 'bg-slate-800 text-gray-500 cursor-wait'
                 : claimCooldown > 0
                 ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
                 : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white active:scale-95'
             }`}
           >
-            {!isDataLoaded 
-              ? 'LOADING...' 
-              : claimCooldown > 0 
-                ? `WAIT ${formatTime(claimCooldown)}` 
+            {!isDataLoaded
+              ? 'LOADING...'
+              : claimCooldown > 0
+                ? `WAIT ${formatTime(claimCooldown)}`
                 : (isSaving ? 'SAVING...' : 'CLAIM POINTS')
             }
           </button>
@@ -640,12 +684,12 @@ export default function Home() {
               </button>
             </div>
           </div>
-          
+
           {(dailyTelegramLink || dailyTwitterLink) && (
             <>
               <h2 className="text-2xl font-bold text-white mb-4">Daily Tasks</h2>
               <div className="flex flex-col gap-4 mb-6">
-                
+
                 {dailyTelegramLink && (
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
                   <div>
@@ -663,7 +707,7 @@ export default function Home() {
                   <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
                   <div>
                     <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                      Like Today's X Post 
+                      Like Today's X Post
                       <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
                     </h3>
                     <p className="text-yellow-400 text-xs">+100 APXN Points</p>
@@ -673,13 +717,12 @@ export default function Home() {
                   </button>
                 </div>
                 )}
-
               </div>
             </>
           )}
-          
+
           <h2 className="text-2xl font-bold text-white mb-4">One-Time Social Tasks</h2>
-          
+
           <div className="flex flex-col gap-4 mb-8">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
@@ -690,7 +733,7 @@ export default function Home() {
                 {taskCompleted ? 'Done ✓' : 'GO'}
               </button>
             </div>
-            
+
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
@@ -705,7 +748,7 @@ export default function Home() {
               <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
               <div>
                 <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                  Follow us on X 
+                  Follow us on X
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
                 </h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
@@ -727,6 +770,7 @@ export default function Home() {
                They get <span className="text-yellow-400 font-bold">1,000 Points</span> welcome bonus!
              </p>
           </div>
+
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center flex flex-col gap-4">
              <div className="flex justify-around mb-2">
                 <div className="flex flex-col">
@@ -773,7 +817,7 @@ export default function Home() {
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-4 pt-4 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store 🛒</h2>
-          
+
           <div className="mt-2 mb-6 bg-red-900/40 border border-red-500/50 rounded-lg p-4 shadow-lg shadow-red-900/20">
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
@@ -824,23 +868,22 @@ export default function Home() {
               <h2 className="text-lg font-semibold mb-4 border-b border-slate-700 pb-2 text-white flex items-center gap-2">
                 {level.title}
               </h2>
-              
+
               <div className="grid grid-cols-2 gap-3">
                 {level.items.map((item, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 overflow-hidden grayscale opacity-75 transition-all hover:grayscale-0 hover:opacity-100 shadow-md"
                   >
                     <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold text-gray-300 backdrop-blur-sm z-10 flex items-center gap-1">
                       🔒 Soon
                     </div>
-
                     <div className="text-center mt-4">
                       <h3 className="font-bold text-sm text-gray-200">{item.name}</h3>
                       <div className="text-green-400 text-[11px] font-bold mt-1">{item.boost}</div>
-                      
-                      <button 
-                        disabled 
+
+                      <button
+                        disabled
                         className="mt-3 w-full bg-slate-800 text-gray-400 py-2 rounded-lg text-xs font-bold cursor-not-allowed border border-slate-700"
                       >
                         {item.price} {level.currency}
@@ -879,11 +922,12 @@ export default function Home() {
                       </span>
                    </div>
                 </div>
-                
+
                 <div className="px-6 w-full mt-8">
                    <p className="text-gray-300 text-sm leading-relaxed mb-8 font-medium text-center">
                      Welcome to the next generation of cloud infrastructure. Built natively on the <strong className="text-yellow-500">Binance Smart Chain (BSC)</strong> for extreme scalability and ultra-low fees, Apex Network offers a seamless Web3 mining ecosystem directly inside Telegram.
                    </p>
+
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Core Features</h2>
                    <div className="grid grid-cols-2 gap-3 mb-8">
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
@@ -931,7 +975,7 @@ export default function Home() {
                         <span>📧</span> Support : contact@apxn.network
                      </button>
                    </div>
-                   
+
                    <div className="bg-gradient-to-br from-red-950/60 to-black p-5 rounded-2xl border border-red-900/50 shadow-[0_10px_30px_rgba(153,27,27,0.3)] mb-8 relative overflow-hidden">
                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900"></div>
                      <div className="flex items-center gap-2 mb-3">
@@ -1111,9 +1155,8 @@ export default function Home() {
                       <li>Ecosystem and global partnerships expansion</li>
                     </ul>
                   </div>
-
                 </div>
-                
+
                 <div className="mt-12 mb-4">
                   <h3 className="text-center text-gray-400 font-black tracking-widest text-[10px] uppercase mb-6">Core Project Flow</h3>
                   <div className="flex flex-col gap-2 items-center">
@@ -1187,7 +1230,7 @@ export default function Home() {
                 </div>
 
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Distribution Details (100M Total)</h2>
-                
+
                 <div className="space-y-4 mb-8">
                   <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
@@ -1240,7 +1283,6 @@ export default function Home() {
                     </p>
                   </div>
                 </div>
-
              </div>
           )}
         </div>
@@ -1266,3 +1308,4 @@ export default function Home() {
     </main>
   );
 }
+
