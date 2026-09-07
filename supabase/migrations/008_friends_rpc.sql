@@ -20,7 +20,7 @@ as $$
         where u.last_claim >= now() - interval '24 hours'
       )::bigint as active_friends
     from public.users as u
-    where u.referred_by = p_telegram_id
+    where u.referred_by = p_telegram_id::text
   ),
   friend_page as (
     select
@@ -28,7 +28,7 @@ as $$
       u.country,
       u.last_claim
     from public.users as u
-    where u.referred_by = p_telegram_id
+    where u.referred_by = p_telegram_id::text
     order by u.last_claim desc nulls last
     limit least(greatest(coalesce(p_limit, 50), 1), 100)
     offset greatest(coalesce(p_offset, 0), 0)
