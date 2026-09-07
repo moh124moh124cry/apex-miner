@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
 import Image from 'next/image';
 
 const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
@@ -488,6 +487,7 @@ export default function Home() {
   }, []);
 
   // Friends are fetched only when the Friends tab is actually opened.
+  // The browser calls our protected API instead of reading public.users directly.
   useEffect(() => {
     const loadFriends = async () => {
       if (
@@ -500,34 +500,52 @@ export default function Home() {
         return;
       }
 
+      const initData =
+        typeof window !== 'undefined'
+          ? window.Telegram?.WebApp?.initData
+          : null;
+
+      if (!initData) {
+        setFriendsLoaded(true);
+        return;
+      }
+
       try {
-        const { data: friendsData, error } = await supabase
-          .from('users')
-          .select('first_name, country, last_claim')
-          .eq('referred_by', userId)
-          .order('last_claim', { ascending: false });
+        const response = await fetch('/api/friends', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            initData,
+            limit: 50,
+            offset: 0,
+          }),
+          cache: 'no-store',
+        });
 
-        if (error) throw error;
+        const data = await response.json();
 
-        const safeFriends = friendsData || [];
-        const activeSince = Date.now() - 24 * 60 * 60 * 1000;
+        if (!response.ok) {
+          throw new Error(data.error || 'Friends load failed');
+        }
 
-        const activeCount = safeFriends.filter((friend) => {
-          if (!friend.last_claim) return false;
-          return new Date(friend.last_claim).getTime() >= activeSince;
-        }).length;
-
+        const safeFriends = Array.isArray(data.friends)
+          ? data.friends
+          : [];
+        const totalFriends = Number(data.totalFriends || 0);
+        const activeCount = Number(data.activeFriends || 0);
         const finalRate =
           dbMiningRate + activeCount * (dbMiningRate * 0.05);
 
         setFriendsList(safeFriends);
-        setFriendsCount(safeFriends.length);
+        setFriendsCount(totalFriends);
         setActiveFriendsCount(activeCount);
         setTotalMiningRate(finalRate);
         setFriendsLoaded(true);
 
         patchUserCache(userId, {
-          friendsCount: safeFriends.length,
+          friendsCount: totalFriends,
           activeFriendsCount: activeCount,
           totalMiningRate: finalRate,
         });
