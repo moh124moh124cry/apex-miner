@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { TonConnectButton } from '@tonconnect/ui-react';
 
 const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const USER_CACHE_VERSION = 1;
@@ -1126,19 +1127,31 @@ export default function Home() {
         </div>
       )}
 
-      <div className="w-full flex justify-between items-center p-4 z-10 mt-2">
-        <div className="flex items-center gap-2">
-          <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
-          <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
+      <div className="w-full p-4 z-10 mt-2">
+        <div className="w-full flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Image src="/logo2.png" alt="Apex Logo" width={28} height={28} className="rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] object-cover" />
+            <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
+          </div>
+
+          <button onClick={() => setShowWalletModal(true)} className={`border font-bold px-4 py-2 rounded-xl text-xs transition-colors flex items-center gap-2 ${walletAddress ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-700 text-white hover:border-yellow-500'}`}>
+            {walletAddress ? (
+               <span>✅</span>
+            ) : (
+               <img src="/binance-logo-1.png" alt="Binance" className="w-4 h-4 object-contain" />
+            )}
+            <span>{walletAddress ? walletAddress : 'Connect Wallet'}</span>
+          </button>
         </div>
-        <button onClick={() => setShowWalletModal(true)} className={`border font-bold px-4 py-2 rounded-xl text-xs transition-colors flex items-center gap-2 ${walletAddress ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-700 text-white hover:border-yellow-500'}`}>
-          {walletAddress ? (
-             <span>✅</span>
-          ) : (
-             <img src="/binance-logo-1.png" alt="Binance" className="w-4 h-4 object-contain" />
-          )}
-          <span>{walletAddress ? walletAddress : 'Connect Wallet'}</span>
-        </button>
+
+        <div className="w-full flex justify-end items-center gap-2 mt-2">
+          <span className="text-[9px] font-black text-[#0098EA] uppercase tracking-wider">
+            TON Wallet
+          </span>
+          <div className="origin-right scale-[0.85]">
+            <TonConnectButton />
+          </div>
+        </div>
       </div>
 
       {activeTab === 'mine' && (
@@ -1861,3 +1874,4 @@ export default function Home() {
     </main>
   );
 }
+
