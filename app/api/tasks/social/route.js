@@ -11,44 +11,149 @@ const ALLOWED_TASKS = new Set([
   'twitter',
 ]);
 
-// Official Telegram destinations already used by the app.
 const TELEGRAM_TASK_CHATS = {
   channel: '@ApexMiner_Official',
   group: '@ApexMinerGroup',
 };
 
-function response(body, status = 200) {
-  return NextResponse.json(body, {
-    status,
-    headers: {
-      'Cache-Control': 'no-store',
-    },
-  });
+// =====================================================
+// Lightweight per-instance one-time Social Tasks gate
+// =====================================================
+//
+// Performance optimization only.
+//
+// Vercel may run multiple instances, therefore this map
+// is NOT a security boundary.
+//
+// Supabase apex_claim_social_task remains the final
+// authority for:
+// - 500 APXN rewards
+// - Duplicate prevention
+// - Balance
+// - Atomic row locking
+//
+// IMPORTANT:
+// The local gate never stores or returns balance.
+// Balance can change through mining/check-in/daily tasks.
+// =====================================================
+
+const MAX_GATE_ENTRIES = 5000;
+
+const socialTaskGate =
+  globalThis.__apexSocialTaskGate ||
+  new Map();
+
+if (!globalThis.__apexSocialTaskGate) {
+  globalThis.__apexSocialTaskGate =
+    socialTaskGate;
+}
+
+function getGateKey(
+  telegramId,
+  task
+) {
+  return `${telegramId}:${task}`;
+}
+
+function setGateEntry(
+  gateKey,
+  entry
+) {
+  // Refresh insertion order.
+  socialTaskGate.delete(
+    gateKey
+  );
+
+  socialTaskGate.set(
+    gateKey,
+    entry
+  );
+
+  // Keep transient Vercel memory bounded.
+  while (
+    socialTaskGate.size >
+    MAX_GATE_ENTRIES
+  ) {
+    const oldestKey =
+      socialTaskGate
+        .keys()
+        .next()
+        .value;
+
+    if (
+      oldestKey === undefined
+    ) {
+      break;
+    }
+
+    socialTaskGate.delete(
+      oldestKey
+    );
+  }
+}
+
+function removeGateEntry(
+  gateKey
+) {
+  socialTaskGate.delete(
+    gateKey
+  );
+}
+
+// =====================================================
+// Response helper
+// =====================================================
+
+function response(
+  body,
+  status = 200
+) {
+  return NextResponse.json(
+    body,
+    {
+      status,
+      headers: {
+        'Cache-Control':
+          'no-store',
+      },
+    }
+  );
 }
 
 // =====================================================
 // Telegram membership verification
 // =====================================================
 
-function isActiveTelegramMember(member) {
+function isActiveTelegramMember(
+  member
+) {
   if (!member?.status) {
     return false;
   }
 
   if (
-    member.status === 'creator' ||
-    member.status === 'administrator' ||
-    member.status === 'member'
+    member.status ===
+      'creator' ||
+    member.status ===
+      'administrator' ||
+    member.status ===
+      'member'
   ) {
     return true;
   }
 
-  // A restricted user may still be an active member.
-  if (member.status === 'restricted') {
-    return member.is_member === true;
+  // Restricted users may still remain members.
+  if (
+    member.status ===
+    'restricted'
+  ) {
+    return (
+      member.is_member ===
+      true
+    );
   }
 
-  // "left" and "kicked" are not members.
+  // left / kicked are not members.
   return false;
 }
 
@@ -56,42 +161,64 @@ async function getTelegramChatMember(
   chatId,
   userId
 ) {
-  const botToken = process.env.BOT_TOKEN;
+  const botToken =
+    process.env.BOT_TOKEN;
 
   if (!botToken) {
-    throw new Error('Missing BOT_TOKEN');
+    throw new Error(
+      'Missing BOT_TOKEN'
+    );
   }
 
-  const controller = new AbortController();
+  const controller =
+    new AbortController();
 
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, 8000);
-
-  try {
-    const telegramResponse = await fetch(
-      `https://api.telegram.org/bot${botToken}/getChatMember`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          user_id: userId,
-        }),
-        cache: 'no-store',
-        signal: controller.signal,
-      }
+  const timeout =
+    setTimeout(
+      () => {
+        controller.abort();
+      },
+      8000
     );
 
-    let telegramData = null;
+  try {
+    const telegramResponse =
+      await fetch(
+        `https://api.telegram.org/bot${botToken}/getChatMember`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+
+          body:
+            JSON.stringify({
+              chat_id:
+                chatId,
+
+              user_id:
+                userId,
+            }),
+
+          cache: 'no-store',
+
+          signal:
+            controller.signal,
+        }
+      );
+
+    let telegramData =
+      null;
 
     try {
       telegramData =
-        await telegramResponse.json();
+        await telegramResponse
+          .json();
     } catch {
-      telegramData = null;
+      telegramData =
+        null;
     }
 
     if (
@@ -105,8 +232,11 @@ async function getTelegramChatMember(
     }
 
     return telegramData.result;
+
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(
+      timeout
+    );
   }
 }
 
@@ -115,7 +245,9 @@ async function verifyTelegramMembership(
   userId
 ) {
   const chatId =
-    TELEGRAM_TASK_CHATS[task];
+    TELEGRAM_TASK_CHATS[
+      task
+    ];
 
   if (!chatId) {
     return false;
@@ -127,30 +259,43 @@ async function verifyTelegramMembership(
       userId
     );
 
-  return isActiveTelegramMember(
-    member
+  return (
+    isActiveTelegramMember(
+      member
+    )
   );
 }
 
 // =====================================================
-// Check whether the one-time task is already completed
-// before calling Telegram API or the reward RPC.
+// Database completion pre-check
 // =====================================================
 
 function getTaskCompletionStatus(
   user,
   task
 ) {
-  if (task === 'channel') {
-    return Boolean(user.channel_joined);
+  if (
+    task === 'channel'
+  ) {
+    return Boolean(
+      user.channel_joined
+    );
   }
 
-  if (task === 'group') {
-    return Boolean(user.group_joined);
+  if (
+    task === 'group'
+  ) {
+    return Boolean(
+      user.group_joined
+    );
   }
 
-  if (task === 'twitter') {
-    return Boolean(user.twitter_joined);
+  if (
+    task === 'twitter'
+  ) {
+    return Boolean(
+      user.twitter_joined
+    );
   }
 
   return false;
@@ -160,16 +305,26 @@ function getTaskCompletionStatus(
 // Social task claim
 // =====================================================
 
-export async function POST(request) {
-  try {
-    const body = await request.json();
+export async function POST(
+  request
+) {
+  let activeGateKey =
+    null;
 
-    const initData = body?.initData;
-    const task = body?.task;
+  try {
+    const body =
+      await request.json();
+
+    const initData =
+      body?.initData;
+
+    const task =
+      body?.task;
 
     if (
       !initData ||
-      typeof initData !== 'string'
+      typeof initData !==
+        'string'
     ) {
       return response(
         {
@@ -180,52 +335,139 @@ export async function POST(request) {
       );
     }
 
-    if (!ALLOWED_TASKS.has(task)) {
+    if (
+      !ALLOWED_TASKS.has(
+        task
+      )
+    ) {
       return response(
         {
-          error: 'Invalid task',
+          error:
+            'Invalid task',
         },
         400
       );
     }
 
-    // Verify the actual Telegram Mini App user.
+    // Central validation also enforces initData size.
     const telegram =
       validateTelegramInitData(
         initData
       );
 
     const telegramId =
-      String(telegram.user.id);
+      String(
+        telegram.user.id
+      );
 
-    // ==================================================
-    // Fast indexed pre-check.
+    const gateKey =
+      getGateKey(
+        telegramId,
+        task
+      );
+
+    activeGateKey =
+      gateKey;
+
+    const existingGate =
+      socialTaskGate.get(
+        gateKey
+      );
+
+    // =================================================
+    // 1. This Vercel instance already knows that the
+    //    one-time task has been completed.
     //
-    // telegram_id is the users primary key.
-    // If this task was already completed, stop here.
+    //    No Supabase read.
+    //    No Telegram API call.
+    //    No reward RPC.
     //
-    // This prevents repeated requests from unnecessarily
-    // reaching Telegram getChatMember or the reward RPC.
-    // ==================================================
+    //    Never return cached balance.
+    // =================================================
+
+    if (
+      existingGate
+        ?.completed === true
+    ) {
+      return response(
+        {
+          error:
+            'Task already claimed',
+
+          completed:
+            true,
+        },
+        409
+      );
+    }
+
+    // =================================================
+    // 2. Another identical request is already being
+    //    processed on this Vercel instance.
+    // =================================================
+
+    if (
+      existingGate
+        ?.inFlight === true
+    ) {
+      return response(
+        {
+          error:
+            'Task request already in progress',
+
+          retryAfter:
+            1,
+
+          completed:
+            false,
+        },
+        429
+      );
+    }
+
+    // Mark before any Supabase / Telegram work.
+    setGateEntry(
+      gateKey,
+      {
+        inFlight:
+          true,
+
+        completed:
+          false,
+      }
+    );
+
+    // =================================================
+    // Fast indexed database pre-check.
+    //
+    // We intentionally do NOT select balance.
+    //
+    // If the task is already completed, this avoids
+    // Telegram getChatMember and the locking reward RPC.
+    // =================================================
 
     const {
       data: user,
       error: userError,
-    } = await supabaseAdmin
-      .from('users')
-      .select(`
-        balance,
-        channel_joined,
-        group_joined,
-        twitter_joined
-      `)
-      .eq(
-        'telegram_id',
-        telegramId
-      )
-      .maybeSingle();
+    } =
+      await supabaseAdmin
+        .from('users')
+        .select(`
+          channel_joined,
+          group_joined,
+          twitter_joined
+        `)
+        .eq(
+          'telegram_id',
+          telegramId
+        )
+        .maybeSingle();
 
     if (userError) {
+      removeGateEntry(
+        gateKey
+      );
+
       console.error(
         'Social task pre-check error:',
         userError.code
@@ -233,16 +475,22 @@ export async function POST(request) {
 
       return response(
         {
-          error: 'Database error',
+          error:
+            'Database error',
         },
         500
       );
     }
 
     if (!user) {
+      removeGateEntry(
+        gateKey
+      );
+
       return response(
         {
-          error: 'User not found',
+          error:
+            'User not found',
         },
         404
       );
@@ -254,31 +502,53 @@ export async function POST(request) {
         task
       );
 
-    if (alreadyCompleted) {
+    // =================================================
+    // Database confirms this one-time task was already
+    // completed.
+    //
+    // Cache completion locally, but NEVER balance.
+    // =================================================
+
+    if (
+      alreadyCompleted
+    ) {
+      setGateEntry(
+        gateKey,
+        {
+          inFlight:
+            false,
+
+          completed:
+            true,
+        }
+      );
+
       return response(
         {
-          error: 'Task already claimed',
-          balance: Number(
-            user.balance || 0
-          ),
-          completed: true,
+          error:
+            'Task already claimed',
+
+          completed:
+            true,
         },
         409
       );
     }
 
-    // ==================================================
-    // Only channel/group require real Telegram
-    // membership verification.
+    // =================================================
+    // Telegram channel/group:
+    // require real membership verification.
     //
-    // Twitter remains exactly as it worked before.
-    // ==================================================
+    // Twitter remains unchanged and does not use
+    // external X verification.
+    // =================================================
 
     if (
       task === 'channel' ||
       task === 'group'
     ) {
-      let isMember = false;
+      let isMember =
+        false;
 
       try {
         isMember =
@@ -286,7 +556,12 @@ export async function POST(request) {
             task,
             telegram.user.id
           );
+
       } catch (error) {
+        removeGateEntry(
+          gateKey
+        );
+
         const message =
           error instanceof Error
             ? error.message
@@ -298,55 +573,70 @@ export async function POST(request) {
         );
 
         // Never award points if Telegram
-        // membership could not be verified.
+        // membership cannot be verified.
         return response(
           {
             error:
               'Unable to verify Telegram membership',
-            completed: false,
+
+            completed:
+              false,
           },
           503
         );
       }
 
       if (!isMember) {
+        removeGateEntry(
+          gateKey
+        );
+
         return response(
           {
             error:
-              task === 'channel'
+              task ===
+              'channel'
                 ? 'Please join the official Telegram channel first'
                 : 'Please join the official Telegram group first',
-            completed: false,
+
+            completed:
+              false,
           },
           403
         );
       }
     }
 
-    // ==================================================
-    // Existing Supabase reward system.
+    // =================================================
+    // Authoritative atomic reward RPC.
     //
-    // The RPC remains the final authority and still uses
-    // row locking, so concurrent requests cannot award
-    // the same task twice.
+    // channel = 500 APXN
+    // group   = 500 APXN
+    // twitter = 500 APXN
     //
-    // channel = 500
-    // group   = 500
-    // twitter = 500
-    // ==================================================
+    // Rewards are unchanged.
+    // =================================================
 
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabaseAdmin.rpc(
         'apex_claim_social_task',
         {
           p_telegram_id:
             telegramId,
+
           p_task:
             task,
         }
       );
 
     if (error) {
+      removeGateEntry(
+        gateKey
+      );
+
       console.error(
         'Social task RPC error:',
         error.code
@@ -354,7 +644,8 @@ export async function POST(request) {
 
       return response(
         {
-          error: 'Database error',
+          error:
+            'Database error',
         },
         500
       );
@@ -366,6 +657,10 @@ export async function POST(request) {
         : data;
 
     if (!result) {
+      removeGateEntry(
+        gateKey
+      );
+
       return response(
         {
           error:
@@ -375,20 +670,46 @@ export async function POST(request) {
       );
     }
 
-    if (!result.success) {
+    if (
+      !result.success
+    ) {
+      // ===============================================
+      // Supabase is authoritative.
+      //
+      // Here returning balance is safe because the
+      // response came directly from the database RPC.
+      //
+      // The balance itself is NOT stored in local gate.
+      // ===============================================
+
       if (
         result.error_code ===
         'ALREADY_CLAIMED'
       ) {
+        setGateEntry(
+          gateKey,
+          {
+            inFlight:
+              false,
+
+            completed:
+              true,
+          }
+        );
+
         return response(
           {
             error:
               'Task already claimed',
+
             balance:
               Number(
-                result.balance || 0
+                result.balance ||
+                0
               ),
-            completed: true,
+
+            completed:
+              true,
           },
           409
         );
@@ -398,6 +719,10 @@ export async function POST(request) {
         result.error_code ===
         'USER_NOT_FOUND'
       ) {
+        removeGateEntry(
+          gateKey
+        );
+
         return response(
           {
             error:
@@ -411,6 +736,10 @@ export async function POST(request) {
         result.error_code ===
         'INVALID_TASK'
       ) {
+        removeGateEntry(
+          gateKey
+        );
+
         return response(
           {
             error:
@@ -420,25 +749,55 @@ export async function POST(request) {
         );
       }
 
+      removeGateEntry(
+        gateKey
+      );
+
       return response(
         {
-          error: 'Task failed',
+          error:
+            'Task failed',
         },
         400
       );
     }
 
+    // =================================================
+    // Successful one-time task.
+    //
+    // Store only completion state locally.
+    // Never cache balance in server memory.
+    // =================================================
+
+    setGateEntry(
+      gateKey,
+      {
+        inFlight:
+          false,
+
+        completed:
+          true,
+      }
+    );
+
     return response({
-      success: true,
+      success:
+        true,
+
       task,
+
       reward:
         Number(
-          result.reward || 0
+          result.reward ||
+          0
         ),
+
       balance:
         Number(
-          result.balance || 0
+          result.balance ||
+          0
         ),
+
       completed:
         Boolean(
           result.task_completed
@@ -446,15 +805,38 @@ export async function POST(request) {
     });
 
   } catch (error) {
+    // Release only an unfinished local request.
+    if (activeGateKey) {
+      const entry =
+        socialTaskGate.get(
+          activeGateKey
+        );
+
+      if (
+        entry?.inFlight ===
+        true
+      ) {
+        removeGateEntry(
+          activeGateKey
+        );
+      }
+    }
+
     const message =
       error instanceof Error
         ? error.message
         : 'Unknown error';
 
     const isAuthError =
-      message.includes('Telegram') ||
-      message.includes('BOT_TOKEN') ||
-      message.includes('Expired');
+      message.includes(
+        'Telegram'
+      ) ||
+      message.includes(
+        'BOT_TOKEN'
+      ) ||
+      message.includes(
+        'Expired'
+      );
 
     if (!isAuthError) {
       console.error(
@@ -470,7 +852,9 @@ export async function POST(request) {
             ? 'Invalid Telegram authentication'
             : 'Internal server error',
       },
-      isAuthError ? 401 : 500
+      isAuthError
+        ? 401
+        : 500
     );
   }
 }
