@@ -45,6 +45,11 @@ function writeUserCache(telegramId, data) {
         ...data,
         version: USER_CACHE_VERSION,
         telegramId: String(telegramId),
+
+        // savedAt represents the last authoritative
+        // Bootstrap/Register synchronization.
+        //
+        // Local actions must never extend this timestamp.
         savedAt: Date.now(),
       })
     );
@@ -56,15 +61,31 @@ function writeUserCache(telegramId, data) {
 function patchUserCache(telegramId, patch) {
   if (typeof window === 'undefined' || !telegramId) return;
 
-  const current = readUserCache(telegramId) || {
-    version: USER_CACHE_VERSION,
-    telegramId: String(telegramId),
-  };
+  // Only patch a still-valid full cache.
+  //
+  // If the cache already expired, do NOT create a new
+  // partial cache from a local action. The next app open
+  // will perform one authoritative Bootstrap instead.
+  const current = readUserCache(telegramId);
 
-  writeUserCache(telegramId, {
-    ...current,
-    ...patch,
-  });
+  if (!current) return;
+
+  try {
+    window.localStorage.setItem(
+      getUserCacheKey(telegramId),
+      JSON.stringify({
+        ...current,
+        ...patch,
+        version: USER_CACHE_VERSION,
+        telegramId: String(telegramId),
+
+        // Preserve the original synchronization time.
+        savedAt: current.savedAt,
+      })
+    );
+  } catch {
+    // Local cache is only a performance optimization.
+  }
 }
 
 export default function Home() {
@@ -101,10 +122,10 @@ export default function Home() {
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
   const [userName, setUserName] = useState('');
-  const [startParam, setStartParam] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeAmount, setWelcomeAmount] = useState(0);
+  const [referralBonusAmount, setReferralBonusAmount] = useState(0);
 
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
@@ -194,7 +215,6 @@ export default function Home() {
       verifiedUserId,
       verifiedFirstName,
       verifiedUsername,
-      verifiedStartParam,
       userData,
       fromCache = false,
     }) => {
@@ -212,7 +232,6 @@ export default function Home() {
       setUserId(verifiedUserId);
       setFirstName(verifiedFirstName);
       setUserName(verifiedUsername);
-      setStartParam(verifiedStartParam);
 
       setBalance(Number(userData.balance || 0));
       setDbMiningRate(currentDbRate);
@@ -352,13 +371,10 @@ export default function Home() {
           authData.user.firstName || 'Unknown';
         const verifiedUsername =
           authData.user.username || 'No Username';
-        const verifiedStartParam =
-          authData.startParam || null;
 
         setUserId(verifiedUserId);
         setFirstName(verifiedFirstName);
         setUserName(verifiedUsername);
-        setStartParam(verifiedStartParam);
 
         // Existing users normally stop here: zero Supabase reads.
         const cachedUser = readUserCache(verifiedUserId);
@@ -368,7 +384,6 @@ export default function Home() {
             verifiedUserId,
             verifiedFirstName,
             verifiedUsername,
-            verifiedStartParam,
             userData: cachedUser,
             fromCache: true,
           });
@@ -398,7 +413,6 @@ export default function Home() {
             verifiedUserId,
             verifiedFirstName,
             verifiedUsername,
-            verifiedStartParam,
             userData: {
               ...data.user,
               totalMiningRate: Number(data.user.miningRate || 0.00025),
@@ -437,7 +451,6 @@ export default function Home() {
           verifiedUserId,
           verifiedFirstName,
           verifiedUsername,
-          verifiedStartParam,
           userData: {
             balance: Number(registeredUser.balance || 0),
             miningRate: Number(
@@ -462,8 +475,16 @@ export default function Home() {
         });
 
         if (registerData.created) {
+          // Use only rewards confirmed by Supabase.
+          //
+          // Never infer referral eligibility from
+          // Telegram start_param on the frontend.
           setWelcomeAmount(
             Number(registerData.welcomeBonus || 0)
+          );
+
+          setReferralBonusAmount(
+            Number(registerData.referralBonus || 0)
           );
 
           setShowWelcome(true);
@@ -1090,9 +1111,10 @@ export default function Home() {
                  <span className="block text-[10px] text-yellow-400 uppercase tracking-widest mb-1">Early Adopter Bonus</span>
                  <span className="text-4xl font-black text-white">+{welcomeAmount.toLocaleString()}</span>
                  <span className="text-sm text-yellow-500 block font-bold">APXN Points</span>
-                 {startParam && startParam !== userId && (
+
+                 {referralBonusAmount > 0 && (
                    <span className="block text-xs font-bold text-green-400 mt-3 pt-3 border-t border-yellow-900/50">
-                     +1,000 APXN (Friend Referral)
+                     +{referralBonusAmount.toLocaleString()} APXN (Friend Referral)
                    </span>
                  )}
               </div>
@@ -1839,5 +1861,3 @@ export default function Home() {
     </main>
   );
 }
-
-
