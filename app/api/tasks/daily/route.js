@@ -22,8 +22,14 @@ const ALLOWED_TASKS = new Set([
 // Supabase apex_claim_daily_task remains the final
 // authority for:
 // - 100 APXN reward
+// - Balance
 // - Daily duplicate prevention
 // - Atomic row locking
+//
+// IMPORTANT:
+// The local gate never stores or returns balance.
+// Balance may change through mining/check-in/social tasks,
+// so only Supabase responses may synchronize balance.
 // =====================================================
 
 const MAX_GATE_ENTRIES = 5000;
@@ -246,6 +252,10 @@ export async function POST(
     //    completed today.
     //
     //    Return immediately without touching Supabase.
+    //
+    //    IMPORTANT:
+    //    Do NOT return balance from local memory.
+    //    The balance may have changed after this task.
     // =================================================
 
     if (
@@ -256,12 +266,6 @@ export async function POST(
         {
           error:
             'Daily task already claimed',
-
-          balance:
-            Number(
-              existingGate.balance ||
-              0
-            ),
 
           lastTaskDate:
             existingGate
@@ -301,8 +305,7 @@ export async function POST(
     // =================================================
     // Mark this user + task as in-flight before the RPC.
     //
-    // Telegram and Twitter are kept independent because
-    // each one has its own daily reward.
+    // Telegram and Twitter remain independent.
     // =================================================
 
     setGateEntry(
@@ -311,7 +314,6 @@ export async function POST(
         dayKey: today,
         inFlight: true,
         completed: false,
-        balance: null,
         lastTaskDate: null,
       }
     );
@@ -336,8 +338,8 @@ export async function POST(
       );
 
     if (error) {
-      // Do not leave a legitimate user blocked after a
-      // database error.
+      // Do not leave a legitimate user blocked after
+      // a database error.
       removeGateEntry(
         gateKey
       );
@@ -378,7 +380,10 @@ export async function POST(
     // =================================================
     // Supabase confirmed this task was already completed.
     //
-    // Cache that result for the current UTC day.
+    // This response is authoritative, so balance may be
+    // returned to the frontend here.
+    //
+    // The local gate stores only completion/date.
     // =================================================
 
     if (
@@ -403,7 +408,6 @@ export async function POST(
             dayKey: today,
             inFlight: false,
             completed: true,
-            balance,
             lastTaskDate,
           }
         );
@@ -456,9 +460,10 @@ export async function POST(
     // =================================================
     // Successful daily task.
     //
-    // Cache only today's completion state.
-    // Tomorrow UTC the entry automatically becomes
-    // invalid and Supabase is authoritative again.
+    // Balance is returned directly from Supabase.
+    //
+    // The local gate stores only today's completion
+    // state and date, never balance.
     // =================================================
 
     const reward =
@@ -481,7 +486,6 @@ export async function POST(
         dayKey: today,
         inFlight: false,
         completed: true,
-        balance,
         lastTaskDate,
       }
     );
