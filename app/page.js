@@ -1145,9 +1145,6 @@ export default function Home() {
         </div>
 
         <div className="w-full flex justify-end items-center gap-2 mt-2">
-          <span className="text-[9px] font-black text-[#0098EA] uppercase tracking-wider">
-            TON Wallet
-          </span>
           <div className="origin-right scale-[0.85]">
             <TonConnectButton />
           </div>
@@ -1874,4 +1871,5 @@ export default function Home() {
     </main>
   );
 }
+
 
