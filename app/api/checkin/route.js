@@ -17,9 +17,15 @@ export const dynamic = 'force-dynamic';
 // Supabase apex_daily_checkin remains the final authority
 // for:
 // - Daily reward
+// - Balance
 // - Streak
 // - Duplicate prevention
 // - Atomic row locking
+//
+// IMPORTANT:
+// The local gate never stores or returns balance.
+// Balance can change through mining/tasks after check-in,
+// so only Supabase responses may synchronize balance.
 // =====================================================
 
 const MAX_GATE_ENTRIES = 5000;
@@ -196,6 +202,11 @@ export async function POST(
     //    completed today's check-in.
     //
     //    Stop here without touching Supabase again.
+    //
+    //    IMPORTANT:
+    //    Do NOT return balance from local memory.
+    //    The user's balance may have changed since the
+    //    original check-in because of mining or tasks.
     // =================================================
 
     if (
@@ -206,12 +217,6 @@ export async function POST(
         {
           error:
             'Daily check-in already claimed',
-
-          balance:
-            Number(
-              existingGate.balance ||
-              0
-            ),
 
           checkinStreak:
             Number(
@@ -262,7 +267,6 @@ export async function POST(
         dayKey: today,
         inFlight: true,
         completed: false,
-        balance: null,
         checkinStreak: null,
         lastCheckinDate: null,
       }
@@ -327,9 +331,10 @@ export async function POST(
     // =================================================
     // Supabase says today's reward was already claimed.
     //
-    // Cache this confirmed result for the current UTC
-    // day so repeated requests do not keep reaching the
-    // database.
+    // This response comes directly from Supabase, so
+    // returning balance here is safe and authoritative.
+    //
+    // Only completion/streak/date are stored locally.
     // =================================================
 
     if (
@@ -360,7 +365,6 @@ export async function POST(
             dayKey: today,
             inFlight: false,
             completed: true,
-            balance,
             checkinStreak,
             lastCheckinDate,
           }
@@ -414,10 +418,10 @@ export async function POST(
     // =================================================
     // Successful check-in.
     //
-    // Cache only today's confirmed completion state.
-    // At the next UTC day the entry automatically stops
-    // being valid and Supabase becomes authoritative
-    // again.
+    // Balance is returned directly from Supabase.
+    //
+    // The local gate stores only stable check-in state,
+    // never the user's balance.
     // =================================================
 
     const reward =
@@ -446,7 +450,6 @@ export async function POST(
         dayKey: today,
         inFlight: false,
         completed: true,
-        balance,
         checkinStreak,
         lastCheckinDate,
       }
