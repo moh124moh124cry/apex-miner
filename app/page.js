@@ -1204,12 +1204,13 @@ export default function Home() {
                     <span className="text-2xl font-black text-white">{checkinStreak} <span className="text-sm">Days</span>🔥</span>
                  </div>
                  <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
-  <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">
-    {canCheckIn ? "Today's Reward" : "Tomorrow's Reward"}
-  </span>
-  <span className="text-2xl font-black text-yellow-400">+{dailyRewardAmt}</span>
-</div>
-                <button onClick={handleDailyCheckIn} disabled={!isDataLoaded || !canCheckIn || isSaving} className={`w-full py-3 rounded-xl text-base font-black uppercase tracking-wider transition-all shadow-lg ${(isDataLoaded && canCheckIn) ? 'bg-white text-orange-600 hover:scale-105 active:scale-95' : 'bg-black/30 text-white/50 cursor-not-allowed border border-white/10'}`}>
+                    <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">
+                      {canCheckIn ? "Today's Reward" : "Tomorrow's Reward"}
+                    </span>
+                    <span className="text-2xl font-black text-yellow-400">+{dailyRewardAmt}</span>
+                 </div>
+              </div>
+              <button onClick={handleDailyCheckIn} disabled={!isDataLoaded || !canCheckIn || isSaving} className={`w-full py-3 rounded-xl text-base font-black uppercase tracking-wider transition-all shadow-lg ${(isDataLoaded && canCheckIn) ? 'bg-white text-orange-600 hover:scale-105 active:scale-95' : 'bg-black/30 text-white/50 cursor-not-allowed border border-white/10'}`}>
                 {!isDataLoaded ? 'Loading...' : (isSaving ? 'Claiming...' : (canCheckIn ? 'Claim Reward' : 'Come Back Tomorrow'))}
               </button>
             </div>
@@ -1838,4 +1839,5 @@ export default function Home() {
     </main>
   );
 }
+
 
