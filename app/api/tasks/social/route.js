@@ -26,9 +26,9 @@ function response(body, status = 200) {
   });
 }
 
-// ======================================================
+// =====================================================
 // Telegram membership verification
-// ======================================================
+// =====================================================
 
 function isActiveTelegramMember(member) {
   if (!member?.status) {
@@ -132,9 +132,33 @@ async function verifyTelegramMembership(
   );
 }
 
-// ======================================================
+// =====================================================
+// Check whether the one-time task is already completed
+// before calling Telegram API or the reward RPC.
+// =====================================================
+
+function getTaskCompletionStatus(
+  user,
+  task
+) {
+  if (task === 'channel') {
+    return Boolean(user.channel_joined);
+  }
+
+  if (task === 'group') {
+    return Boolean(user.group_joined);
+  }
+
+  if (task === 'twitter') {
+    return Boolean(user.twitter_joined);
+  }
+
+  return false;
+}
+
+// =====================================================
 // Social task claim
-// ======================================================
+// =====================================================
 
 export async function POST(request) {
   try {
@@ -173,6 +197,75 @@ export async function POST(request) {
 
     const telegramId =
       String(telegram.user.id);
+
+    // ==================================================
+    // Fast indexed pre-check.
+    //
+    // telegram_id is the users primary key.
+    // If this task was already completed, stop here.
+    //
+    // This prevents repeated requests from unnecessarily
+    // reaching Telegram getChatMember or the reward RPC.
+    // ==================================================
+
+    const {
+      data: user,
+      error: userError,
+    } = await supabaseAdmin
+      .from('users')
+      .select(`
+        balance,
+        channel_joined,
+        group_joined,
+        twitter_joined
+      `)
+      .eq(
+        'telegram_id',
+        telegramId
+      )
+      .maybeSingle();
+
+    if (userError) {
+      console.error(
+        'Social task pre-check error:',
+        userError.code
+      );
+
+      return response(
+        {
+          error: 'Database error',
+        },
+        500
+      );
+    }
+
+    if (!user) {
+      return response(
+        {
+          error: 'User not found',
+        },
+        404
+      );
+    }
+
+    const alreadyCompleted =
+      getTaskCompletionStatus(
+        user,
+        task
+      );
+
+    if (alreadyCompleted) {
+      return response(
+        {
+          error: 'Task already claimed',
+          balance: Number(
+            user.balance || 0
+          ),
+          completed: true,
+        },
+        409
+      );
+    }
 
     // ==================================================
     // Only channel/group require real Telegram
@@ -231,11 +324,15 @@ export async function POST(request) {
     }
 
     // ==================================================
-    // Existing Supabase reward system
+    // Existing Supabase reward system.
+    //
+    // The RPC remains the final authority and still uses
+    // row locking, so concurrent requests cannot award
+    // the same task twice.
     //
     // channel = 500
     // group   = 500
-    // twitter = existing 500-point follow task
+    // twitter = 500
     // ==================================================
 
     const { data, error } =
