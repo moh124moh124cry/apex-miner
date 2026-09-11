@@ -97,7 +97,6 @@ async function searchUserByUsername(rawUsername) {
   }
 
   const balance = Number(user.balance || 0);
-  const createdAt = user.created_at || null;
   const telegramId = String(user.telegram_id || '');
   const country = user.country
     ? String(user.country).toUpperCase()
@@ -105,29 +104,16 @@ async function searchUserByUsername(rawUsername) {
 
   let rowNumber = null;
 
-  if (createdAt && telegramId) {
-    const [beforeResult, sameTimeResult] = await Promise.all([
-      supabaseAdmin
-        .from('users')
-        .select('telegram_id', {
-          count: 'exact',
-          head: true,
-        })
-        .lt('created_at', createdAt),
+  if (telegramId) {
+    const rowPositionResult = await supabaseAdmin
+      .from('users')
+      .select('telegram_id', {
+        count: 'exact',
+        head: true,
+      })
+      .lte('telegram_id', telegramId);
 
-      supabaseAdmin
-        .from('users')
-        .select('telegram_id', {
-          count: 'exact',
-          head: true,
-        })
-        .eq('created_at', createdAt)
-        .lte('telegram_id', telegramId),
-    ]);
-
-    rowNumber =
-      countValue(beforeResult) +
-      countValue(sameTimeResult);
+    rowNumber = countValue(rowPositionResult);
   }
 
   const [higherBalanceResult, totalUsersResult] = await Promise.all([
@@ -196,7 +182,7 @@ async function searchUserByUsername(rawUsername) {
           schema: 'public',
           table: 'users',
           rowNumber,
-          rowOrder: 'created_at ASC',
+          rowOrder: 'telegram_id ASC',
         },
         ranking: {
           globalRank,
