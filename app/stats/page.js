@@ -87,6 +87,26 @@ export default function Stats() {
     });
   };
 
+  const SUPABASE_ROWS_PER_PAGE = 100;
+
+  const getSupabasePageInfo = (rowNumber) => {
+    const row = Number(rowNumber);
+
+    if (!Number.isFinite(row) || row < 1) {
+      return {
+        pageNumber: null,
+        positionOnPage: null,
+      };
+    }
+
+    return {
+      pageNumber:
+        Math.floor((row - 1) / SUPABASE_ROWS_PER_PAGE) + 1,
+      positionOnPage:
+        ((row - 1) % SUPABASE_ROWS_PER_PAGE) + 1,
+    };
+  };
+
   const cleanUsername = (value) => {
     return String(value || '')
       .trim()
@@ -280,6 +300,30 @@ export default function Stats() {
                   </div>
                 </div>
 
+                <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                  <div className="text-[9px] uppercase tracking-widest text-gray-600 font-black mb-1">
+                    Supabase Page
+                  </div>
+
+                  <div className="text-lg font-black text-violet-300">
+                    #{getSupabasePageInfo(
+                      userResult?.database?.rowNumber
+                    ).pageNumber ?? '—'}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-3">
+                  <div className="text-[9px] uppercase tracking-widest text-gray-600 font-black mb-1">
+                    Position on Page
+                  </div>
+
+                  <div className="text-lg font-black text-fuchsia-300">
+                    #{getSupabasePageInfo(
+                      userResult?.database?.rowNumber
+                    ).positionOnPage ?? '—'}
+                  </div>
+                </div>
+
                 <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3">
                   <div className="text-[9px] uppercase tracking-widest text-gray-600 font-black mb-1">
                     APXN Points
@@ -334,7 +378,9 @@ export default function Stats() {
 
               <p className="text-[10px] text-gray-600 mt-4 leading-relaxed">
                 Row Number uses registration order (created_at ascending).
-                Ranking uses the current APXN Points balance.
+                Supabase Page and Position on Page are calculated using
+                100 rows per page. Ranking uses the current APXN Points
+                balance.
               </p>
 
               <button
