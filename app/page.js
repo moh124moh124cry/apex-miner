@@ -377,10 +377,12 @@ export default function Home() {
         setFirstName(verifiedFirstName);
         setUserName(verifiedUsername);
 
-        // Existing users normally stop here: zero Supabase reads.
+        // Existing users load instantly from local cache, then the
+        // authoritative balance is synchronized from Supabase.
         const cachedUser = readUserCache(verifiedUserId);
 
         if (cachedUser) {
+          // Fast first render from local cache.
           applyUserState({
             verifiedUserId,
             verifiedFirstName,
@@ -388,6 +390,44 @@ export default function Home() {
             userData: cachedUser,
             fromCache: true,
           });
+
+          // Silent balance synchronization.
+          //
+          // This keeps the app fast while ensuring rewards or manual
+          // balance changes made in Supabase appear when the app opens,
+          // without waiting for the user to press Claim.
+          try {
+            const bootstrapResponse = await fetch('/api/bootstrap', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ initData }),
+              cache: 'no-store',
+            });
+
+            if (bootstrapResponse.ok) {
+              const data = await bootstrapResponse.json();
+              const freshBalance = Number(data?.user?.balance);
+
+              if (
+                !cancelled &&
+                data?.exists &&
+                data?.user &&
+                Number.isFinite(freshBalance)
+              ) {
+                setBalance(freshBalance);
+
+                patchUserCache(verifiedUserId, {
+                  balance: freshBalance,
+                });
+              }
+            }
+          } catch {
+            // If synchronization temporarily fails, keep showing
+            // the cached balance and try again on the next app open.
+          }
+
           return;
         }
 
@@ -1145,6 +1185,9 @@ export default function Home() {
         </div>
 
         <div className="w-full flex justify-end items-center gap-2 mt-2">
+          <span className="text-[9px] font-black text-[#0098EA] uppercase tracking-wider">
+            TON Wallet
+          </span>
           <div className="origin-right scale-[0.85]">
             <TonConnectButton />
           </div>
@@ -1871,5 +1914,4 @@ export default function Home() {
     </main>
   );
 }
-
 
