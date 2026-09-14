@@ -56,7 +56,10 @@ export async function POST(request) {
         last_claim,
         country,
         last_ad_reward_at,
-        ad_reward_count
+        ad_reward_count,
+        mining_boost_started_at,
+        mining_boost_until,
+        mining_boost_count
       `)
       .eq('telegram_id', telegramId)
       .maybeSingle();
@@ -120,6 +123,9 @@ export async function POST(request) {
           country: user.country || 'Unknown',
           lastAdRewardAt: user.last_ad_reward_at || null,
           adRewardCount: Number(user.ad_reward_count || 0),
+          miningBoostStartedAt: user.mining_boost_started_at || null,
+          miningBoostUntil: user.mining_boost_until || null,
+          miningBoostCount: Number(user.mining_boost_count || 0),
         },
         telegram: {
           id: telegram.user.id,
