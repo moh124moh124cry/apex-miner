@@ -1,6 +1,7 @@
 "use client";
 
 import "./globals.css";
+import Script from "next/script";
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 
 const appUrl =
@@ -26,7 +27,16 @@ export default function RootLayout({ children }) {
         >
           {children}
         </TonConnectUIProvider>
+
+        <Script
+          id="monetag-sdk"
+          src="https://libtl.com/sdk.js"
+          data-zone="11803132"
+          data-sdk="show_11803132"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
 }
+
