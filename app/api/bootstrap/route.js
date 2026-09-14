@@ -54,7 +54,9 @@ export async function POST(request) {
         checkin_streak,
         last_checkin_date,
         last_claim,
-        country
+        country,
+        last_ad_reward_at,
+        ad_reward_count
       `)
       .eq('telegram_id', telegramId)
       .maybeSingle();
@@ -116,6 +118,8 @@ export async function POST(request) {
           lastCheckinDate: user.last_checkin_date || null,
           lastClaim: user.last_claim || null,
           country: user.country || 'Unknown',
+          lastAdRewardAt: user.last_ad_reward_at || null,
+          adRewardCount: Number(user.ad_reward_count || 0),
         },
         telegram: {
           id: telegram.user.id,
