@@ -4,8 +4,30 @@ import Image from 'next/image';
 import { TonConnectButton } from '@tonconnect/ui-react';
 
 const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
+const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const USER_CACHE_VERSION = 1;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getRemainingAdRewardCooldown(lastAdRewardAt) {
+  if (!lastAdRewardAt) return 0;
+
+  const lastTime = new Date(lastAdRewardAt).getTime();
+
+  if (!Number.isFinite(lastTime)) return 0;
+
+  const elapsedSeconds = Math.max(
+    0,
+    (Date.now() - lastTime) / 1000
+  );
+
+  if (elapsedSeconds >= AD_REWARD_COOLDOWN_SECONDS) {
+    return 0;
+  }
+
+  return Math.ceil(
+    AD_REWARD_COOLDOWN_SECONDS - elapsedSeconds
+  );
+}
 
 function getUserCacheKey(telegramId) {
   return `apex_user_v${USER_CACHE_VERSION}_${telegramId}`;
@@ -109,6 +131,9 @@ export default function Home() {
   const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
   const [verifyingTwitter, setVerifyingTwitter] = useState(false);
   const [verifyingTelegram, setVerifyingTelegram] = useState(false);
+  const [adRewardCooldown, setAdRewardCooldown] = useState(0);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [isAdRewardStatusLoaded, setIsAdRewardStatusLoaded] = useState(false);
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
   const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
@@ -251,6 +276,16 @@ export default function Home() {
       setDailyTwitterDone(userData.lastTwitterTask === todayStr);
       setDailyTelegramDone(userData.lastTelegramTask === todayStr);
 
+      setAdRewardCooldown(
+        getRemainingAdRewardCooldown(
+          userData.lastAdRewardAt
+        )
+      );
+
+      setIsAdRewardStatusLoaded(
+        !fromCache
+      );
+
       let currentStreak = Number(userData.checkinStreak || 0);
       let isCheckinAvailable = true;
       const now = new Date();
@@ -316,6 +351,8 @@ export default function Home() {
           checkinStreak: Number(userData.checkinStreak || 0),
           lastCheckinDate: userData.lastCheckinDate || null,
           lastClaim: userData.lastClaim || null,
+          lastAdRewardAt: userData.lastAdRewardAt || null,
+          adRewardCount: Number(userData.adRewardCount || 0),
         });
       }
     };
@@ -413,13 +450,35 @@ export default function Home() {
               if (
                 !cancelled &&
                 data?.exists &&
-                data?.user &&
-                Number.isFinite(freshBalance)
+                data?.user
               ) {
-                setBalance(freshBalance);
+                if (Number.isFinite(freshBalance)) {
+                  setBalance(freshBalance);
+                }
+
+                const freshLastAdRewardAt =
+                  data.user.lastAdRewardAt || null;
+
+                setAdRewardCooldown(
+                  getRemainingAdRewardCooldown(
+                    freshLastAdRewardAt
+                  )
+                );
+
+                setIsAdRewardStatusLoaded(
+                  true
+                );
 
                 patchUserCache(verifiedUserId, {
-                  balance: freshBalance,
+                  ...(Number.isFinite(freshBalance)
+                    ? { balance: freshBalance }
+                    : {}),
+                  lastAdRewardAt:
+                    freshLastAdRewardAt,
+                  adRewardCount:
+                    Number(
+                      data.user.adRewardCount || 0
+                    ),
                 });
               }
             }
@@ -512,6 +571,8 @@ export default function Home() {
             lastClaim:
               registeredUser.lastClaim ||
               new Date().toISOString(),
+            lastAdRewardAt: null,
+            adRewardCount: 0,
           },
         });
 
@@ -630,6 +691,7 @@ export default function Home() {
     const interval = setInterval(() => {
       setMiningDelta(prev => prev + totalMiningRate);
       setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
+      setAdRewardCooldown(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
   }, [totalMiningRate]);
@@ -920,6 +982,147 @@ export default function Home() {
       setVerifying: setVerifyingTelegram,
       cacheField: 'lastTelegramTask',
     });
+  };
+
+  const handleWatchAdReward = async () => {
+    if (
+      !isDataLoaded ||
+      !isAdRewardStatusLoaded ||
+      isWatchingAd ||
+      adRewardCooldown > 0
+    ) {
+      return;
+    }
+
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
+    if (
+      typeof window.show_11803132 !==
+      'function'
+    ) {
+      alert(
+        '⚠️ Ad is not ready yet. Please try again in a moment.'
+      );
+      return;
+    }
+
+    setIsWatchingAd(true);
+
+    try {
+      // Monetag resolves this promise after its rewarded
+      // interstitial flow completes on the client.
+      await window.show_11803132();
+
+      const response = await fetch('/api/ads/reward', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initData }),
+        cache: 'no-store',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (
+          response.status === 429 &&
+          data.retryAfter
+        ) {
+          const retryAfter =
+            Math.max(
+              1,
+              Number(data.retryAfter || 0)
+            );
+
+          const syncedBalance =
+            Number(data.balance);
+
+          setAdRewardCooldown(
+            retryAfter
+          );
+
+          if (
+            Number.isFinite(
+              syncedBalance
+            )
+          ) {
+            setBalance(
+              syncedBalance
+            );
+          }
+
+          patchUserCache(userId, {
+            ...(Number.isFinite(syncedBalance)
+              ? { balance: syncedBalance }
+              : {}),
+            lastAdRewardAt:
+              data.lastAdRewardAt || null,
+            adRewardCount:
+              Number(
+                data.adRewardCount || 0
+              ),
+          });
+
+          return;
+        }
+
+        throw new Error(
+          data.error ||
+          'Ad reward failed'
+        );
+      }
+
+      const newBalance =
+        Number(data.balance || 0);
+
+      const lastAdRewardAt =
+        data.lastAdRewardAt ||
+        new Date().toISOString();
+
+      setBalance(
+        newBalance
+      );
+
+      setAdRewardCooldown(
+        Number(
+          data.cooldown ||
+          AD_REWARD_COOLDOWN_SECONDS
+        )
+      );
+
+      patchUserCache(userId, {
+        balance: newBalance,
+        lastAdRewardAt,
+        adRewardCount:
+          Number(
+            data.adRewardCount || 0
+          ),
+      });
+
+      alert(
+        '✅ +150 APXN added to your balance!'
+      );
+    } catch (error) {
+      console.error(
+        'Rewarded ad failed:',
+        error
+      );
+
+      alert(
+        '❌ Ad was not completed. No reward was claimed.'
+      );
+    } finally {
+      setIsWatchingAd(false);
+    }
   };
 
   const claimSocialTask = async ({
@@ -1291,41 +1494,75 @@ export default function Home() {
             </div>
           </div>
 
-          {(dailyTelegramLink || dailyTwitterLink) && (
-            <>
-              <h2 className="text-2xl font-bold text-white mb-4">Daily Tasks</h2>
-              <div className="flex flex-col gap-4 mb-6">
+          <h2 className="text-2xl font-bold text-white mb-4">Daily Tasks</h2>
 
-                {dailyTelegramLink && (
-                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-white text-lg">Like Today's Post</h3>
-                    <p className="text-yellow-400 text-xs">+100 APXN Points</p>
-                  </div>
-                  <button onClick={handleDailyTelegram} disabled={!isDataLoaded || dailyTelegramDone || verifyingTelegram} className={`${dailyTelegramDone ? 'bg-green-600' : (!isDataLoaded || verifyingTelegram) ? 'bg-slate-700 animate-pulse' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                    {dailyTelegramDone ? 'Done ✓' : (!isDataLoaded || verifyingTelegram) ? 'Wait..' : 'GO'}
-                  </button>
-                </div>
-                )}
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="bg-slate-900/80 border border-yellow-500/30 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-lg">Watch Rewarded Ad</h3>
+                <p className="text-yellow-400 text-xs">+150 APXN Points</p>
 
-                {dailyTwitterLink && (
-                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
-                  <div>
-                    <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                      Like Today's X Post
-                      <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
-                    </h3>
-                    <p className="text-yellow-400 text-xs">+100 APXN Points</p>
-                  </div>
-                  <button onClick={handleDailyTwitter} disabled={!isDataLoaded || dailyTwitterDone || verifyingTwitter} className={`${dailyTwitterDone ? 'bg-green-600' : (!isDataLoaded || verifyingTwitter) ? 'bg-slate-700 animate-pulse' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                    {dailyTwitterDone ? 'Done ✓' : (!isDataLoaded || verifyingTwitter) ? 'Wait..' : 'GO'}
-                  </button>
-                </div>
+                {adRewardCooldown > 0 && (
+                  <p className="text-gray-500 text-[10px] mt-1">
+                    Available in {formatTime(adRewardCooldown)}
+                  </p>
                 )}
               </div>
-            </>
-          )}
+
+              <button
+                onClick={handleWatchAdReward}
+                disabled={
+                  !isDataLoaded ||
+                  !isAdRewardStatusLoaded ||
+                  isWatchingAd ||
+                  adRewardCooldown > 0
+                }
+                className={`px-4 py-2 rounded-xl text-white text-sm font-bold transition-colors min-w-[80px] ${
+                  adRewardCooldown > 0
+                    ? 'bg-green-600'
+                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd)
+                    ? 'bg-slate-700 animate-pulse'
+                    : 'bg-gradient-to-r from-yellow-500 to-orange-600 active:scale-95'
+                }`}
+              >
+                {!isDataLoaded || !isAdRewardStatusLoaded
+                  ? 'Wait..'
+                  : isWatchingAd
+                  ? 'Ad...'
+                  : adRewardCooldown > 0
+                  ? 'Done ✓'
+                  : 'WATCH'}
+              </button>
+            </div>
+
+            {dailyTelegramLink && (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-lg">Like Today's Post</h3>
+                <p className="text-yellow-400 text-xs">+100 APXN Points</p>
+              </div>
+              <button onClick={handleDailyTelegram} disabled={!isDataLoaded || dailyTelegramDone || verifyingTelegram} className={`${dailyTelegramDone ? 'bg-green-600' : (!isDataLoaded || verifyingTelegram) ? 'bg-slate-700 animate-pulse' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                {dailyTelegramDone ? 'Done ✓' : (!isDataLoaded || verifyingTelegram) ? 'Wait..' : 'GO'}
+              </button>
+            </div>
+            )}
+
+            {dailyTwitterLink && (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-2 h-full bg-slate-700"></div>
+              <div>
+                <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                  Like Today's X Post
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
+                </h3>
+                <p className="text-yellow-400 text-xs">+100 APXN Points</p>
+              </div>
+              <button onClick={handleDailyTwitter} disabled={!isDataLoaded || dailyTwitterDone || verifyingTwitter} className={`${dailyTwitterDone ? 'bg-green-600' : (!isDataLoaded || verifyingTwitter) ? 'bg-slate-700 animate-pulse' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                {dailyTwitterDone ? 'Done ✓' : (!isDataLoaded || verifyingTwitter) ? 'Wait..' : 'GO'}
+              </button>
+            </div>
+            )}
+          </div>
 
           <h2 className="text-2xl font-bold text-white mb-4">One-Time Social Tasks</h2>
 
