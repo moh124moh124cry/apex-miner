@@ -5,6 +5,7 @@ import { TonConnectButton } from '@tonconnect/ui-react';
 
 const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
+const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
 const USER_CACHE_VERSION = 1;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -26,6 +27,119 @@ function getRemainingAdRewardCooldown(lastAdRewardAt) {
 
   return Math.ceil(
     AD_REWARD_COOLDOWN_SECONDS - elapsedSeconds
+  );
+}
+
+function getRemainingMiningBoost(boostUntil) {
+  if (!boostUntil) return 0;
+
+  const untilTime = new Date(boostUntil).getTime();
+
+  if (!Number.isFinite(untilTime)) return 0;
+
+  const remainingSeconds =
+    (untilTime - Date.now()) / 1000;
+
+  if (remainingSeconds <= 0) return 0;
+
+  return Math.ceil(remainingSeconds);
+}
+
+function getEffectiveMiningRate(
+  baseRate,
+  activeFriends,
+  boostActive
+) {
+  const safeBaseRate = Number(baseRate || 0.00025);
+  const safeActiveFriends = Math.max(
+    0,
+    Number(activeFriends || 0)
+  );
+
+  const referralRate =
+    safeActiveFriends *
+    (safeBaseRate * 0.05);
+
+  return boostActive
+    ? safeBaseRate * 3 + referralRate
+    : safeBaseRate + referralRate;
+}
+
+function calculateEstimatedMiningDelta({
+  lastClaim,
+  baseRate,
+  activeFriends,
+  boostStartedAt,
+  boostUntil,
+}) {
+  if (!lastClaim) return 0;
+
+  const lastClaimTime = new Date(lastClaim).getTime();
+  const nowTime = Date.now();
+
+  if (!Number.isFinite(lastClaimTime)) return 0;
+
+  const elapsedSeconds = Math.max(
+    0,
+    (nowTime - lastClaimTime) / 1000
+  );
+
+  const normalRate = getEffectiveMiningRate(
+    baseRate,
+    activeFriends,
+    false
+  );
+
+  const boostedRate = getEffectiveMiningRate(
+    baseRate,
+    activeFriends,
+    true
+  );
+
+  const boostStartTime = boostStartedAt
+    ? new Date(boostStartedAt).getTime()
+    : NaN;
+
+  const boostUntilTime = boostUntil
+    ? new Date(boostUntil).getTime()
+    : NaN;
+
+  let boostedSeconds = 0;
+
+  if (
+    Number.isFinite(boostStartTime) &&
+    Number.isFinite(boostUntilTime) &&
+    boostUntilTime > boostStartTime
+  ) {
+    const overlapStart = Math.max(
+      lastClaimTime,
+      boostStartTime
+    );
+
+    const overlapEnd = Math.min(
+      nowTime,
+      boostUntilTime
+    );
+
+    boostedSeconds = Math.max(
+      0,
+      (overlapEnd - overlapStart) / 1000
+    );
+  }
+
+  boostedSeconds = Math.min(
+    elapsedSeconds,
+    boostedSeconds
+  );
+
+  const normalSeconds = Math.max(
+    0,
+    elapsedSeconds - boostedSeconds
+  );
+
+  return (
+    normalSeconds * normalRate +
+    boostedSeconds * boostedRate
   );
 }
 
@@ -134,6 +248,11 @@ export default function Home() {
   const [adRewardCooldown, setAdRewardCooldown] = useState(0);
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [isAdRewardStatusLoaded, setIsAdRewardStatusLoaded] = useState(false);
+
+  const [miningBoostRemaining, setMiningBoostRemaining] = useState(0);
+  const [isWatchingBoostAd, setIsWatchingBoostAd] = useState(false);
+  const [isMiningBoostStatusLoaded, setIsMiningBoostStatusLoaded] = useState(false);
+
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
   const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
@@ -160,6 +279,9 @@ export default function Home() {
 
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
+
+  const isMiningBoostActive =
+    miningBoostRemaining > 0;
 
   const getFlagIcon = (countryCode) => {
     if (!countryCode || countryCode === 'Unknown') {
@@ -249,11 +371,23 @@ export default function Home() {
       const currentDbRate = Number(userData.miningRate ?? 0.00025);
       const cachedActiveFriends = Number(userData.activeFriendsCount ?? 0);
       const cachedFriendsCount = Number(userData.friendsCount ?? 0);
-      const cachedTotalRate = Number(
-        userData.totalMiningRate ??
-          currentDbRate +
-            cachedActiveFriends * (currentDbRate * 0.05)
-      );
+      const currentMiningBoostStartedAt =
+        userData.miningBoostStartedAt || null;
+
+      const currentMiningBoostUntil =
+        userData.miningBoostUntil || null;
+
+      const currentMiningBoostRemaining =
+        getRemainingMiningBoost(
+          currentMiningBoostUntil
+        );
+
+      const cachedTotalRate =
+        getEffectiveMiningRate(
+          currentDbRate,
+          cachedActiveFriends,
+          currentMiningBoostRemaining > 0
+        );
 
       setUserId(verifiedUserId);
       setFirstName(verifiedFirstName);
@@ -283,6 +417,14 @@ export default function Home() {
       );
 
       setIsAdRewardStatusLoaded(
+        !fromCache
+      );
+
+      setMiningBoostRemaining(
+        currentMiningBoostRemaining
+      );
+
+      setIsMiningBoostStatusLoaded(
         !fromCache
       );
 
@@ -317,7 +459,17 @@ export default function Home() {
         const diffSeconds = Math.max(0, (Date.now() - lastTime) / 1000);
 
         if (diffSeconds > 0) {
-          setMiningDelta(diffSeconds * cachedTotalRate);
+          setMiningDelta(
+            calculateEstimatedMiningDelta({
+              lastClaim: userData.lastClaim,
+              baseRate: currentDbRate,
+              activeFriends: cachedActiveFriends,
+              boostStartedAt:
+                currentMiningBoostStartedAt,
+              boostUntil:
+                currentMiningBoostUntil,
+            })
+          );
         }
 
         if (diffSeconds < CLAIM_COOLDOWN_SECONDS) {
@@ -353,6 +505,12 @@ export default function Home() {
           lastClaim: userData.lastClaim || null,
           lastAdRewardAt: userData.lastAdRewardAt || null,
           adRewardCount: Number(userData.adRewardCount || 0),
+          miningBoostStartedAt:
+            currentMiningBoostStartedAt,
+          miningBoostUntil:
+            currentMiningBoostUntil,
+          miningBoostCount:
+            Number(userData.miningBoostCount || 0),
         });
       }
     };
@@ -469,16 +627,126 @@ export default function Home() {
                   true
                 );
 
+                const freshMiningBoostStartedAt =
+                  data.user.miningBoostStartedAt || null;
+
+                const freshMiningBoostUntil =
+                  data.user.miningBoostUntil || null;
+
+                const freshMiningBoostRemaining =
+                  getRemainingMiningBoost(
+                    freshMiningBoostUntil
+                  );
+
+                const freshMiningBoostCount =
+                  Number(
+                    data.user.miningBoostCount || 0
+                  );
+
+                const freshDbRate = Number(
+                  data.user.miningRate ??
+                  cachedUser.miningRate ??
+                  0.00025
+                );
+
+                const cachedActiveFriends = Number(
+                  cachedUser.activeFriendsCount || 0
+                );
+
+                const freshTotalMiningRate =
+                  getEffectiveMiningRate(
+                    freshDbRate,
+                    cachedActiveFriends,
+                    freshMiningBoostRemaining > 0
+                  );
+
+                const freshLastClaim =
+                  data.user.lastClaim ||
+                  cachedUser.lastClaim ||
+                  null;
+
+                if (freshLastClaim) {
+                  setMiningDelta(
+                    calculateEstimatedMiningDelta({
+                      lastClaim: freshLastClaim,
+                      baseRate: freshDbRate,
+                      activeFriends:
+                        cachedActiveFriends,
+                      boostStartedAt:
+                        freshMiningBoostStartedAt,
+                      boostUntil:
+                        freshMiningBoostUntil,
+                    })
+                  );
+
+                  const freshLastClaimTime =
+                    new Date(
+                      freshLastClaim
+                    ).getTime();
+
+                  if (
+                    Number.isFinite(
+                      freshLastClaimTime
+                    )
+                  ) {
+                    const elapsedSeconds =
+                      Math.max(
+                        0,
+                        (Date.now() -
+                          freshLastClaimTime) /
+                          1000
+                      );
+
+                    setClaimCooldown(
+                      elapsedSeconds <
+                        CLAIM_COOLDOWN_SECONDS
+                        ? Math.floor(
+                            CLAIM_COOLDOWN_SECONDS -
+                              elapsedSeconds
+                          )
+                        : 0
+                    );
+                  }
+                }
+
+                setDbMiningRate(
+                  freshDbRate
+                );
+
+                setTotalMiningRate(
+                  freshTotalMiningRate
+                );
+
+                setMiningBoostRemaining(
+                  freshMiningBoostRemaining
+                );
+
+                setIsMiningBoostStatusLoaded(
+                  true
+                );
+
                 patchUserCache(verifiedUserId, {
                   ...(Number.isFinite(freshBalance)
                     ? { balance: freshBalance }
                     : {}),
+                  miningRate:
+                    freshDbRate,
+                  totalMiningRate:
+                    freshTotalMiningRate,
+                  lastClaim:
+                    freshLastClaim,
                   lastAdRewardAt:
                     freshLastAdRewardAt,
                   adRewardCount:
                     Number(
                       data.user.adRewardCount || 0
                     ),
+                  miningBoostStartedAt:
+                    freshMiningBoostStartedAt,
+                  miningBoostUntil:
+                    freshMiningBoostUntil,
+                  miningBoostCount:
+                    freshMiningBoostCount,
                 });
               }
             }
@@ -573,6 +841,9 @@ export default function Home() {
               new Date().toISOString(),
             lastAdRewardAt: null,
             adRewardCount: 0,
+            miningBoostStartedAt: null,
+            miningBoostUntil: null,
+            miningBoostCount: 0,
           },
         });
 
@@ -659,7 +930,11 @@ export default function Home() {
         const totalFriends = Number(data.totalFriends || 0);
         const activeCount = Number(data.activeFriends || 0);
         const finalRate =
-          dbMiningRate + activeCount * (dbMiningRate * 0.05);
+          getEffectiveMiningRate(
+            dbMiningRate,
+            activeCount,
+            miningBoostRemaining > 0
+          );
 
         setFriendsList(safeFriends);
         setFriendsCount(totalFriends);
@@ -692,9 +967,24 @@ export default function Home() {
       setMiningDelta(prev => prev + totalMiningRate);
       setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
       setAdRewardCooldown(prev => (prev > 0 ? prev - 1 : 0));
+      setMiningBoostRemaining(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
   }, [totalMiningRate]);
+
+  useEffect(() => {
+    setTotalMiningRate(
+      getEffectiveMiningRate(
+        dbMiningRate,
+        activeFriendsCount,
+        isMiningBoostActive
+      )
+    );
+  }, [
+    dbMiningRate,
+    activeFriendsCount,
+    isMiningBoostActive,
+  ]);
 
   const handleDailyCheckIn = async () => {
     if (!isDataLoaded || !canCheckIn || isSaving) return;
@@ -833,6 +1123,10 @@ export default function Home() {
         Number(data.cooldown || CLAIM_COOLDOWN_SECONDS)
       );
 
+      if (Number.isFinite(Number(data.baseMiningRate))) {
+        setDbMiningRate(Number(data.baseMiningRate));
+      }
+
       if (Number.isFinite(Number(data.miningRate))) {
         setTotalMiningRate(Number(data.miningRate));
       }
@@ -843,6 +1137,7 @@ export default function Home() {
 
       patchUserCache(userId, {
         balance: Number(data.balance || 0),
+        miningRate: Number(data.baseMiningRate || dbMiningRate),
         totalMiningRate: Number(data.miningRate || totalMiningRate),
         activeFriendsCount: Number(data.activeFriends || 0),
         lastClaim: data.lastClaim || new Date().toISOString(),
@@ -989,6 +1284,7 @@ export default function Home() {
       !isDataLoaded ||
       !isAdRewardStatusLoaded ||
       isWatchingAd ||
+      isWatchingBoostAd ||
       adRewardCooldown > 0
     ) {
       return;
@@ -1122,6 +1418,176 @@ export default function Home() {
       );
     } finally {
       setIsWatchingAd(false);
+    }
+  };
+
+  const handleWatchMiningBoost = async () => {
+    if (
+      !isDataLoaded ||
+      !isMiningBoostStatusLoaded ||
+      isWatchingBoostAd ||
+      isWatchingAd ||
+      miningBoostRemaining > 0
+    ) {
+      return;
+    }
+
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
+    if (
+      typeof window.show_11803132 !==
+      'function'
+    ) {
+      alert(
+        '⚠️ Ad is not ready yet. Please try again in a moment.'
+      );
+      return;
+    }
+
+    setIsWatchingBoostAd(true);
+
+    try {
+      await window.show_11803132();
+
+      const response = await fetch('/api/ads/boost', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initData }),
+        cache: 'no-store',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (
+          response.status === 409 &&
+          data.active
+        ) {
+          const boostStartedAt =
+            data.boostStartedAt || null;
+
+          const boostUntil =
+            data.boostUntil || null;
+
+          const retryAfter =
+            Math.max(
+              1,
+              Number(
+                data.retryAfter ||
+                getRemainingMiningBoost(
+                  boostUntil
+                ) ||
+                MINING_BOOST_DURATION_SECONDS
+              )
+            );
+
+          setMiningBoostRemaining(
+            retryAfter
+          );
+
+          setTotalMiningRate(
+            getEffectiveMiningRate(
+              dbMiningRate,
+              activeFriendsCount,
+              true
+            )
+          );
+
+          patchUserCache(userId, {
+            miningBoostStartedAt:
+              boostStartedAt,
+            miningBoostUntil:
+              boostUntil,
+            miningBoostCount:
+              Number(data.boostCount || 0),
+            totalMiningRate:
+              getEffectiveMiningRate(
+                dbMiningRate,
+                activeFriendsCount,
+                true
+              ),
+          });
+
+          alert(
+            '⚡ Your x3 Mining Boost is already active.'
+          );
+
+          return;
+        }
+
+        throw new Error(
+          data.error ||
+          'Mining boost activation failed'
+        );
+      }
+
+      const boostStartedAt =
+        data.boostStartedAt ||
+        new Date().toISOString();
+
+      const boostUntil =
+        data.boostUntil ||
+        new Date(
+          Date.now() +
+          MINING_BOOST_DURATION_SECONDS * 1000
+        ).toISOString();
+
+      const remaining =
+        getRemainingMiningBoost(
+          boostUntil
+        ) ||
+        MINING_BOOST_DURATION_SECONDS;
+
+      const boostedMiningRate =
+        getEffectiveMiningRate(
+          dbMiningRate,
+          activeFriendsCount,
+          true
+        );
+
+      setMiningBoostRemaining(
+        remaining
+      );
+
+      setTotalMiningRate(
+        boostedMiningRate
+      );
+
+      patchUserCache(userId, {
+        miningBoostStartedAt:
+          boostStartedAt,
+        miningBoostUntil:
+          boostUntil,
+        miningBoostCount:
+          Number(data.boostCount || 0),
+        totalMiningRate:
+          boostedMiningRate,
+      });
+
+      alert(
+        '⚡ x3 Mining Boost activated for 24 hours!'
+      );
+    } catch (error) {
+      console.error(
+        'Mining boost ad failed:',
+        error
+      );
+
+      alert(
+        '❌ Ad was not completed. Mining Boost was not activated.'
+      );
+    } finally {
+      setIsWatchingBoostAd(false);
     }
   };
 
@@ -1411,8 +1877,56 @@ export default function Home() {
                <div className="flex flex-col">
                  <span className="text-gray-400 text-sm font-medium">TOTAL MINING SPEED</span>
                  {activeFriendsCount > 0 && <span className="text-[9px] text-green-400">Includes +5% per active friend</span>}
+                 {isMiningBoostActive && (
+                   <span className="text-[9px] text-fuchsia-400 font-bold">
+                     ⚡ x3 base speed active
+                   </span>
+                 )}
                </div>
                <span className="font-semibold text-yellow-400 text-xs">+{totalMiningRate.toFixed(5)} APXN/sec</span>
+            </div>
+
+            <div className={`rounded-2xl p-4 flex items-center justify-between border ${
+              isMiningBoostActive
+                ? 'bg-fuchsia-950/30 border-fuchsia-500/50 shadow-[0_0_18px_rgba(217,70,239,0.12)]'
+                : 'bg-slate-900/60 border-slate-800'
+            }`}>
+              <div className="flex flex-col pr-3">
+                <span className="text-white text-sm font-black">⚡ x3 Mining Boost</span>
+                <span className="text-[10px] text-gray-400 mt-1">
+                  {isMiningBoostActive
+                    ? `Active • ${formatTime(miningBoostRemaining)} left`
+                    : 'Watch an ad → x3 base mining speed for 24h'}
+                </span>
+              </div>
+
+              <button
+                onClick={handleWatchMiningBoost}
+                disabled={
+                  !isDataLoaded ||
+                  !isMiningBoostStatusLoaded ||
+                  isWatchingBoostAd ||
+                  isWatchingAd ||
+                  isMiningBoostActive
+                }
+                className={`px-4 py-2 rounded-xl text-xs font-black min-w-[84px] transition-all ${
+                  isMiningBoostActive
+                    ? 'bg-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-500/40 cursor-not-allowed'
+                    : (!isDataLoaded || !isMiningBoostStatusLoaded || isWatchingBoostAd || isWatchingAd)
+                    ? 'bg-slate-700 text-gray-300 animate-pulse'
+                    : 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white active:scale-95'
+                }`}
+              >
+                {!isDataLoaded || !isMiningBoostStatusLoaded
+                  ? 'Wait..'
+                  : isWatchingBoostAd
+                  ? 'Ad...'
+                  : isWatchingAd
+                  ? 'Wait..'
+                  : isMiningBoostActive
+                  ? 'ACTIVE'
+                  : 'WATCH'}
+              </button>
             </div>
           </div>
 
@@ -1515,12 +2029,13 @@ export default function Home() {
                   !isDataLoaded ||
                   !isAdRewardStatusLoaded ||
                   isWatchingAd ||
+                  isWatchingBoostAd ||
                   adRewardCooldown > 0
                 }
                 className={`px-4 py-2 rounded-xl text-white text-sm font-bold transition-colors min-w-[80px] ${
                   adRewardCooldown > 0
                     ? 'bg-green-600'
-                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd)
+                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd || isWatchingBoostAd)
                     ? 'bg-slate-700 animate-pulse'
                     : 'bg-gradient-to-r from-yellow-500 to-orange-600 active:scale-95'
                 }`}
@@ -1529,6 +2044,8 @@ export default function Home() {
                   ? 'Wait..'
                   : isWatchingAd
                   ? 'Ad...'
+                  : isWatchingBoostAd
+                  ? 'Wait..'
                   : adRewardCooldown > 0
                   ? 'Done ✓'
                   : 'WATCH'}
@@ -2151,4 +2668,5 @@ export default function Home() {
     </main>
   );
 }
+
 
