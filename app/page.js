@@ -272,6 +272,7 @@ export default function Home() {
   const [activeFriendsCount, setActiveFriendsCount] = useState(0);
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoaded, setFriendsLoaded] = useState(false);
+  const [referralSummaryLoaded, setReferralSummaryLoaded] = useState(false);
 
   const [dbMiningRate, setDbMiningRate] = useState(0.00025);
   const [totalMiningRate, setTotalMiningRate] = useState(0.00025);
@@ -892,6 +893,116 @@ export default function Home() {
     };
   }, []);
 
+  // Keep referral mining speed accurate as soon as the app opens.
+  //
+  // We request only one friend row here because the purpose of this
+  // lightweight call is to refresh total/active referral counts.
+  // The full referral list is still loaded only when the Friends tab
+  // is opened, so startup remains fast.
+  useEffect(() => {
+    const loadReferralSummary = async () => {
+      if (
+        !isDataLoaded ||
+        !userId ||
+        userId === 'test_user' ||
+        referralSummaryLoaded
+      ) {
+        return;
+      }
+
+      const initData =
+        typeof window !== 'undefined'
+          ? window.Telegram?.WebApp?.initData
+          : null;
+
+      if (!initData) {
+        setReferralSummaryLoaded(true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/friends', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            initData,
+            limit: 1,
+            offset: 0,
+          }),
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Referral summary load failed'
+          );
+        }
+
+        const totalFriends = Number(
+          data.totalFriends || 0
+        );
+
+        const activeCount = Number(
+          data.activeFriends || 0
+        );
+
+        const finalRate =
+          getEffectiveMiningRate(
+            dbMiningRate,
+            activeCount,
+            isMiningBoostActive
+          );
+
+        setFriendsCount(totalFriends);
+        setActiveFriendsCount(activeCount);
+        setTotalMiningRate(finalRate);
+
+        // Recalculate the visible pending mining amount using
+        // the refreshed active-referral count. The authoritative
+        // Claim RPC in Supabase remains the final source of truth.
+        const cachedUser = readUserCache(userId);
+        const cachedLastClaim =
+          cachedUser?.lastClaim || null;
+
+        if (cachedLastClaim) {
+          setMiningDelta(
+            calculateEstimatedMiningDelta({
+              lastClaim: cachedLastClaim,
+              baseRate: dbMiningRate,
+              activeFriends: activeCount,
+              boostStartedAt:
+                cachedUser?.miningBoostStartedAt || null,
+              boostUntil:
+                cachedUser?.miningBoostUntil || null,
+            })
+          );
+        }
+
+        patchUserCache(userId, {
+          friendsCount: totalFriends,
+          activeFriendsCount: activeCount,
+          totalMiningRate: finalRate,
+        });
+      } catch (error) {
+        console.error('Referral summary load failed');
+      } finally {
+        setReferralSummaryLoaded(true);
+      }
+    };
+
+    loadReferralSummary();
+  }, [
+    isDataLoaded,
+    userId,
+    referralSummaryLoaded,
+    dbMiningRate,
+    isMiningBoostActive,
+  ]);
+
   // Friends are fetched only when the Friends tab is actually opened.
   // The browser calls our protected API instead of reading public.users directly.
   useEffect(() => {
@@ -953,6 +1064,7 @@ export default function Home() {
         setActiveFriendsCount(activeCount);
         setTotalMiningRate(finalRate);
         setFriendsLoaded(true);
+        setReferralSummaryLoaded(true);
 
         patchUserCache(userId, {
           friendsCount: totalFriends,
