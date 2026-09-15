@@ -245,6 +245,18 @@ export default function Home() {
   const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
   const [verifyingTwitter, setVerifyingTwitter] = useState(false);
   const [verifyingTelegram, setVerifyingTelegram] = useState(false);
+
+  // Three-step task flow:
+  // GO -> CONFIRM -> CONFIRM AGAIN -> server reward.
+  // The first two steps are local only, so they add no Supabase load.
+  const [taskConfirmStages, setTaskConfirmStages] = useState({
+    dailyTelegram: 0,
+    dailyTwitter: 0,
+    channel: 0,
+    group: 0,
+    twitter: 0,
+  });
+
   const [adRewardCooldown, setAdRewardCooldown] = useState(0);
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [isAdRewardStatusLoaded, setIsAdRewardStatusLoaded] = useState(false);
@@ -1153,20 +1165,86 @@ export default function Home() {
     }
   };
 
+  const updateTaskConfirmStage = (key, stage) => {
+    setTaskConfirmStages(prev => ({
+      ...prev,
+      [key]: stage,
+    }));
+  };
+
+  const getTaskConfirmLabel = ({
+    key,
+    completed,
+    loading = false,
+  }) => {
+    if (completed) return 'Done ✓';
+    if (loading) return 'Wait..';
+
+    const stage = Number(
+      taskConfirmStages[key] || 0
+    );
+
+    if (stage === 0) return 'GO';
+    if (stage === 1) return 'CONFIRM';
+    return 'CONFIRM AGAIN';
+  };
+
+  const runTaskConfirmationFlow = async ({
+    key,
+    link,
+    completed,
+    busy,
+    onFinalConfirm,
+  }) => {
+    if (
+      !isDataLoaded ||
+      completed ||
+      busy ||
+      !link
+    ) {
+      return;
+    }
+
+    const stage = Number(
+      taskConfirmStages[key] || 0
+    );
+
+    // First press: open the real Telegram/X destination.
+    if (stage === 0) {
+      window.open(link, '_blank');
+      updateTaskConfirmStage(key, 1);
+      return;
+    }
+
+    // First confirmation: ask the user to confirm once more.
+    // No reward request is sent yet.
+    if (stage === 1) {
+      updateTaskConfirmStage(key, 2);
+
+      alert(
+        '⚠️ Please complete the task, then confirm it one more time.'
+      );
+
+      return;
+    }
+
+    // Second confirmation: only now call the existing protected API.
+    await onFinalConfirm();
+  };
+
   const claimDailyTask = async ({
     task,
-    link,
     completed,
     verifying,
     setCompleted,
     setVerifying,
     cacheField,
+    confirmationKey,
   }) => {
     if (
       !isDataLoaded ||
       completed ||
-      verifying ||
-      !link
+      verifying
     ) {
       return;
     }
@@ -1181,101 +1259,128 @@ export default function Home() {
       return;
     }
 
-    window.open(link, '_blank');
     setVerifying(true);
 
-    setTimeout(async () => {
-      try {
-        const response = await fetch('/api/tasks/daily', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            initData,
-            task,
-          }),
-          cache: 'no-store',
-        });
+    try {
+      const response = await fetch('/api/tasks/daily', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          initData,
+          task,
+        }),
+        cache: 'no-store',
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-          if (
-            response.status === 409 &&
-            data.completed
-          ) {
-            const syncedBalance = Number(
-              data.balance
-            );
+      if (!response.ok) {
+        if (
+          response.status === 409 &&
+          data.completed
+        ) {
+          const syncedBalance = Number(
+            data.balance
+          );
 
-            if (Number.isFinite(syncedBalance)) {
-              setBalance(syncedBalance);
-            }
-
-            const taskDate =
-              data.lastTaskDate ||
-              new Date().toISOString().split('T')[0];
-
-            setCompleted(true);
-
-            patchUserCache(userId, {
-              ...(Number.isFinite(syncedBalance)
-                ? { balance: syncedBalance }
-                : {}),
-              [cacheField]: taskDate,
-            });
-
-            return;
+          if (Number.isFinite(syncedBalance)) {
+            setBalance(syncedBalance);
           }
 
-          throw new Error(
-            data.error || 'Daily task failed'
+          const taskDate =
+            data.lastTaskDate ||
+            new Date().toISOString().split('T')[0];
+
+          setCompleted(true);
+          updateTaskConfirmStage(
+            confirmationKey,
+            0
           );
+
+          patchUserCache(userId, {
+            ...(Number.isFinite(syncedBalance)
+              ? { balance: syncedBalance }
+              : {}),
+            [cacheField]: taskDate,
+          });
+
+          return;
         }
 
-        const newBalance = Number(data.balance || 0);
-        const taskDate =
-          data.lastTaskDate ||
-          new Date().toISOString().split('T')[0];
-
-        setBalance(newBalance);
-        setCompleted(true);
-
-        patchUserCache(userId, {
-          balance: newBalance,
-          [cacheField]: taskDate,
-        });
-      } catch (error) {
-        console.error('Daily task failed:', error);
-        alert('❌ Daily task failed. Please try again.');
-      } finally {
-        setVerifying(false);
+        throw new Error(
+          data.error || 'Daily task failed'
+        );
       }
-    }, 10000);
+
+      const newBalance = Number(data.balance || 0);
+      const taskDate =
+        data.lastTaskDate ||
+        new Date().toISOString().split('T')[0];
+
+      setBalance(newBalance);
+      setCompleted(true);
+      updateTaskConfirmStage(
+        confirmationKey,
+        0
+      );
+
+      patchUserCache(userId, {
+        balance: newBalance,
+        [cacheField]: taskDate,
+      });
+    } catch (error) {
+      console.error('Daily task failed:', error);
+
+      updateTaskConfirmStage(
+        confirmationKey,
+        0
+      );
+
+      alert('❌ Daily task failed. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const handleDailyTwitter = async () => {
-    await claimDailyTask({
-      task: 'twitter',
+    await runTaskConfirmationFlow({
+      key: 'dailyTwitter',
       link: dailyTwitterLink,
       completed: dailyTwitterDone,
-      verifying: verifyingTwitter,
-      setCompleted: setDailyTwitterDone,
-      setVerifying: setVerifyingTwitter,
-      cacheField: 'lastTwitterTask',
+      busy: verifyingTwitter,
+      onFinalConfirm: async () => {
+        await claimDailyTask({
+          task: 'twitter',
+          completed: dailyTwitterDone,
+          verifying: verifyingTwitter,
+          setCompleted: setDailyTwitterDone,
+          setVerifying: setVerifyingTwitter,
+          cacheField: 'lastTwitterTask',
+          confirmationKey: 'dailyTwitter',
+        });
+      },
     });
   };
 
   const handleDailyTelegram = async () => {
-    await claimDailyTask({
-      task: 'telegram',
+    await runTaskConfirmationFlow({
+      key: 'dailyTelegram',
       link: dailyTelegramLink,
       completed: dailyTelegramDone,
-      verifying: verifyingTelegram,
-      setCompleted: setDailyTelegramDone,
-      setVerifying: setVerifyingTelegram,
-      cacheField: 'lastTelegramTask',
+      busy: verifyingTelegram,
+      onFinalConfirm: async () => {
+        await claimDailyTask({
+          task: 'telegram',
+          completed: dailyTelegramDone,
+          verifying: verifyingTelegram,
+          setCompleted: setDailyTelegramDone,
+          setVerifying: setVerifyingTelegram,
+          cacheField: 'lastTelegramTask',
+          confirmationKey: 'dailyTelegram',
+        });
+      },
     });
   };
 
@@ -1593,10 +1698,10 @@ export default function Home() {
 
   const claimSocialTask = async ({
     task,
-    url,
     completed,
     setCompleted,
     cacheField,
+    confirmationKey,
   }) => {
     if (
       !isDataLoaded ||
@@ -1616,7 +1721,6 @@ export default function Home() {
       return;
     }
 
-    window.open(url, '_blank');
     setIsSaving(true);
 
     try {
@@ -1646,6 +1750,10 @@ export default function Home() {
           }
 
           setCompleted(true);
+          updateTaskConfirmStage(
+            confirmationKey,
+            0
+          );
 
           patchUserCache(userId, {
             ...(Number.isFinite(syncedBalance)
@@ -1666,6 +1774,10 @@ export default function Home() {
 
       setBalance(newBalance);
       setCompleted(true);
+      updateTaskConfirmStage(
+        confirmationKey,
+        0
+      );
 
       patchUserCache(userId, {
         balance: newBalance,
@@ -1673,39 +1785,73 @@ export default function Home() {
       });
     } catch (error) {
       console.error('Social task failed:', error);
-      alert('❌ Task failed. Please try again.');
+
+      updateTaskConfirmStage(
+        confirmationKey,
+        0
+      );
+
+      const message =
+        error?.message ||
+        'Task failed. Please try again.';
+
+      alert(`❌ ${message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleJoinChannel = async () => {
-    await claimSocialTask({
-      task: 'channel',
-      url: 'https://t.me/ApexMiner_Official',
+    await runTaskConfirmationFlow({
+      key: 'channel',
+      link: 'https://t.me/ApexMiner_Official',
       completed: taskCompleted,
-      setCompleted: setTaskCompleted,
-      cacheField: 'channelJoined',
+      busy: isSaving,
+      onFinalConfirm: async () => {
+        await claimSocialTask({
+          task: 'channel',
+          completed: taskCompleted,
+          setCompleted: setTaskCompleted,
+          cacheField: 'channelJoined',
+          confirmationKey: 'channel',
+        });
+      },
     });
   };
 
   const handleJoinGroup = async () => {
-    await claimSocialTask({
-      task: 'group',
-      url: 'https://t.me/ApexMinerGroup',
+    await runTaskConfirmationFlow({
+      key: 'group',
+      link: 'https://t.me/ApexMinerGroup',
       completed: groupTaskCompleted,
-      setCompleted: setGroupTaskCompleted,
-      cacheField: 'groupJoined',
+      busy: isSaving,
+      onFinalConfirm: async () => {
+        await claimSocialTask({
+          task: 'group',
+          completed: groupTaskCompleted,
+          setCompleted: setGroupTaskCompleted,
+          cacheField: 'groupJoined',
+          confirmationKey: 'group',
+        });
+      },
     });
   };
 
   const handleFollowTwitter = async () => {
-    await claimSocialTask({
-      task: 'twitter',
-      url: 'https://x.com/ApexNetworkApp',
+    await runTaskConfirmationFlow({
+      key: 'twitter',
+      link: 'https://x.com/ApexNetworkApp',
       completed: twitterTaskCompleted,
-      setCompleted: setTwitterTaskCompleted,
-      cacheField: 'twitterJoined',
+      busy: isSaving,
+      onFinalConfirm: async () => {
+        await claimSocialTask({
+          task: 'twitter',
+          completed: twitterTaskCompleted,
+          setCompleted: setTwitterTaskCompleted,
+          cacheField: 'twitterJoined',
+          confirmationKey: 'twitter',
+        });
+      },
     });
   };
 
@@ -1854,9 +2000,6 @@ export default function Home() {
         </div>
 
         <div className="w-full flex justify-end items-center gap-2 mt-2">
-          <span className="text-[9px] font-black text-[#0098EA] uppercase tracking-wider">
-            TON Wallet
-          </span>
           <div className="origin-right scale-[0.85]">
             <TonConnectButton />
           </div>
@@ -2059,7 +2202,11 @@ export default function Home() {
                 <p className="text-yellow-400 text-xs">+100 APXN Points</p>
               </div>
               <button onClick={handleDailyTelegram} disabled={!isDataLoaded || dailyTelegramDone || verifyingTelegram} className={`${dailyTelegramDone ? 'bg-green-600' : (!isDataLoaded || verifyingTelegram) ? 'bg-slate-700 animate-pulse' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                {dailyTelegramDone ? 'Done ✓' : (!isDataLoaded || verifyingTelegram) ? 'Wait..' : 'GO'}
+                {getTaskConfirmLabel({
+                  key: 'dailyTelegram',
+                  completed: dailyTelegramDone,
+                  loading: !isDataLoaded || verifyingTelegram,
+                })}
               </button>
             </div>
             )}
@@ -2075,7 +2222,11 @@ export default function Home() {
                 <p className="text-yellow-400 text-xs">+100 APXN Points</p>
               </div>
               <button onClick={handleDailyTwitter} disabled={!isDataLoaded || dailyTwitterDone || verifyingTwitter} className={`${dailyTwitterDone ? 'bg-green-600' : (!isDataLoaded || verifyingTwitter) ? 'bg-slate-700 animate-pulse' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                {dailyTwitterDone ? 'Done ✓' : (!isDataLoaded || verifyingTwitter) ? 'Wait..' : 'GO'}
+                {getTaskConfirmLabel({
+                  key: 'dailyTwitter',
+                  completed: dailyTwitterDone,
+                  loading: !isDataLoaded || verifyingTwitter,
+                })}
               </button>
             </div>
             )}
@@ -2089,8 +2240,12 @@ export default function Home() {
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleJoinChannel} disabled={!isDataLoaded || taskCompleted} className={`${taskCompleted ? 'bg-green-600' : (!isDataLoaded ? 'bg-slate-700' : 'bg-[#2AABEE]')} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                {taskCompleted ? 'Done ✓' : 'GO'}
+              <button onClick={handleJoinChannel} disabled={!isDataLoaded || taskCompleted || isSaving} className={`${taskCompleted ? 'bg-green-600' : (!isDataLoaded || isSaving) ? 'bg-slate-700' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                {getTaskConfirmLabel({
+                  key: 'channel',
+                  completed: taskCompleted,
+                  loading: !isDataLoaded || isSaving,
+                })}
               </button>
             </div>
 
@@ -2099,8 +2254,12 @@ export default function Home() {
                 <h3 className="font-bold text-white text-lg">Join Telegram Group</h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleJoinGroup} disabled={!isDataLoaded || groupTaskCompleted} className={`${groupTaskCompleted ? 'bg-green-600' : (!isDataLoaded ? 'bg-slate-700' : 'bg-[#229ED9]')} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                {groupTaskCompleted ? 'Done ✓' : 'GO'}
+              <button onClick={handleJoinGroup} disabled={!isDataLoaded || groupTaskCompleted || isSaving} className={`${groupTaskCompleted ? 'bg-green-600' : (!isDataLoaded || isSaving) ? 'bg-slate-700' : 'bg-[#229ED9]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                {getTaskConfirmLabel({
+                  key: 'group',
+                  completed: groupTaskCompleted,
+                  loading: !isDataLoaded || isSaving,
+                })}
               </button>
             </div>
 
@@ -2113,8 +2272,12 @@ export default function Home() {
                 </h3>
                 <p className="text-yellow-400 text-xs">+500 APXN Points</p>
               </div>
-              <button onClick={handleFollowTwitter} disabled={!isDataLoaded || twitterTaskCompleted} className={`${twitterTaskCompleted ? 'bg-green-600' : (!isDataLoaded ? 'bg-slate-700' : 'bg-black border border-slate-700')} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
-                {twitterTaskCompleted ? 'Done ✓' : 'GO'}
+              <button onClick={handleFollowTwitter} disabled={!isDataLoaded || twitterTaskCompleted || isSaving} className={`${twitterTaskCompleted ? 'bg-green-600' : (!isDataLoaded || isSaving) ? 'bg-slate-700' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
+                {getTaskConfirmLabel({
+                  key: 'twitter',
+                  completed: twitterTaskCompleted,
+                  loading: !isDataLoaded || isSaving,
+                })}
               </button>
             </div>
           </div>
@@ -2668,5 +2831,6 @@ export default function Home() {
     </main>
   );
 }
+
 
 
