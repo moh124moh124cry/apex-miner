@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { TonConnectButton } from '@tonconnect/ui-react';
 
 const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
+const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
 const USER_CACHE_VERSION = 1;
@@ -28,6 +29,44 @@ function getRemainingAdRewardCooldown(lastAdRewardAt) {
   return Math.ceil(
     AD_REWARD_COOLDOWN_SECONDS - elapsedSeconds
   );
+}
+
+function getMiningSessionEndsAt(lastClaim) {
+  if (!lastClaim) {
+    return (
+      Date.now() +
+      MINING_SESSION_DURATION_SECONDS * 1000
+    );
+  }
+
+  const lastClaimTime = new Date(lastClaim).getTime();
+
+  if (!Number.isFinite(lastClaimTime)) {
+    return null;
+  }
+
+  return (
+    lastClaimTime +
+    MINING_SESSION_DURATION_SECONDS * 1000
+  );
+}
+
+function getRemainingMiningSession(lastClaim) {
+  const endsAt =
+    getMiningSessionEndsAt(lastClaim);
+
+  if (!Number.isFinite(endsAt)) {
+    return 0;
+  }
+
+  const remainingSeconds =
+    (endsAt - Date.now()) / 1000;
+
+  if (remainingSeconds <= 0) {
+    return 0;
+  }
+
+  return Math.ceil(remainingSeconds);
 }
 
 function getRemainingMiningBoost(boostUntil) {
@@ -79,9 +118,15 @@ function calculateEstimatedMiningDelta({
 
   if (!Number.isFinite(lastClaimTime)) return 0;
 
+  const accrualEndTime = Math.min(
+    nowTime,
+    lastClaimTime +
+      MINING_SESSION_DURATION_SECONDS * 1000
+  );
+
   const elapsedSeconds = Math.max(
     0,
-    (nowTime - lastClaimTime) / 1000
+    (accrualEndTime - lastClaimTime) / 1000
   );
 
   const normalRate = getEffectiveMiningRate(
@@ -117,7 +162,7 @@ function calculateEstimatedMiningDelta({
     );
 
     const overlapEnd = Math.min(
-      nowTime,
+      accrualEndTime,
       boostUntilTime
     );
 
@@ -230,6 +275,11 @@ export default function Home() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [miningDelta, setMiningDelta] = useState(0);
   const [claimCooldown, setClaimCooldown] = useState(0);
+  const [miningSessionRemaining, setMiningSessionRemaining] =
+    useState(MINING_SESSION_DURATION_SECONDS);
+  const [miningSessionEndsAt, setMiningSessionEndsAt] =
+    useState(null);
+  const [isWatchingClaimAd, setIsWatchingClaimAd] = useState(false);
   const [activeTab, setActiveTab] = useState('mine');
 
   const [discoverView, setDiscoverView] = useState('about');
@@ -295,6 +345,10 @@ export default function Home() {
 
   const isMiningBoostActive =
     miningBoostRemaining > 0;
+
+  const isMiningPaused =
+    isDataLoaded &&
+    miningSessionRemaining <= 0;
 
   const getFlagIcon = (countryCode) => {
     if (!countryCode || countryCode === 'Unknown') {
@@ -471,6 +525,17 @@ export default function Home() {
         const lastTime = new Date(userData.lastClaim).getTime();
         const diffSeconds = Math.max(0, (Date.now() - lastTime) / 1000);
 
+        setMiningSessionRemaining(
+          getRemainingMiningSession(
+            userData.lastClaim
+          )
+        );
+        setMiningSessionEndsAt(
+          getMiningSessionEndsAt(
+            userData.lastClaim
+          )
+        );
+
         if (diffSeconds > 0) {
           setMiningDelta(
             calculateEstimatedMiningDelta({
@@ -495,6 +560,13 @@ export default function Home() {
       } else {
         setMiningDelta(0);
         setClaimCooldown(0);
+        setMiningSessionRemaining(
+          MINING_SESSION_DURATION_SECONDS
+        );
+        setMiningSessionEndsAt(
+          Date.now() +
+            MINING_SESSION_DURATION_SECONDS * 1000
+        );
       }
 
       setIsDataLoaded(true);
@@ -679,6 +751,17 @@ export default function Home() {
                   null;
 
                 if (freshLastClaim) {
+                  setMiningSessionRemaining(
+                    getRemainingMiningSession(
+                      freshLastClaim
+                    )
+                  );
+                  setMiningSessionEndsAt(
+                    getMiningSessionEndsAt(
+                      freshLastClaim
+                    )
+                  );
+
                   setMiningDelta(
                     calculateEstimatedMiningDelta({
                       lastClaim: freshLastClaim,
@@ -720,6 +803,16 @@ export default function Home() {
                         : 0
                     );
                   }
+                } else {
+                  setMiningDelta(0);
+                  setClaimCooldown(0);
+                  setMiningSessionRemaining(
+                    MINING_SESSION_DURATION_SECONDS
+                  );
+                  setMiningSessionEndsAt(
+                    Date.now() +
+                      MINING_SESSION_DURATION_SECONDS * 1000
+                  );
                 }
 
                 setDbMiningRate(
@@ -1088,13 +1181,39 @@ export default function Home() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setMiningDelta(prev => prev + totalMiningRate);
+      const remaining =
+        Number.isFinite(miningSessionEndsAt)
+          ? Math.max(
+              0,
+              Math.ceil(
+                (
+                  miningSessionEndsAt -
+                  Date.now()
+                ) / 1000
+              )
+            )
+          : 0;
+
+      setMiningSessionRemaining(
+        remaining
+      );
+
+      if (remaining > 0) {
+        setMiningDelta(prev =>
+          prev + totalMiningRate
+        );
+      }
+
       setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
       setAdRewardCooldown(prev => (prev > 0 ? prev - 1 : 0));
       setMiningBoostRemaining(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
+
     return () => clearInterval(interval);
-  }, [totalMiningRate]);
+  }, [
+    totalMiningRate,
+    miningSessionEndsAt,
+  ]);
 
   useEffect(() => {
     setTotalMiningRate(
@@ -1200,6 +1319,9 @@ export default function Home() {
     if (
       !isDataLoaded ||
       isSaving ||
+      isWatchingClaimAd ||
+      isWatchingAd ||
+      isWatchingBoostAd ||
       claimCooldown > 0 ||
       miningDelta < 0.0001
     ) {
@@ -1216,9 +1338,28 @@ export default function Home() {
       return;
     }
 
-    setIsSaving(true);
+    if (
+      typeof window.show_11803132 !==
+      'function'
+    ) {
+      alert(
+        '⚠️ Ad is not ready yet. Please try again in a moment.'
+      );
+      return;
+    }
+
+    let adCompleted = false;
+
+    setIsWatchingClaimAd(true);
 
     try {
+      // The Claim request is sent only after the existing
+      // Monetag rewarded interstitial promise completes.
+      await window.show_11803132();
+      adCompleted = true;
+
+      setIsSaving(true);
+
       const response = await fetch('/api/mining/claim', {
         method: 'POST',
         headers: {
@@ -1241,10 +1382,22 @@ export default function Home() {
         throw new Error(data.error || 'Claim failed');
       }
 
+      const newLastClaim =
+        data.lastClaim ||
+        new Date().toISOString();
+
       setBalance(Number(data.balance || 0));
       setMiningDelta(0);
       setClaimCooldown(
         Number(data.cooldown || CLAIM_COOLDOWN_SECONDS)
+      );
+      setMiningSessionRemaining(
+        MINING_SESSION_DURATION_SECONDS
+      );
+      setMiningSessionEndsAt(
+        getMiningSessionEndsAt(
+          newLastClaim
+        )
       );
 
       if (Number.isFinite(Number(data.baseMiningRate))) {
@@ -1264,16 +1417,24 @@ export default function Home() {
         miningRate: Number(data.baseMiningRate || dbMiningRate),
         totalMiningRate: Number(data.miningRate || totalMiningRate),
         activeFriendsCount: Number(data.activeFriends || 0),
-        lastClaim: data.lastClaim || new Date().toISOString(),
+        lastClaim: newLastClaim,
       });
     } catch (error) {
       console.error('Claim failed:', error);
 
-      if (error?.message && error.message !== 'Claim cooldown active') {
+      if (!adCompleted) {
+        alert(
+          '❌ Ad was not completed. Your points were not claimed.'
+        );
+      } else if (
+        error?.message &&
+        error.message !== 'Claim cooldown active'
+      ) {
         alert('❌ Claim failed. Please try again.');
       }
     } finally {
       setIsSaving(false);
+      setIsWatchingClaimAd(false);
     }
   };
 
@@ -1502,6 +1663,7 @@ export default function Home() {
       !isAdRewardStatusLoaded ||
       isWatchingAd ||
       isWatchingBoostAd ||
+      isWatchingClaimAd ||
       adRewardCooldown > 0
     ) {
       return;
@@ -1644,6 +1806,7 @@ export default function Home() {
       !isMiningBoostStatusLoaded ||
       isWatchingBoostAd ||
       isWatchingAd ||
+      isWatchingClaimAd ||
       miningBoostRemaining > 0
     ) {
       return;
@@ -2162,12 +2325,13 @@ export default function Home() {
                   !isMiningBoostStatusLoaded ||
                   isWatchingBoostAd ||
                   isWatchingAd ||
+                  isWatchingClaimAd ||
                   isMiningBoostActive
                 }
                 className={`px-4 py-2 rounded-xl text-xs font-black min-w-[84px] transition-all ${
                   isMiningBoostActive
                     ? 'bg-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-500/40 cursor-not-allowed'
-                    : (!isDataLoaded || !isMiningBoostStatusLoaded || isWatchingBoostAd || isWatchingAd)
+                    : (!isDataLoaded || !isMiningBoostStatusLoaded || isWatchingBoostAd || isWatchingAd || isWatchingClaimAd)
                     ? 'bg-slate-700 text-gray-300 animate-pulse'
                     : 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white active:scale-95'
                 }`}
@@ -2176,7 +2340,7 @@ export default function Home() {
                   ? 'Wait..'
                   : isWatchingBoostAd
                   ? 'Ad...'
-                  : isWatchingAd
+                  : isWatchingAd || isWatchingClaimAd
                   ? 'Wait..'
                   : isMiningBoostActive
                   ? 'ACTIVE'
@@ -2189,6 +2353,15 @@ export default function Home() {
              <h3 className="text-5xl font-black text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)] tabular-nums">
                +{miningDelta.toFixed(4)}
              </h3>
+             <div className={`mt-2 text-[11px] font-bold ${
+               isMiningPaused
+                 ? 'text-red-400'
+                 : 'text-emerald-400'
+             }`}>
+               {isMiningPaused
+                 ? '⏸ Mining Paused • Claim points to restart'
+                 : `● Mining Active • ${formatTime(miningSessionRemaining)} left`}
+             </div>
           </div>
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
@@ -2218,12 +2391,21 @@ export default function Home() {
 
           <button
             onClick={handleClaim}
-            disabled={!isDataLoaded || isSaving || claimCooldown > 0}
+            disabled={
+              !isDataLoaded ||
+              isSaving ||
+              isWatchingClaimAd ||
+              isWatchingAd ||
+              isWatchingBoostAd ||
+              claimCooldown > 0
+            }
             className={`w-full py-4 mt-auto mb-4 rounded-2xl text-lg font-bold shadow-[0_4px_20px_rgba(245,158,11,0.4)] transition-all ${
               !isDataLoaded
                 ? 'bg-slate-800 text-gray-500 cursor-wait'
                 : claimCooldown > 0
                 ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
+                : (isSaving || isWatchingClaimAd || isWatchingAd || isWatchingBoostAd)
+                ? 'bg-slate-700 text-gray-300 animate-pulse'
                 : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white active:scale-95'
             }`}
           >
@@ -2231,7 +2413,15 @@ export default function Home() {
               ? 'LOADING...'
               : claimCooldown > 0
                 ? `WAIT ${formatTime(claimCooldown)}`
-                : (isSaving ? 'SAVING...' : 'CLAIM POINTS')
+                : isWatchingClaimAd
+                  ? 'WATCHING AD...'
+                  : isSaving
+                    ? 'CLAIMING...'
+                    : (isWatchingAd || isWatchingBoostAd)
+                      ? 'WAIT...'
+                      : isMiningPaused
+                        ? 'WATCH AD & CLAIM • RESTART MINING'
+                        : 'WATCH AD & CLAIM POINTS'
             }
           </button>
         </div>
@@ -2285,12 +2475,13 @@ export default function Home() {
                   !isAdRewardStatusLoaded ||
                   isWatchingAd ||
                   isWatchingBoostAd ||
+                  isWatchingClaimAd ||
                   adRewardCooldown > 0
                 }
                 className={`px-4 py-2 rounded-xl text-white text-sm font-bold transition-colors min-w-[80px] ${
                   adRewardCooldown > 0
                     ? 'bg-green-600'
-                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd || isWatchingBoostAd)
+                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd || isWatchingBoostAd || isWatchingClaimAd)
                     ? 'bg-slate-700 animate-pulse'
                     : 'bg-gradient-to-r from-yellow-500 to-orange-600 active:scale-95'
                 }`}
@@ -2299,7 +2490,7 @@ export default function Home() {
                   ? 'Wait..'
                   : isWatchingAd
                   ? 'Ad...'
-                  : isWatchingBoostAd
+                  : isWatchingBoostAd || isWatchingClaimAd
                   ? 'Wait..'
                   : adRewardCooldown > 0
                   ? 'Done ✓'
