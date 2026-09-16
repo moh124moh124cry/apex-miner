@@ -84,6 +84,87 @@ function getRemainingMiningBoost(boostUntil) {
   return Math.ceil(remainingSeconds);
 }
 
+function getEventAwareMiningBoostRemaining({
+  boostStartedAt,
+  boostUntil,
+  eventStartsAt,
+  eventEndsAt,
+  nowTime,
+}) {
+  if (!boostStartedAt || !boostUntil) return 0;
+
+  const boostStartTime =
+    new Date(boostStartedAt).getTime();
+
+  const boostUntilTime =
+    new Date(boostUntil).getTime();
+
+  const eventStartTime = eventStartsAt
+    ? new Date(eventStartsAt).getTime()
+    : NaN;
+
+  const eventEndTime = eventEndsAt
+    ? new Date(eventEndsAt).getTime()
+    : NaN;
+
+  const safeNowTime = Number(nowTime);
+
+  if (
+    !Number.isFinite(boostStartTime) ||
+    !Number.isFinite(boostUntilTime) ||
+    !Number.isFinite(safeNowTime) ||
+    boostUntilTime <= boostStartTime
+  ) {
+    return 0;
+  }
+
+  if (
+    Number.isFinite(eventStartTime) &&
+    Number.isFinite(eventEndTime) &&
+    eventEndTime > eventStartTime &&
+    boostStartTime < eventStartTime &&
+    boostUntilTime > eventStartTime
+  ) {
+    const savedSeconds = Math.max(
+      0,
+      (boostUntilTime - eventStartTime) / 1000
+    );
+
+    if (safeNowTime < eventStartTime) {
+      return Math.max(
+        0,
+        Math.ceil(
+          (boostUntilTime - safeNowTime) / 1000
+        )
+      );
+    }
+
+    if (safeNowTime < eventEndTime) {
+      return Math.max(
+        0,
+        Math.ceil(savedSeconds)
+      );
+    }
+
+    const resumedUntilTime =
+      eventEndTime + savedSeconds * 1000;
+
+    return Math.max(
+      0,
+      Math.ceil(
+        (resumedUntilTime - safeNowTime) / 1000
+      )
+    );
+  }
+
+  return Math.max(
+    0,
+    Math.ceil(
+      (boostUntilTime - safeNowTime) / 1000
+    )
+  );
+}
+
 function getEffectiveMiningRate(
   baseRate,
   activeFriends,
@@ -104,42 +185,134 @@ function getEffectiveMiningRate(
     : safeBaseRate + referralRate;
 }
 
+function getOverlapSeconds(
+  rangeStart,
+  rangeEnd,
+  segmentStart,
+  segmentEnd
+) {
+  if (
+    !Number.isFinite(rangeStart) ||
+    !Number.isFinite(rangeEnd) ||
+    !Number.isFinite(segmentStart) ||
+    !Number.isFinite(segmentEnd)
+  ) {
+    return 0;
+  }
+
+  const overlapStart = Math.max(
+    rangeStart,
+    segmentStart
+  );
+
+  const overlapEnd = Math.min(
+    rangeEnd,
+    segmentEnd
+  );
+
+  if (overlapEnd <= overlapStart) {
+    return 0;
+  }
+
+  return (
+    overlapEnd - overlapStart
+  ) / 1000;
+}
+
 function calculateEstimatedMiningDelta({
   lastClaim,
   baseRate,
   activeFriends,
   boostStartedAt,
   boostUntil,
+  eventStartsAt = null,
+  eventEndsAt = null,
+  eventBaseRate = 0.02,
+  nowTime = Date.now(),
 }) {
   if (!lastClaim) return 0;
 
-  const lastClaimTime = new Date(lastClaim).getTime();
-  const nowTime = Date.now();
+  const lastClaimTime =
+    new Date(lastClaim).getTime();
 
-  if (!Number.isFinite(lastClaimTime)) return 0;
+  const safeNowTime = Number(nowTime);
+
+  if (
+    !Number.isFinite(lastClaimTime) ||
+    !Number.isFinite(safeNowTime)
+  ) {
+    return 0;
+  }
 
   const accrualEndTime = Math.min(
-    nowTime,
+    safeNowTime,
     lastClaimTime +
       MINING_SESSION_DURATION_SECONDS * 1000
   );
+
+  if (accrualEndTime <= lastClaimTime) {
+    return 0;
+  }
 
   const elapsedSeconds = Math.max(
     0,
     (accrualEndTime - lastClaimTime) / 1000
   );
 
+  const safeBaseRate = Number(
+    baseRate || 0.00025
+  );
+
+  const safeEventBaseRate = Number(
+    eventBaseRate || 0.02
+  );
+
+  const safeActiveFriends = Math.max(
+    0,
+    Number(activeFriends || 0)
+  );
+
   const normalRate = getEffectiveMiningRate(
-    baseRate,
-    activeFriends,
+    safeBaseRate,
+    safeActiveFriends,
     false
   );
 
   const boostedRate = getEffectiveMiningRate(
-    baseRate,
-    activeFriends,
+    safeBaseRate,
+    safeActiveFriends,
     true
   );
+
+  const eventRate = getEffectiveMiningRate(
+    safeEventBaseRate,
+    safeActiveFriends,
+    false
+  );
+
+  const eventStartTime = eventStartsAt
+    ? new Date(eventStartsAt).getTime()
+    : NaN;
+
+  const eventEndTime = eventEndsAt
+    ? new Date(eventEndsAt).getTime()
+    : NaN;
+
+  const hasValidEvent =
+    Number.isFinite(eventStartTime) &&
+    Number.isFinite(eventEndTime) &&
+    eventEndTime > eventStartTime;
+
+  let eventSeconds = 0;
+
+  if (hasValidEvent) {
+    eventSeconds = getOverlapSeconds(
+      lastClaimTime,
+      accrualEndTime,
+      eventStartTime,
+      eventEndTime
+    );
+  }
 
   const boostStartTime = boostStartedAt
     ? new Date(boostStartedAt).getTime()
@@ -156,35 +329,97 @@ function calculateEstimatedMiningDelta({
     Number.isFinite(boostUntilTime) &&
     boostUntilTime > boostStartTime
   ) {
-    const overlapStart = Math.max(
-      lastClaimTime,
-      boostStartTime
-    );
+    const boostSegments = [];
 
-    const overlapEnd = Math.min(
-      accrualEndTime,
-      boostUntilTime
-    );
+    if (
+      hasValidEvent &&
+      boostStartTime < eventStartTime &&
+      boostUntilTime > eventStartTime
+    ) {
+      boostSegments.push([
+        boostStartTime,
+        Math.min(
+          boostUntilTime,
+          eventStartTime
+        ),
+      ]);
 
-    boostedSeconds = Math.max(
-      0,
-      (overlapEnd - overlapStart) / 1000
-    );
+      boostSegments.push([
+        eventEndTime,
+        eventEndTime +
+          (boostUntilTime - eventStartTime),
+      ]);
+    } else if (
+      hasValidEvent &&
+      boostStartTime >= eventStartTime &&
+      boostStartTime < eventEndTime
+    ) {
+      // x3 cannot be activated during the event.
+      // Ignore any stale/historical interval that starts inside it.
+    } else {
+      boostSegments.push([
+        boostStartTime,
+        boostUntilTime,
+      ]);
+    }
+
+    for (const [segmentStart, segmentEnd] of boostSegments) {
+      let seconds = getOverlapSeconds(
+        lastClaimTime,
+        accrualEndTime,
+        segmentStart,
+        segmentEnd
+      );
+
+      if (
+        hasValidEvent &&
+        seconds > 0
+      ) {
+        const eventOverlap = getOverlapSeconds(
+          Math.max(
+            lastClaimTime,
+            segmentStart
+          ),
+          Math.min(
+            accrualEndTime,
+            segmentEnd
+          ),
+          eventStartTime,
+          eventEndTime
+        );
+
+        seconds = Math.max(
+          0,
+          seconds - eventOverlap
+        );
+      }
+
+      boostedSeconds += seconds;
+    }
   }
 
   boostedSeconds = Math.min(
-    elapsedSeconds,
-    boostedSeconds
+    Math.max(
+      0,
+      elapsedSeconds - eventSeconds
+    ),
+    Math.max(
+      0,
+      boostedSeconds
+    )
   );
 
   const normalSeconds = Math.max(
     0,
-    elapsedSeconds - boostedSeconds
+    elapsedSeconds -
+      eventSeconds -
+      boostedSeconds
   );
 
   return (
     normalSeconds * normalRate +
-    boostedSeconds * boostedRate
+    boostedSeconds * boostedRate +
+    eventSeconds * eventRate
   );
 }
 
@@ -279,7 +514,7 @@ export default function Home() {
     useState(MINING_SESSION_DURATION_SECONDS);
   const [miningSessionEndsAt, setMiningSessionEndsAt] =
     useState(null);
-  const [isWatchingClaimAd, setIsWatchingClaimAd] = useState(false);
+  const [isWatchingRestartAd, setIsWatchingRestartAd] = useState(false);
   const [activeTab, setActiveTab] = useState('mine');
 
   const [discoverView, setDiscoverView] = useState('about');
@@ -311,9 +546,22 @@ export default function Home() {
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [isAdRewardStatusLoaded, setIsAdRewardStatusLoaded] = useState(false);
 
+  const [miningBoostStartedAt, setMiningBoostStartedAt] = useState(null);
+  const [miningBoostUntil, setMiningBoostUntil] = useState(null);
   const [miningBoostRemaining, setMiningBoostRemaining] = useState(0);
   const [isWatchingBoostAd, setIsWatchingBoostAd] = useState(false);
   const [isMiningBoostStatusLoaded, setIsMiningBoostStatusLoaded] = useState(false);
+
+  const [miningEventStatusLoaded, setMiningEventStatusLoaded] = useState(false);
+  const [miningEventPhase, setMiningEventPhase] = useState('unknown');
+  const [miningEventRemaining, setMiningEventRemaining] = useState(0);
+  const [miningEventStartsIn, setMiningEventStartsIn] = useState(0);
+  const [miningEventStartsAt, setMiningEventStartsAt] = useState(null);
+  const [miningEventEndsAt, setMiningEventEndsAt] = useState(null);
+  const [miningEventBaseRate, setMiningEventBaseRate] = useState(0.02);
+  const [miningEventBoostEnabled, setMiningEventBoostEnabled] = useState(true);
+  const [miningEventServerNowMs, setMiningEventServerNowMs] = useState(null);
+  const [miningEventClockElapsed, setMiningEventClockElapsed] = useState(0);
 
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [canCheckIn, setCanCheckIn] = useState(false);
@@ -343,12 +591,102 @@ export default function Home() {
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
 
+  const isMiningEventActive =
+    miningEventStatusLoaded &&
+    miningEventPhase === 'active';
+
+  const effectiveBaseMiningRate =
+    isMiningEventActive
+      ? miningEventBaseRate
+      : dbMiningRate;
+
   const isMiningBoostActive =
+    miningBoostRemaining > 0 &&
+    !isMiningEventActive;
+
+  const hasFrozenMiningBoost =
+    isMiningEventActive &&
     miningBoostRemaining > 0;
 
   const isMiningPaused =
     isDataLoaded &&
     miningSessionRemaining <= 0;
+
+  const getAuthoritativeNowTime = () => {
+    if (
+      Number.isFinite(
+        Number(miningEventServerNowMs)
+      )
+    ) {
+      return (
+        Number(miningEventServerNowMs) +
+        Number(miningEventClockElapsed || 0) * 1000
+      );
+    }
+
+    return Date.now();
+  };
+
+  const applyMiningEventState = (eventData) => {
+    if (!eventData) return;
+
+    const serverNowTime = eventData.serverNow
+      ? new Date(eventData.serverNow).getTime()
+      : NaN;
+
+    const startsAtTime = eventData.startsAt
+      ? new Date(eventData.startsAt).getTime()
+      : NaN;
+
+    const endsAtTime = eventData.endsAt
+      ? new Date(eventData.endsAt).getTime()
+      : NaN;
+
+    let phase = 'ended';
+
+    if (Boolean(eventData.active)) {
+      phase = 'active';
+    } else if (
+      Number.isFinite(serverNowTime) &&
+      Number.isFinite(startsAtTime) &&
+      serverNowTime < startsAtTime
+    ) {
+      phase = 'before';
+    }
+
+    setMiningEventPhase(phase);
+    setMiningEventStartsAt(eventData.startsAt || null);
+    setMiningEventEndsAt(eventData.endsAt || null);
+    setMiningEventBaseRate(
+      Number(eventData.baseRate || 0.02)
+    );
+    setMiningEventBoostEnabled(
+      Boolean(eventData.boostEnabled)
+    );
+    setMiningEventRemaining(
+      phase === 'active'
+        ? Math.max(
+            0,
+            Number(eventData.remainingSeconds || 0)
+          )
+        : 0
+    );
+    setMiningEventStartsIn(
+      phase === 'before'
+        ? Math.max(
+            0,
+            Number(eventData.secondsUntilStart || 0)
+          )
+        : 0
+    );
+
+    if (Number.isFinite(serverNowTime)) {
+      setMiningEventServerNowMs(serverNowTime);
+      setMiningEventClockElapsed(0);
+    }
+
+    setMiningEventStatusLoaded(true);
+  };
 
   const getFlagIcon = (countryCode) => {
     if (!countryCode || countryCode === 'Unknown') {
@@ -432,6 +770,8 @@ export default function Home() {
       verifiedUsername,
       userData,
       fromCache = false,
+      eventData = null,
+      authoritativeNowTime = null,
     }) => {
       if (cancelled) return;
 
@@ -444,16 +784,48 @@ export default function Home() {
       const currentMiningBoostUntil =
         userData.miningBoostUntil || null;
 
+      const eventActive =
+        Boolean(eventData?.active);
+
+      const currentEventBaseRate = Number(
+        eventData?.baseRate || 0.02
+      );
+
+      const safeNowTime =
+        Number.isFinite(
+          Number(authoritativeNowTime)
+        )
+          ? Number(authoritativeNowTime)
+          : Date.now();
+
       const currentMiningBoostRemaining =
-        getRemainingMiningBoost(
-          currentMiningBoostUntil
-        );
+        eventData
+          ? getEventAwareMiningBoostRemaining({
+              boostStartedAt:
+                currentMiningBoostStartedAt,
+              boostUntil:
+                currentMiningBoostUntil,
+              eventStartsAt:
+                eventData.startsAt || null,
+              eventEndsAt:
+                eventData.endsAt || null,
+              nowTime: safeNowTime,
+            })
+          : getRemainingMiningBoost(
+              currentMiningBoostUntil
+            );
+
+      const visibleBaseRate =
+        eventActive
+          ? currentEventBaseRate
+          : currentDbRate;
 
       const cachedTotalRate =
         getEffectiveMiningRate(
-          currentDbRate,
+          visibleBaseRate,
           cachedActiveFriends,
-          currentMiningBoostRemaining > 0
+          !eventActive &&
+            currentMiningBoostRemaining > 0
         );
 
       setUserId(verifiedUserId);
@@ -485,6 +857,14 @@ export default function Home() {
 
       setIsAdRewardStatusLoaded(
         !fromCache
+      );
+
+      setMiningBoostStartedAt(
+        currentMiningBoostStartedAt
+      );
+
+      setMiningBoostUntil(
+        currentMiningBoostUntil
       );
 
       setMiningBoostRemaining(
@@ -523,7 +903,10 @@ export default function Home() {
 
       if (userData.lastClaim) {
         const lastTime = new Date(userData.lastClaim).getTime();
-        const diffSeconds = Math.max(0, (Date.now() - lastTime) / 1000);
+        const diffSeconds = Math.max(
+          0,
+          (Date.now() - lastTime) / 1000
+        );
 
         setMiningSessionRemaining(
           getRemainingMiningSession(
@@ -546,6 +929,13 @@ export default function Home() {
                 currentMiningBoostStartedAt,
               boostUntil:
                 currentMiningBoostUntil,
+              eventStartsAt:
+                eventData?.startsAt || null,
+              eventEndsAt:
+                eventData?.endsAt || null,
+              eventBaseRate:
+                currentEventBaseRate,
+              nowTime: safeNowTime,
             })
           );
         }
@@ -658,11 +1048,10 @@ export default function Home() {
         setUserName(verifiedUsername);
 
         // Existing users load instantly from local cache, then the
-        // authoritative balance is synchronized from Supabase.
+        // authoritative balance/event state is synchronized from Supabase.
         const cachedUser = readUserCache(verifiedUserId);
 
         if (cachedUser) {
-          // Fast first render from local cache.
           applyUserState({
             verifiedUserId,
             verifiedFirstName,
@@ -671,11 +1060,6 @@ export default function Home() {
             fromCache: true,
           });
 
-          // Silent balance synchronization.
-          //
-          // This keeps the app fast while ensuring rewards or manual
-          // balance changes made in Supabase appear when the app opens,
-          // without waiting for the user to press Claim.
           try {
             const bootstrapResponse = await fetch('/api/bootstrap', {
               method: 'POST',
@@ -688,6 +1072,21 @@ export default function Home() {
 
             if (bootstrapResponse.ok) {
               const data = await bootstrapResponse.json();
+
+              applyMiningEventState(
+                data?.miningEvent || null
+              );
+
+              const eventData =
+                data?.miningEvent || null;
+
+              const authoritativeNowTime =
+                eventData?.serverNow
+                  ? new Date(
+                      eventData.serverNow
+                    ).getTime()
+                  : Date.now();
+
               const freshBalance = Number(data?.user?.balance);
 
               if (
@@ -719,9 +1118,22 @@ export default function Home() {
                   data.user.miningBoostUntil || null;
 
                 const freshMiningBoostRemaining =
-                  getRemainingMiningBoost(
-                    freshMiningBoostUntil
-                  );
+                  eventData
+                    ? getEventAwareMiningBoostRemaining({
+                        boostStartedAt:
+                          freshMiningBoostStartedAt,
+                        boostUntil:
+                          freshMiningBoostUntil,
+                        eventStartsAt:
+                          eventData.startsAt || null,
+                        eventEndsAt:
+                          eventData.endsAt || null,
+                        nowTime:
+                          authoritativeNowTime,
+                      })
+                    : getRemainingMiningBoost(
+                        freshMiningBoostUntil
+                      );
 
                 const freshMiningBoostCount =
                   Number(
@@ -738,11 +1150,19 @@ export default function Home() {
                   cachedUser.activeFriendsCount || 0
                 );
 
+                const freshVisibleBaseRate =
+                  eventData?.active
+                    ? Number(
+                        eventData.baseRate || 0.02
+                      )
+                    : freshDbRate;
+
                 const freshTotalMiningRate =
                   getEffectiveMiningRate(
-                    freshDbRate,
+                    freshVisibleBaseRate,
                     cachedActiveFriends,
-                    freshMiningBoostRemaining > 0
+                    !eventData?.active &&
+                      freshMiningBoostRemaining > 0
                   );
 
                 const freshLastClaim =
@@ -772,6 +1192,16 @@ export default function Home() {
                         freshMiningBoostStartedAt,
                       boostUntil:
                         freshMiningBoostUntil,
+                      eventStartsAt:
+                        eventData?.startsAt || null,
+                      eventEndsAt:
+                        eventData?.endsAt || null,
+                      eventBaseRate:
+                        Number(
+                          eventData?.baseRate || 0.02
+                        ),
+                      nowTime:
+                        authoritativeNowTime,
                     })
                   );
 
@@ -823,6 +1253,14 @@ export default function Home() {
                   freshTotalMiningRate
                 );
 
+                setMiningBoostStartedAt(
+                  freshMiningBoostStartedAt
+                );
+
+                setMiningBoostUntil(
+                  freshMiningBoostUntil
+                );
+
                 setMiningBoostRemaining(
                   freshMiningBoostRemaining
                 );
@@ -858,7 +1296,7 @@ export default function Home() {
             }
           } catch {
             // If synchronization temporarily fails, keep showing
-            // the cached balance and try again on the next app open.
+            // the cached account and retry on the next app open.
           }
 
           return;
@@ -882,11 +1320,27 @@ export default function Home() {
 
         if (cancelled) return;
 
+        applyMiningEventState(
+          data?.miningEvent || null
+        );
+
+        const eventData =
+          data?.miningEvent || null;
+
+        const authoritativeNowTime =
+          eventData?.serverNow
+            ? new Date(
+                eventData.serverNow
+              ).getTime()
+            : Date.now();
+
         if (data.exists && data.user) {
           applyUserState({
             verifiedUserId,
             verifiedFirstName,
             verifiedUsername,
+            eventData,
+            authoritativeNowTime,
             userData: {
               ...data.user,
               totalMiningRate: Number(data.user.miningRate || 0.00025),
@@ -925,6 +1379,8 @@ export default function Home() {
           verifiedUserId,
           verifiedFirstName,
           verifiedUsername,
+          eventData,
+          authoritativeNowTime,
           userData: {
             balance: Number(registeredUser.balance || 0),
             miningRate: Number(
@@ -986,6 +1442,210 @@ export default function Home() {
     };
   }, []);
 
+  const refreshMiningEventState = async () => {
+    const initData =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp?.initData
+        : null;
+
+    if (!initData) return;
+
+    try {
+      const response = await fetch('/api/bootstrap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initData }),
+        cache: 'no-store',
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const eventData = data?.miningEvent || null;
+
+      if (!eventData) return;
+
+      applyMiningEventState(eventData);
+
+      if (data?.exists && data?.user) {
+        const freshDbRate = Number(
+          data.user.miningRate ?? dbMiningRate
+        );
+
+        const freshBoostStartedAt =
+          data.user.miningBoostStartedAt || null;
+
+        const freshBoostUntil =
+          data.user.miningBoostUntil || null;
+
+        const authoritativeNowTime =
+          eventData.serverNow
+            ? new Date(
+                eventData.serverNow
+              ).getTime()
+            : Date.now();
+
+        const freshBoostRemaining =
+          getEventAwareMiningBoostRemaining({
+            boostStartedAt:
+              freshBoostStartedAt,
+            boostUntil:
+              freshBoostUntil,
+            eventStartsAt:
+              eventData.startsAt || null,
+            eventEndsAt:
+              eventData.endsAt || null,
+            nowTime:
+              authoritativeNowTime,
+          });
+
+        setDbMiningRate(freshDbRate);
+        setMiningBoostStartedAt(
+          freshBoostStartedAt
+        );
+        setMiningBoostUntil(
+          freshBoostUntil
+        );
+        setMiningBoostRemaining(
+          freshBoostRemaining
+        );
+        setIsMiningBoostStatusLoaded(true);
+      }
+    } catch {
+      // The previously confirmed server state remains in place.
+    }
+  };
+
+  // Server-authoritative APXN event clock.
+  // The phone's wall clock is never used to decide event start/end.
+  useEffect(() => {
+    if (!miningEventStatusLoaded) return;
+
+    const interval = setInterval(() => {
+      setMiningEventClockElapsed(
+        prev => prev + 1
+      );
+
+      if (miningEventPhase === 'before') {
+        setMiningEventStartsIn(
+          prev => Math.max(0, prev - 1)
+        );
+      }
+
+      if (miningEventPhase === 'active') {
+        setMiningEventRemaining(
+          prev => Math.max(0, prev - 1)
+        );
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    miningEventStatusLoaded,
+    miningEventPhase,
+  ]);
+
+  // Re-confirm the event with the server at the exact server-provided
+  // boundary. This prevents a local phone-clock change from activating
+  // or extending the event.
+  useEffect(() => {
+    if (!miningEventStatusLoaded) return;
+
+    let boundarySeconds = 0;
+
+    if (miningEventPhase === 'before') {
+      boundarySeconds = Math.max(
+        0,
+        Number(miningEventStartsIn || 0)
+      );
+    } else if (miningEventPhase === 'active') {
+      boundarySeconds = Math.max(
+        0,
+        Number(miningEventRemaining || 0)
+      );
+    } else {
+      return;
+    }
+
+    const timeout = setTimeout(
+      () => {
+        refreshMiningEventState();
+      },
+      Math.max(
+        250,
+        boundarySeconds * 1000 + 250
+      )
+    );
+
+    return () => clearTimeout(timeout);
+    // Intentionally scheduled once per confirmed server phase.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    miningEventStatusLoaded,
+    miningEventPhase,
+    miningEventStartsAt,
+    miningEventEndsAt,
+  ]);
+
+  // Mobile browsers can suspend timers in the background.
+  // Refresh from Supabase when Telegram becomes visible again.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibility = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        miningEventStatusLoaded
+      ) {
+        refreshMiningEventState();
+      }
+    };
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibility
+    );
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibility
+      );
+    };
+  }, [miningEventStatusLoaded]);
+
+  // Recalculate saved x3 time whenever the authoritative event phase
+  // changes or a fresh boost timestamp is received from the server.
+  useEffect(() => {
+    if (!miningEventStatusLoaded) return;
+
+    setMiningBoostRemaining(
+      getEventAwareMiningBoostRemaining({
+        boostStartedAt:
+          miningBoostStartedAt,
+        boostUntil:
+          miningBoostUntil,
+        eventStartsAt:
+          miningEventStartsAt,
+        eventEndsAt:
+          miningEventEndsAt,
+        nowTime:
+          getAuthoritativeNowTime(),
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    miningEventStatusLoaded,
+    miningEventPhase,
+    miningEventServerNowMs,
+    miningBoostStartedAt,
+    miningBoostUntil,
+    miningEventStartsAt,
+    miningEventEndsAt,
+  ]);
+
   // Keep referral mining speed accurate as soon as the app opens.
   //
   // We request only one friend row here because the purpose of this
@@ -1045,7 +1705,7 @@ export default function Home() {
 
         const finalRate =
           getEffectiveMiningRate(
-            dbMiningRate,
+            effectiveBaseMiningRate,
             activeCount,
             isMiningBoostActive
           );
@@ -1068,9 +1728,21 @@ export default function Home() {
               baseRate: dbMiningRate,
               activeFriends: activeCount,
               boostStartedAt:
-                cachedUser?.miningBoostStartedAt || null,
+                miningBoostStartedAt ||
+                cachedUser?.miningBoostStartedAt ||
+                null,
               boostUntil:
-                cachedUser?.miningBoostUntil || null,
+                miningBoostUntil ||
+                cachedUser?.miningBoostUntil ||
+                null,
+              eventStartsAt:
+                miningEventStartsAt,
+              eventEndsAt:
+                miningEventEndsAt,
+              eventBaseRate:
+                miningEventBaseRate,
+              nowTime:
+                getAuthoritativeNowTime(),
             })
           );
         }
@@ -1093,7 +1765,13 @@ export default function Home() {
     userId,
     referralSummaryLoaded,
     dbMiningRate,
+    effectiveBaseMiningRate,
     isMiningBoostActive,
+    miningBoostStartedAt,
+    miningBoostUntil,
+    miningEventStartsAt,
+    miningEventEndsAt,
+    miningEventBaseRate,
   ]);
 
   // Friends are fetched only when the Friends tab is actually opened.
@@ -1147,9 +1825,9 @@ export default function Home() {
         const activeCount = Number(data.activeFriends || 0);
         const finalRate =
           getEffectiveMiningRate(
-            dbMiningRate,
+            effectiveBaseMiningRate,
             activeCount,
-            miningBoostRemaining > 0
+            isMiningBoostActive
           );
 
         setFriendsList(safeFriends);
@@ -1176,7 +1854,8 @@ export default function Home() {
     isDataLoaded,
     userId,
     friendsLoaded,
-    dbMiningRate,
+    effectiveBaseMiningRate,
+    isMiningBoostActive,
   ]);
 
   useEffect(() => {
@@ -1206,25 +1885,32 @@ export default function Home() {
 
       setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
       setAdRewardCooldown(prev => (prev > 0 ? prev - 1 : 0));
-      setMiningBoostRemaining(prev => (prev > 0 ? prev - 1 : 0));
+
+      // x3 time is frozen during the APXN 48-hour event.
+      if (!isMiningEventActive) {
+        setMiningBoostRemaining(
+          prev => (prev > 0 ? prev - 1 : 0)
+        );
+      }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [
     totalMiningRate,
     miningSessionEndsAt,
+    isMiningEventActive,
   ]);
 
   useEffect(() => {
     setTotalMiningRate(
       getEffectiveMiningRate(
-        dbMiningRate,
+        effectiveBaseMiningRate,
         activeFriendsCount,
         isMiningBoostActive
       )
     );
   }, [
-    dbMiningRate,
+    effectiveBaseMiningRate,
     activeFriendsCount,
     isMiningBoostActive,
   ]);
@@ -1319,7 +2005,7 @@ export default function Home() {
     if (
       !isDataLoaded ||
       isSaving ||
-      isWatchingClaimAd ||
+      isWatchingRestartAd ||
       isWatchingAd ||
       isWatchingBoostAd ||
       claimCooldown > 0 ||
@@ -1338,25 +2024,29 @@ export default function Home() {
       return;
     }
 
+    // Claim itself is permanently ad-free.
+    // An ad is required only when the 24-hour mining session
+    // has stopped and the same action is restarting mining.
+    const requiresRestartAd = isMiningPaused;
+    let restartAdCompleted = !requiresRestartAd;
+
     if (
-      typeof window.show_11803132 !==
-      'function'
+      requiresRestartAd &&
+      typeof window.show_11803132 !== 'function'
     ) {
       alert(
-        '⚠️ Ad is not ready yet. Please try again in a moment.'
+        '⚠️ Restart ad is not ready yet. Please try again in a moment.'
       );
       return;
     }
 
-    let adCompleted = false;
-
-    setIsWatchingClaimAd(true);
-
     try {
-      // The Claim request is sent only after the existing
-      // Monetag rewarded interstitial promise completes.
-      await window.show_11803132();
-      adCompleted = true;
+      if (requiresRestartAd) {
+        setIsWatchingRestartAd(true);
+
+        await window.show_11803132();
+        restartAdCompleted = true;
+      }
 
       setIsSaving(true);
 
@@ -1386,7 +2076,16 @@ export default function Home() {
         data.lastClaim ||
         new Date().toISOString();
 
-      setBalance(Number(data.balance || 0));
+      const newBalance =
+        Number(data.balance || 0);
+
+      const returnedBaseMiningRate =
+        Number(data.baseMiningRate);
+
+      const returnedTotalMiningRate =
+        Number(data.miningRate);
+
+      setBalance(newBalance);
       setMiningDelta(0);
       setClaimCooldown(
         Number(data.cooldown || CLAIM_COOLDOWN_SECONDS)
@@ -1400,31 +2099,48 @@ export default function Home() {
         )
       );
 
-      if (Number.isFinite(Number(data.baseMiningRate))) {
-        setDbMiningRate(Number(data.baseMiningRate));
+      // During the event the RPC returns the temporary 0.02 rate.
+      // Never overwrite the user's permanent stored base rate with it.
+      if (
+        !isMiningEventActive &&
+        Number.isFinite(returnedBaseMiningRate)
+      ) {
+        setDbMiningRate(returnedBaseMiningRate);
       }
 
-      if (Number.isFinite(Number(data.miningRate))) {
-        setTotalMiningRate(Number(data.miningRate));
+      if (Number.isFinite(returnedTotalMiningRate)) {
+        setTotalMiningRate(returnedTotalMiningRate);
       }
 
       if (Number.isFinite(Number(data.activeFriends))) {
         setActiveFriendsCount(Number(data.activeFriends));
       }
 
+      const cacheBaseRate =
+        !isMiningEventActive &&
+        Number.isFinite(returnedBaseMiningRate)
+          ? returnedBaseMiningRate
+          : dbMiningRate;
+
       patchUserCache(userId, {
-        balance: Number(data.balance || 0),
-        miningRate: Number(data.baseMiningRate || dbMiningRate),
-        totalMiningRate: Number(data.miningRate || totalMiningRate),
+        balance: newBalance,
+        miningRate: cacheBaseRate,
+        totalMiningRate:
+          Number.isFinite(returnedTotalMiningRate)
+            ? returnedTotalMiningRate
+            : totalMiningRate,
         activeFriendsCount: Number(data.activeFriends || 0),
         lastClaim: newLastClaim,
       });
     } catch (error) {
       console.error('Claim failed:', error);
 
-      if (!adCompleted) {
+      if (
+        requiresRestartAd &&
+        !restartAdCompleted
+      ) {
         alert(
-          '❌ Ad was not completed. Your points were not claimed.'
+          '❌ Restart ad was not completed. Mining was not restarted.'
         );
       } else if (
         error?.message &&
@@ -1434,7 +2150,7 @@ export default function Home() {
       }
     } finally {
       setIsSaving(false);
-      setIsWatchingClaimAd(false);
+      setIsWatchingRestartAd(false);
     }
   };
 
@@ -1497,7 +2213,6 @@ export default function Home() {
       alert(
         '⚠️ Please complete the task, then confirm it one more time.'
       );
-
       return;
     }
 
@@ -1657,13 +2372,14 @@ export default function Home() {
     });
   };
 
+  // Existing +150 APXN rewarded-ad task remains unchanged.
   const handleWatchAdReward = async () => {
     if (
       !isDataLoaded ||
       !isAdRewardStatusLoaded ||
       isWatchingAd ||
       isWatchingBoostAd ||
-      isWatchingClaimAd ||
+      isWatchingRestartAd ||
       adRewardCooldown > 0
     ) {
       return;
@@ -1804,9 +2520,12 @@ export default function Home() {
     if (
       !isDataLoaded ||
       !isMiningBoostStatusLoaded ||
+      !miningEventStatusLoaded ||
+      isMiningEventActive ||
+      !miningEventBoostEnabled ||
       isWatchingBoostAd ||
       isWatchingAd ||
-      isWatchingClaimAd ||
+      isWatchingRestartAd ||
       miningBoostRemaining > 0
     ) {
       return;
@@ -1864,13 +2583,26 @@ export default function Home() {
               1,
               Number(
                 data.retryAfter ||
-                getRemainingMiningBoost(
-                  boostUntil
-                ) ||
+                getEventAwareMiningBoostRemaining({
+                  boostStartedAt,
+                  boostUntil,
+                  eventStartsAt:
+                    miningEventStartsAt,
+                  eventEndsAt:
+                    miningEventEndsAt,
+                  nowTime:
+                    getAuthoritativeNowTime(),
+                }) ||
                 MINING_BOOST_DURATION_SECONDS
               )
             );
 
+          setMiningBoostStartedAt(
+            boostStartedAt
+          );
+          setMiningBoostUntil(
+            boostUntil
+          );
           setMiningBoostRemaining(
             retryAfter
           );
@@ -1905,6 +2637,14 @@ export default function Home() {
           return;
         }
 
+        if (
+          data.eventActive ||
+          data.errorCode === 'EVENT_ACTIVE'
+        ) {
+          await refreshMiningEventState();
+          return;
+        }
+
         throw new Error(
           data.error ||
           'Mining boost activation failed'
@@ -1923,9 +2663,16 @@ export default function Home() {
         ).toISOString();
 
       const remaining =
-        getRemainingMiningBoost(
-          boostUntil
-        ) ||
+        getEventAwareMiningBoostRemaining({
+          boostStartedAt,
+          boostUntil,
+          eventStartsAt:
+            miningEventStartsAt,
+          eventEndsAt:
+            miningEventEndsAt,
+          nowTime:
+            getAuthoritativeNowTime(),
+        }) ||
         MINING_BOOST_DURATION_SECONDS;
 
       const boostedMiningRate =
@@ -1935,6 +2682,12 @@ export default function Home() {
           true
         );
 
+      setMiningBoostStartedAt(
+        boostStartedAt
+      );
+      setMiningBoostUntil(
+        boostUntil
+      );
       setMiningBoostRemaining(
         remaining
       );
@@ -2290,6 +3043,23 @@ export default function Home() {
             </h2>
           </div>
 
+          {isMiningEventActive && (
+            <div className="w-full mt-5 rounded-2xl border border-yellow-400/60 bg-gradient-to-r from-yellow-950/70 via-orange-950/60 to-yellow-950/70 p-4 text-center shadow-[0_0_24px_rgba(250,204,21,0.16)]">
+              <div className="text-xl font-black text-yellow-300">
+                🎉 ✅ APXN
+              </div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-yellow-100/70 font-bold">
+                48H Mining Event
+              </div>
+              <div className="mt-1 text-3xl font-black text-white tabular-nums">
+                {formatTime(miningEventRemaining)}
+              </div>
+              <div className="mt-1 text-[10px] font-bold text-emerald-400">
+                Base speed: +{Number(miningEventBaseRate).toFixed(5)} APXN/sec
+              </div>
+            </div>
+          )}
+
           <div className="w-full flex flex-col gap-3 mt-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex justify-between items-center">
                <div className="flex flex-col">
@@ -2300,19 +3070,30 @@ export default function Home() {
                      ⚡ x3 base speed active
                    </span>
                  )}
+                 {hasFrozenMiningBoost && (
+                   <span className="text-[9px] text-cyan-400 font-bold">
+                     ⏸ x3 saved time is frozen
+                   </span>
+                 )}
                </div>
                <span className="font-semibold text-yellow-400 text-xs">+{totalMiningRate.toFixed(5)} APXN/sec</span>
             </div>
 
             <div className={`rounded-2xl p-4 flex items-center justify-between border ${
-              isMiningBoostActive
+              isMiningEventActive
+                ? 'bg-cyan-950/20 border-cyan-500/40 shadow-[0_0_18px_rgba(6,182,212,0.10)]'
+                : isMiningBoostActive
                 ? 'bg-fuchsia-950/30 border-fuchsia-500/50 shadow-[0_0_18px_rgba(217,70,239,0.12)]'
                 : 'bg-slate-900/60 border-slate-800'
             }`}>
               <div className="flex flex-col pr-3">
                 <span className="text-white text-sm font-black">⚡ x3 Mining Boost</span>
                 <span className="text-[10px] text-gray-400 mt-1">
-                  {isMiningBoostActive
+                  {isMiningEventActive
+                    ? hasFrozenMiningBoost
+                      ? `Frozen • ${formatTime(miningBoostRemaining)} saved`
+                      : 'Temporarily frozen during the APXN 48h event'
+                    : isMiningBoostActive
                     ? `Active • ${formatTime(miningBoostRemaining)} left`
                     : 'Watch an ad → x3 base mining speed for 24h'}
                 </span>
@@ -2323,24 +3104,31 @@ export default function Home() {
                 disabled={
                   !isDataLoaded ||
                   !isMiningBoostStatusLoaded ||
+                  !miningEventStatusLoaded ||
+                  isMiningEventActive ||
+                  !miningEventBoostEnabled ||
                   isWatchingBoostAd ||
                   isWatchingAd ||
-                  isWatchingClaimAd ||
+                  isWatchingRestartAd ||
                   isMiningBoostActive
                 }
                 className={`px-4 py-2 rounded-xl text-xs font-black min-w-[84px] transition-all ${
-                  isMiningBoostActive
+                  isMiningEventActive
+                    ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/40 cursor-not-allowed'
+                    : isMiningBoostActive
                     ? 'bg-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-500/40 cursor-not-allowed'
-                    : (!isDataLoaded || !isMiningBoostStatusLoaded || isWatchingBoostAd || isWatchingAd || isWatchingClaimAd)
+                    : (!isDataLoaded || !isMiningBoostStatusLoaded || !miningEventStatusLoaded || isWatchingBoostAd || isWatchingAd || isWatchingRestartAd)
                     ? 'bg-slate-700 text-gray-300 animate-pulse'
                     : 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white active:scale-95'
                 }`}
               >
-                {!isDataLoaded || !isMiningBoostStatusLoaded
+                {!isDataLoaded || !isMiningBoostStatusLoaded || !miningEventStatusLoaded
                   ? 'Wait..'
+                  : isMiningEventActive
+                  ? 'FROZEN'
                   : isWatchingBoostAd
                   ? 'Ad...'
-                  : isWatchingAd || isWatchingClaimAd
+                  : isWatchingAd || isWatchingRestartAd
                   ? 'Wait..'
                   : isMiningBoostActive
                   ? 'ACTIVE'
@@ -2359,7 +3147,7 @@ export default function Home() {
                  : 'text-emerald-400'
              }`}>
                {isMiningPaused
-                 ? '⏸ Mining Paused • Claim points to restart'
+                 ? '⏸ Mining Paused • Watch ad to restart mining'
                  : `● Mining Active • ${formatTime(miningSessionRemaining)} left`}
              </div>
           </div>
@@ -2394,7 +3182,7 @@ export default function Home() {
             disabled={
               !isDataLoaded ||
               isSaving ||
-              isWatchingClaimAd ||
+              isWatchingRestartAd ||
               isWatchingAd ||
               isWatchingBoostAd ||
               claimCooldown > 0
@@ -2404,7 +3192,7 @@ export default function Home() {
                 ? 'bg-slate-800 text-gray-500 cursor-wait'
                 : claimCooldown > 0
                 ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
-                : (isSaving || isWatchingClaimAd || isWatchingAd || isWatchingBoostAd)
+                : (isSaving || isWatchingRestartAd || isWatchingAd || isWatchingBoostAd)
                 ? 'bg-slate-700 text-gray-300 animate-pulse'
                 : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white active:scale-95'
             }`}
@@ -2413,15 +3201,15 @@ export default function Home() {
               ? 'LOADING...'
               : claimCooldown > 0
                 ? `WAIT ${formatTime(claimCooldown)}`
-                : isWatchingClaimAd
-                  ? 'WATCHING AD...'
+                : isWatchingRestartAd
+                  ? 'WATCHING RESTART AD...'
                   : isSaving
                     ? 'CLAIMING...'
                     : (isWatchingAd || isWatchingBoostAd)
                       ? 'WAIT...'
                       : isMiningPaused
-                        ? 'WATCH AD & CLAIM • RESTART MINING'
-                        : 'WATCH AD & CLAIM POINTS'
+                        ? 'WATCH AD • RESTART MINING'
+                        : 'CLAIM POINTS'
             }
           </button>
         </div>
@@ -2475,13 +3263,13 @@ export default function Home() {
                   !isAdRewardStatusLoaded ||
                   isWatchingAd ||
                   isWatchingBoostAd ||
-                  isWatchingClaimAd ||
+                  isWatchingRestartAd ||
                   adRewardCooldown > 0
                 }
                 className={`px-4 py-2 rounded-xl text-white text-sm font-bold transition-colors min-w-[80px] ${
                   adRewardCooldown > 0
                     ? 'bg-green-600'
-                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd || isWatchingBoostAd || isWatchingClaimAd)
+                    : (!isDataLoaded || !isAdRewardStatusLoaded || isWatchingAd || isWatchingBoostAd || isWatchingRestartAd)
                     ? 'bg-slate-700 animate-pulse'
                     : 'bg-gradient-to-r from-yellow-500 to-orange-600 active:scale-95'
                 }`}
@@ -2490,14 +3278,13 @@ export default function Home() {
                   ? 'Wait..'
                   : isWatchingAd
                   ? 'Ad...'
-                  : isWatchingBoostAd || isWatchingClaimAd
+                  : isWatchingBoostAd || isWatchingRestartAd
                   ? 'Wait..'
                   : adRewardCooldown > 0
                   ? 'Done ✓'
                   : 'WATCH'}
               </button>
             </div>
-
             {dailyTelegramLink && (
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
@@ -3134,6 +3921,5 @@ export default function Home() {
     </main>
   );
 }
-
 
 
