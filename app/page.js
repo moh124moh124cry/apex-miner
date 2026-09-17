@@ -7,7 +7,7 @@ const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
-const USER_CACHE_VERSION = 1;
+const USER_CACHE_VERSION = 2;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getRemainingAdRewardCooldown(lastAdRewardAt) {
@@ -31,17 +31,42 @@ function getRemainingAdRewardCooldown(lastAdRewardAt) {
   );
 }
 
-function getMiningSessionEndsAt(lastClaim) {
-  if (!lastClaim) {
-    return (
-      Date.now() +
-      MINING_SESSION_DURATION_SECONDS * 1000
-    );
+function getMiningSessionEndsAt(
+  miningSessionEndsAt,
+  lastClaim = null
+) {
+  const independentEndTime =
+    miningSessionEndsAt
+      ? new Date(
+          miningSessionEndsAt
+        ).getTime()
+      : NaN;
+
+  if (
+    Number.isFinite(
+      independentEndTime
+    )
+  ) {
+    return independentEndTime;
   }
 
-  const lastClaimTime = new Date(lastClaim).getTime();
+  // Compatibility fallback only.
+  // Authoritative Bootstrap/Register data provides
+  // miningSessionEndsAt independently from lastClaim.
+  if (!lastClaim) {
+    return null;
+  }
 
-  if (!Number.isFinite(lastClaimTime)) {
+  const lastClaimTime =
+    new Date(
+      lastClaim
+    ).getTime();
+
+  if (
+    !Number.isFinite(
+      lastClaimTime
+    )
+  ) {
     return null;
   }
 
@@ -51,9 +76,15 @@ function getMiningSessionEndsAt(lastClaim) {
   );
 }
 
-function getRemainingMiningSession(lastClaim) {
+function getRemainingMiningSession(
+  miningSessionEndsAt,
+  lastClaim = null
+) {
   const endsAt =
-    getMiningSessionEndsAt(lastClaim);
+    getMiningSessionEndsAt(
+      miningSessionEndsAt,
+      lastClaim
+    );
 
   if (!Number.isFinite(endsAt)) {
     return 0;
@@ -66,7 +97,9 @@ function getRemainingMiningSession(lastClaim) {
     return 0;
   }
 
-  return Math.ceil(remainingSeconds);
+  return Math.ceil(
+    remainingSeconds
+  );
 }
 
 function getRemainingMiningBoost(boostUntil) {
@@ -221,6 +254,7 @@ function getOverlapSeconds(
 
 function calculateEstimatedMiningDelta({
   lastClaim,
+  miningSessionEndsAt = null,
   baseRate,
   activeFriends,
   boostStartedAt,
@@ -244,10 +278,20 @@ function calculateEstimatedMiningDelta({
     return 0;
   }
 
+  const sessionEndTime =
+    getMiningSessionEndsAt(
+      miningSessionEndsAt,
+      lastClaim
+    );
+
   const accrualEndTime = Math.min(
     safeNowTime,
-    lastClaimTime +
-      MINING_SESSION_DURATION_SECONDS * 1000
+    Number.isFinite(
+      sessionEndTime
+    )
+      ? sessionEndTime
+      : lastClaimTime +
+          MINING_SESSION_DURATION_SECONDS * 1000
   );
 
   if (accrualEndTime <= lastClaimTime) {
@@ -901,30 +945,63 @@ export default function Home() {
       setCanCheckIn(isCheckinAvailable);
       setDailyRewardAmt(((currentStreak % 7) + 1) * 100);
 
-      if (userData.lastClaim) {
-        const lastTime = new Date(userData.lastClaim).getTime();
-        const diffSeconds = Math.max(
-          0,
-          (Date.now() - lastTime) / 1000
+      const currentMiningSessionEndsAt =
+        getMiningSessionEndsAt(
+          userData.miningSessionEndsAt ||
+            null,
+          userData.lastClaim ||
+            null
         );
 
-        setMiningSessionRemaining(
-          getRemainingMiningSession(
+      setMiningSessionEndsAt(
+        currentMiningSessionEndsAt
+      );
+
+      setMiningSessionRemaining(
+        Number.isFinite(
+          currentMiningSessionEndsAt
+        )
+          ? Math.max(
+              0,
+              Math.ceil(
+                (
+                  currentMiningSessionEndsAt -
+                  Date.now()
+                ) / 1000
+              )
+            )
+          : 0
+      );
+
+      if (userData.lastClaim) {
+        const lastTime =
+          new Date(
             userData.lastClaim
-          )
-        );
-        setMiningSessionEndsAt(
-          getMiningSessionEndsAt(
-            userData.lastClaim
-          )
-        );
+          ).getTime();
+
+        const diffSeconds =
+          Number.isFinite(lastTime)
+            ? Math.max(
+                0,
+                (
+                  Date.now() -
+                  lastTime
+                ) / 1000
+              )
+            : CLAIM_COOLDOWN_SECONDS;
 
         if (diffSeconds > 0) {
           setMiningDelta(
             calculateEstimatedMiningDelta({
-              lastClaim: userData.lastClaim,
-              baseRate: currentDbRate,
-              activeFriends: cachedActiveFriends,
+              lastClaim:
+                userData.lastClaim,
+              miningSessionEndsAt:
+                userData.miningSessionEndsAt ||
+                null,
+              baseRate:
+                currentDbRate,
+              activeFriends:
+                cachedActiveFriends,
               boostStartedAt:
                 currentMiningBoostStartedAt,
               boostUntil:
@@ -938,11 +1015,19 @@ export default function Home() {
               nowTime: safeNowTime,
             })
           );
+        } else {
+          setMiningDelta(0);
         }
 
-        if (diffSeconds < CLAIM_COOLDOWN_SECONDS) {
+        if (
+          diffSeconds <
+          CLAIM_COOLDOWN_SECONDS
+        ) {
           setClaimCooldown(
-            Math.floor(CLAIM_COOLDOWN_SECONDS - diffSeconds)
+            Math.floor(
+              CLAIM_COOLDOWN_SECONDS -
+              diffSeconds
+            )
           );
         } else {
           setClaimCooldown(0);
@@ -950,13 +1035,6 @@ export default function Home() {
       } else {
         setMiningDelta(0);
         setClaimCooldown(0);
-        setMiningSessionRemaining(
-          MINING_SESSION_DURATION_SECONDS
-        );
-        setMiningSessionEndsAt(
-          Date.now() +
-            MINING_SESSION_DURATION_SECONDS * 1000
-        );
       }
 
       setIsDataLoaded(true);
@@ -978,6 +1056,9 @@ export default function Home() {
           checkinStreak: Number(userData.checkinStreak || 0),
           lastCheckinDate: userData.lastCheckinDate || null,
           lastClaim: userData.lastClaim || null,
+          miningSessionEndsAt:
+            userData.miningSessionEndsAt ||
+            null,
           lastAdRewardAt: userData.lastAdRewardAt || null,
           adRewardCount: Number(userData.adRewardCount || 0),
           miningBoostStartedAt:
@@ -1170,22 +1251,46 @@ export default function Home() {
                   cachedUser.lastClaim ||
                   null;
 
-                if (freshLastClaim) {
-                  setMiningSessionRemaining(
-                    getRemainingMiningSession(
-                      freshLastClaim
-                    )
-                  );
-                  setMiningSessionEndsAt(
-                    getMiningSessionEndsAt(
-                      freshLastClaim
-                    )
+                const freshMiningSessionEndsAt =
+                  data.user.miningSessionEndsAt ||
+                  cachedUser.miningSessionEndsAt ||
+                  null;
+
+                const freshMiningSessionEndTime =
+                  getMiningSessionEndsAt(
+                    freshMiningSessionEndsAt,
+                    freshLastClaim
                   );
 
+                setMiningSessionEndsAt(
+                  freshMiningSessionEndTime
+                );
+
+                setMiningSessionRemaining(
+                  Number.isFinite(
+                    freshMiningSessionEndTime
+                  )
+                    ? Math.max(
+                        0,
+                        Math.ceil(
+                          (
+                            freshMiningSessionEndTime -
+                            Date.now()
+                          ) / 1000
+                        )
+                      )
+                    : 0
+                );
+
+                if (freshLastClaim) {
                   setMiningDelta(
                     calculateEstimatedMiningDelta({
-                      lastClaim: freshLastClaim,
-                      baseRate: freshDbRate,
+                      lastClaim:
+                        freshLastClaim,
+                      miningSessionEndsAt:
+                        freshMiningSessionEndsAt,
+                      baseRate:
+                        freshDbRate,
                       activeFriends:
                         cachedActiveFriends,
                       boostStartedAt:
@@ -1218,9 +1323,10 @@ export default function Home() {
                     const elapsedSeconds =
                       Math.max(
                         0,
-                        (Date.now() -
-                          freshLastClaimTime) /
-                          1000
+                        (
+                          Date.now() -
+                          freshLastClaimTime
+                        ) / 1000
                       );
 
                     setClaimCooldown(
@@ -1228,21 +1334,16 @@ export default function Home() {
                         CLAIM_COOLDOWN_SECONDS
                         ? Math.floor(
                             CLAIM_COOLDOWN_SECONDS -
-                              elapsedSeconds
+                            elapsedSeconds
                           )
                         : 0
                     );
+                  } else {
+                    setClaimCooldown(0);
                   }
                 } else {
                   setMiningDelta(0);
                   setClaimCooldown(0);
-                  setMiningSessionRemaining(
-                    MINING_SESSION_DURATION_SECONDS
-                  );
-                  setMiningSessionEndsAt(
-                    Date.now() +
-                      MINING_SESSION_DURATION_SECONDS * 1000
-                  );
                 }
 
                 setDbMiningRate(
@@ -1279,6 +1380,8 @@ export default function Home() {
                     freshTotalMiningRate,
                   lastClaim:
                     freshLastClaim,
+                  miningSessionEndsAt:
+                    freshMiningSessionEndsAt,
                   lastAdRewardAt:
                     freshLastAdRewardAt,
                   adRewardCount:
@@ -1401,6 +1504,10 @@ export default function Home() {
             lastClaim:
               registeredUser.lastClaim ||
               new Date().toISOString(),
+            miningSessionEndsAt:
+              registeredUser
+                .miningSessionEndsAt ||
+              null,
             lastAdRewardAt: null,
             adRewardCount: 0,
             miningBoostStartedAt: null,
@@ -1500,6 +1607,48 @@ export default function Home() {
             nowTime:
               authoritativeNowTime,
           });
+
+        const freshLastClaim =
+          data.user.lastClaim || null;
+
+        const freshMiningSessionEndsAt =
+          data.user.miningSessionEndsAt ||
+          null;
+
+        const freshMiningSessionEndTime =
+          getMiningSessionEndsAt(
+            freshMiningSessionEndsAt,
+            freshLastClaim
+          );
+
+        setMiningSessionEndsAt(
+          freshMiningSessionEndTime
+        );
+
+        setMiningSessionRemaining(
+          Number.isFinite(
+            freshMiningSessionEndTime
+          )
+            ? Math.max(
+                0,
+                Math.ceil(
+                  (
+                    freshMiningSessionEndTime -
+                    Date.now()
+                  ) / 1000
+                )
+              )
+            : 0
+        );
+
+        if (userId) {
+          patchUserCache(userId, {
+            lastClaim:
+              freshLastClaim,
+            miningSessionEndsAt:
+              freshMiningSessionEndsAt,
+          });
+        }
 
         setDbMiningRate(freshDbRate);
         setMiningBoostStartedAt(
@@ -1724,7 +1873,11 @@ export default function Home() {
         if (cachedLastClaim) {
           setMiningDelta(
             calculateEstimatedMiningDelta({
-              lastClaim: cachedLastClaim,
+              lastClaim:
+                cachedLastClaim,
+              miningSessionEndsAt:
+                cachedUser?.miningSessionEndsAt ||
+                null,
               baseRate: dbMiningRate,
               activeFriends: activeCount,
               boostStartedAt:
@@ -2002,14 +2155,23 @@ export default function Home() {
   };
 
   const handleClaim = async () => {
+    const requiresRestartAd =
+      isMiningPaused;
+
     if (
       !isDataLoaded ||
       isSaving ||
       isWatchingRestartAd ||
       isWatchingAd ||
       isWatchingBoostAd ||
-      claimCooldown > 0 ||
-      miningDelta < 0.0001
+      (
+        !requiresRestartAd &&
+        claimCooldown > 0
+      ) ||
+      (
+        !requiresRestartAd &&
+        miningDelta < 0.0001
+      )
     ) {
       return;
     }
@@ -2020,19 +2182,22 @@ export default function Home() {
         : null;
 
     if (!initData) {
-      alert('❌ Please open Apex Miner inside Telegram.');
+      alert(
+        '❌ Please open Apex Miner inside Telegram.'
+      );
       return;
     }
 
-    // Claim itself is permanently ad-free.
-    // An ad is required only when the 24-hour mining session
-    // has stopped and the same action is restarting mining.
-    const requiresRestartAd = isMiningPaused;
-    let restartAdCompleted = !requiresRestartAd;
+    // A normal 12-hour Claim is permanently ad-free.
+    // Only an expired 24-hour mining session requires
+    // the Monetag restart ad.
+    let restartAdCompleted =
+      !requiresRestartAd;
 
     if (
       requiresRestartAd &&
-      typeof window.show_11803132 !== 'function'
+      typeof window.show_11803132 !==
+        'function'
     ) {
       alert(
         '⚠️ Restart ad is not ready yet. Please try again in a moment.'
@@ -2042,7 +2207,9 @@ export default function Home() {
 
     try {
       if (requiresRestartAd) {
-        setIsWatchingRestartAd(true);
+        setIsWatchingRestartAd(
+          true
+        );
 
         await window.show_11803132();
         restartAdCompleted = true;
@@ -2050,26 +2217,84 @@ export default function Home() {
 
       setIsSaving(true);
 
-      const response = await fetch('/api/mining/claim', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ initData }),
-        cache: 'no-store',
-      });
+      const endpoint =
+        requiresRestartAd
+          ? '/api/mining/restart'
+          : '/api/mining/claim';
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          endpoint,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body: JSON.stringify({
+              initData,
+            }),
+            cache: 'no-store',
+          }
+        );
+
+      const data =
+        await response.json();
 
       if (!response.ok) {
         if (
-          (response.status === 429 || response.status === 409) &&
-          data.retryAfter
+          data.errorCode ===
+          'SESSION_EXPIRED'
         ) {
-          setClaimCooldown(Number(data.retryAfter));
+          setMiningSessionRemaining(
+            0
+          );
         }
 
-        throw new Error(data.error || 'Claim failed');
+        if (
+          !requiresRestartAd &&
+          response.status === 429 &&
+          data.retryAfter
+        ) {
+          setClaimCooldown(
+            Number(
+              data.retryAfter
+            )
+          );
+        }
+
+        if (
+          requiresRestartAd &&
+          data.errorCode ===
+            'SESSION_ACTIVE' &&
+          data.retryAfter
+        ) {
+          const retryAfter =
+            Math.max(
+              1,
+              Number(
+                data.retryAfter
+              )
+            );
+
+          setMiningSessionRemaining(
+            retryAfter
+          );
+
+          setMiningSessionEndsAt(
+            Date.now() +
+              retryAfter * 1000
+          );
+        }
+
+        throw new Error(
+          data.error ||
+          (
+            requiresRestartAd
+              ? 'Mining restart failed'
+              : 'Claim failed'
+          )
+        );
       }
 
       const newLastClaim =
@@ -2077,63 +2302,147 @@ export default function Home() {
         new Date().toISOString();
 
       const newBalance =
-        Number(data.balance || 0);
+        Number(
+          data.balance || 0
+        );
 
       const returnedBaseMiningRate =
-        Number(data.baseMiningRate);
+        Number(
+          data.baseMiningRate
+        );
 
       const returnedTotalMiningRate =
-        Number(data.miningRate);
+        Number(
+          data.miningRate
+        );
 
-      setBalance(newBalance);
+      setBalance(
+        newBalance
+      );
+
       setMiningDelta(0);
+
       setClaimCooldown(
-        Number(data.cooldown || CLAIM_COOLDOWN_SECONDS)
-      );
-      setMiningSessionRemaining(
-        MINING_SESSION_DURATION_SECONDS
-      );
-      setMiningSessionEndsAt(
-        getMiningSessionEndsAt(
-          newLastClaim
+        Number(
+          data.cooldown ||
+          CLAIM_COOLDOWN_SECONDS
         )
       );
 
-      // During the event the RPC returns the temporary 0.02 rate.
-      // Never overwrite the user's permanent stored base rate with it.
+      const returnedMiningSessionEndsAt =
+        data.miningSessionEndsAt ||
+        null;
+
+      if (requiresRestartAd) {
+        const newSessionEndTime =
+          getMiningSessionEndsAt(
+            returnedMiningSessionEndsAt,
+            newLastClaim
+          );
+
+        setMiningSessionEndsAt(
+          newSessionEndTime
+        );
+
+        setMiningSessionRemaining(
+          Number.isFinite(
+            newSessionEndTime
+          )
+            ? Math.max(
+                0,
+                Math.ceil(
+                  (
+                    newSessionEndTime -
+                    Date.now()
+                  ) / 1000
+                )
+              )
+            : MINING_SESSION_DURATION_SECONDS
+        );
+      }
+
+      // During the event the RPC returns the temporary
+      // 0.02 rate. Never overwrite the user's permanent
+      // stored base rate with it.
       if (
         !isMiningEventActive &&
-        Number.isFinite(returnedBaseMiningRate)
+        Number.isFinite(
+          returnedBaseMiningRate
+        )
       ) {
-        setDbMiningRate(returnedBaseMiningRate);
+        setDbMiningRate(
+          returnedBaseMiningRate
+        );
       }
 
-      if (Number.isFinite(returnedTotalMiningRate)) {
-        setTotalMiningRate(returnedTotalMiningRate);
+      if (
+        Number.isFinite(
+          returnedTotalMiningRate
+        )
+      ) {
+        setTotalMiningRate(
+          returnedTotalMiningRate
+        );
       }
 
-      if (Number.isFinite(Number(data.activeFriends))) {
-        setActiveFriendsCount(Number(data.activeFriends));
+      if (
+        Number.isFinite(
+          Number(
+            data.activeFriends
+          )
+        )
+      ) {
+        setActiveFriendsCount(
+          Number(
+            data.activeFriends
+          )
+        );
       }
 
       const cacheBaseRate =
         !isMiningEventActive &&
-        Number.isFinite(returnedBaseMiningRate)
+        Number.isFinite(
+          returnedBaseMiningRate
+        )
           ? returnedBaseMiningRate
           : dbMiningRate;
 
-      patchUserCache(userId, {
-        balance: newBalance,
-        miningRate: cacheBaseRate,
-        totalMiningRate:
-          Number.isFinite(returnedTotalMiningRate)
-            ? returnedTotalMiningRate
-            : totalMiningRate,
-        activeFriendsCount: Number(data.activeFriends || 0),
-        lastClaim: newLastClaim,
-      });
+      patchUserCache(
+        userId,
+        {
+          balance:
+            newBalance,
+          miningRate:
+            cacheBaseRate,
+          totalMiningRate:
+            Number.isFinite(
+              returnedTotalMiningRate
+            )
+              ? returnedTotalMiningRate
+              : totalMiningRate,
+          activeFriendsCount:
+            Number(
+              data.activeFriends || 0
+            ),
+          lastClaim:
+            newLastClaim,
+          ...(
+            requiresRestartAd
+              ? {
+                  miningSessionEndsAt:
+                    returnedMiningSessionEndsAt,
+                }
+              : {}
+          ),
+        }
+      );
     } catch (error) {
-      console.error('Claim failed:', error);
+      console.error(
+        requiresRestartAd
+          ? 'Mining restart failed:'
+          : 'Claim failed:',
+        error
+      );
 
       if (
         requiresRestartAd &&
@@ -2144,13 +2453,20 @@ export default function Home() {
         );
       } else if (
         error?.message &&
-        error.message !== 'Claim cooldown active'
+        error.message !==
+          'Claim cooldown active'
       ) {
-        alert('❌ Claim failed. Please try again.');
+        alert(
+          requiresRestartAd
+            ? '❌ Mining restart failed. Please try again.'
+            : '❌ Claim failed. Please try again.'
+        );
       }
     } finally {
       setIsSaving(false);
-      setIsWatchingRestartAd(false);
+      setIsWatchingRestartAd(
+        false
+      );
     }
   };
 
@@ -3185,30 +3501,37 @@ export default function Home() {
               isWatchingRestartAd ||
               isWatchingAd ||
               isWatchingBoostAd ||
-              claimCooldown > 0
+              (
+                !isMiningPaused &&
+                claimCooldown > 0
+              )
             }
             className={`w-full py-4 mt-auto mb-4 rounded-2xl text-lg font-bold shadow-[0_4px_20px_rgba(245,158,11,0.4)] transition-all ${
               !isDataLoaded
                 ? 'bg-slate-800 text-gray-500 cursor-wait'
-                : claimCooldown > 0
-                ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
                 : (isSaving || isWatchingRestartAd || isWatchingAd || isWatchingBoostAd)
                 ? 'bg-slate-700 text-gray-300 animate-pulse'
+                : (!isMiningPaused && claimCooldown > 0)
+                ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
                 : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white active:scale-95'
             }`}
           >
             {!isDataLoaded
               ? 'LOADING...'
-              : claimCooldown > 0
-                ? `WAIT ${formatTime(claimCooldown)}`
-                : isWatchingRestartAd
-                  ? 'WATCHING RESTART AD...'
-                  : isSaving
-                    ? 'CLAIMING...'
-                    : (isWatchingAd || isWatchingBoostAd)
-                      ? 'WAIT...'
-                      : isMiningPaused
-                        ? 'WATCH AD • RESTART MINING'
+              : isWatchingRestartAd
+                ? 'WATCHING RESTART AD...'
+                : isSaving
+                  ? (
+                      isMiningPaused
+                        ? 'RESTARTING...'
+                        : 'CLAIMING...'
+                    )
+                  : (isWatchingAd || isWatchingBoostAd)
+                    ? 'WAIT...'
+                    : isMiningPaused
+                      ? 'WATCH AD • RESTART MINING'
+                      : claimCooldown > 0
+                        ? `WAIT ${formatTime(claimCooldown)}`
                         : 'CLAIM POINTS'
             }
           </button>
@@ -3921,5 +4244,6 @@ export default function Home() {
     </main>
   );
 }
+
 
 
