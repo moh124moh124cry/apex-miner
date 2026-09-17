@@ -317,6 +317,48 @@ export async function POST(
       }
     }
 
+    // =================================================
+    // Read the authoritative independent mining-session
+    // end created by Supabase.
+    //
+    // Registration is a one-time flow, so this single
+    // indexed read has negligible performance impact.
+    // =================================================
+
+    const {
+      data: sessionUser,
+      error: sessionError,
+    } =
+      await supabaseAdmin
+        .from('users')
+        .select(
+          'mining_session_ends_at'
+        )
+        .eq(
+          'telegram_id',
+          telegramId
+        )
+        .maybeSingle();
+
+    if (
+      sessionError ||
+      !sessionUser
+    ) {
+      console.error(
+        'Register mining session read error:',
+        sessionError?.code ||
+          'USER_NOT_FOUND'
+      );
+
+      return response(
+        {
+          error:
+            'Database error',
+        },
+        500
+      );
+    }
+
     return response({
       success: true,
 
@@ -353,6 +395,11 @@ export async function POST(
 
         lastClaim:
           result.last_claim ||
+          null,
+
+        miningSessionEndsAt:
+          sessionUser
+            .mining_session_ends_at ||
           null,
 
         country:
@@ -410,3 +457,4 @@ export async function POST(
     );
   }
 }
+
