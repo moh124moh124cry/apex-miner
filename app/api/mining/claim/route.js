@@ -39,8 +39,8 @@ const MAX_GATE_ENTRIES = 5000;
 // is NOT treated as a security boundary.
 //
 // The Supabase apex_mining_claim RPC remains responsible
-// for atomic locking, balance updates and cooldown
-// enforcement.
+// for atomic locking, balance updates, cooldown
+// enforcement and the independent 24-hour session limit.
 // =====================================================
 
 const miningClaimGate =
@@ -353,6 +353,13 @@ export async function POST(
 
     // =================================================
     // One authoritative Supabase RPC.
+    //
+    // The RPC is also the final authority for:
+    // - 12-hour claim cooldown
+    // - fixed 24-hour mining-session expiration
+    // - balance updates
+    // - event mining rate
+    // - x3 boost accounting
     // =================================================
 
     const {
@@ -408,15 +415,51 @@ export async function POST(
     }
 
     // =================================================
-    // Supabase says the user is still in cooldown.
-    //
-    // Cache that result locally for a short period so
-    // repeated requests do not keep touching Supabase.
+    // Supabase rejected the claim.
     // =================================================
 
     if (
       !result.success
     ) {
+      if (
+        result.error_code ===
+        'SESSION_EXPIRED'
+      ) {
+        // Session expiry must never be cached as a claim
+        // cooldown. The restart flow is a separate action
+        // that begins a new 24-hour session after the ad.
+        removeGateEntry(
+          telegramId
+        );
+
+        return response(
+          {
+            error:
+              'Mining session expired',
+
+            errorCode:
+              'SESSION_EXPIRED',
+
+            balance:
+              Number(
+                result.balance ||
+                0
+              ),
+
+            cooldown:
+              Number(
+                result.cooldown ||
+                CLAIM_COOLDOWN_SECONDS
+              ),
+
+            lastClaim:
+              result.last_claim ||
+              null,
+          },
+          409
+        );
+      }
+
       if (
         result.error_code ===
         'COOLDOWN'
@@ -500,6 +543,9 @@ export async function POST(
 
     // =================================================
     // Successful claim.
+    //
+    // The claim updates last_claim only.
+    // It does NOT extend mining_session_ends_at.
     //
     // Keep a short local protection window while
     // preserving the actual 12-hour remaining cooldown
@@ -621,3 +667,4 @@ export async function POST(
     );
   }
 }
+
