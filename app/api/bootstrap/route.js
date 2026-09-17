@@ -163,6 +163,7 @@ export async function POST(request) {
         checkin_streak,
         last_checkin_date,
         last_claim,
+        mining_session_ends_at,
         country,
         last_ad_reward_at,
         ad_reward_count,
@@ -306,6 +307,10 @@ export async function POST(request) {
         lastClaim:
           user.last_claim || null,
 
+        miningSessionEndsAt:
+          user.mining_session_ends_at ||
+          null,
+
         country:
           user.country ||
           'Unknown',
@@ -399,3 +404,4 @@ export async function POST(request) {
     );
   }
 }
+
