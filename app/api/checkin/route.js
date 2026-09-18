@@ -302,7 +302,7 @@ export async function POST(
       error,
     } =
       await supabaseAdmin.rpc(
-        'apex_daily_checkin_transition',
+        'apex_daily_checkin_rollout',
         {
           p_telegram_id:
             telegramId,
