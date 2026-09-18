@@ -6,8 +6,9 @@ import { TonConnectButton } from '@tonconnect/ui-react';
 const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
+const DAILY_TASK_COOLDOWN_SECONDS = 24 * 60 * 60;
 const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
-const USER_CACHE_VERSION = 3;
+const USER_CACHE_VERSION = 4;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getRemainingAdRewardCooldown(lastAdRewardAt) {
@@ -28,6 +29,42 @@ function getRemainingAdRewardCooldown(lastAdRewardAt) {
 
   return Math.ceil(
     AD_REWARD_COOLDOWN_SECONDS - elapsedSeconds
+  );
+}
+
+function getRemainingDailyTaskCooldown(
+  lastTaskAt,
+  nowTime = Date.now()
+) {
+  if (!lastTaskAt) return 0;
+
+  const lastTime =
+    new Date(lastTaskAt).getTime();
+
+  const safeNowTime =
+    Number.isFinite(Number(nowTime))
+      ? Number(nowTime)
+      : Date.now();
+
+  if (!Number.isFinite(lastTime)) {
+    return 0;
+  }
+
+  const elapsedSeconds = Math.max(
+    0,
+    (safeNowTime - lastTime) / 1000
+  );
+
+  if (
+    elapsedSeconds >=
+    DAILY_TASK_COOLDOWN_SECONDS
+  ) {
+    return 0;
+  }
+
+  return Math.ceil(
+    DAILY_TASK_COOLDOWN_SECONDS -
+    elapsedSeconds
   );
 }
 
@@ -572,6 +609,8 @@ export default function Home() {
 
   const [dailyTwitterDone, setDailyTwitterDone] = useState(false);
   const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
+  const [dailyTwitterCooldown, setDailyTwitterCooldown] = useState(0);
+  const [dailyTelegramCooldown, setDailyTelegramCooldown] = useState(0);
   const [verifyingTwitter, setVerifyingTwitter] = useState(false);
   const [verifyingTelegram, setVerifyingTelegram] = useState(false);
 
@@ -1081,8 +1120,43 @@ export default function Home() {
           .toISOString()
           .split('T')[0];
 
-      setDailyTwitterDone(userData.lastTwitterTask === todayStr);
-      setDailyTelegramDone(userData.lastTelegramTask === todayStr);
+      const twitterTaskCooldown =
+        getRemainingDailyTaskCooldown(
+          userData.lastTwitterTaskAt,
+          safeNowTime
+        );
+
+      const telegramTaskCooldown =
+        getRemainingDailyTaskCooldown(
+          userData.lastTelegramTaskAt,
+          safeNowTime
+        );
+
+      const legacyTwitterDone =
+        !userData.lastTwitterTaskAt &&
+        userData.lastTwitterTask === todayStr;
+
+      const legacyTelegramDone =
+        !userData.lastTelegramTaskAt &&
+        userData.lastTelegramTask === todayStr;
+
+      setDailyTwitterCooldown(
+        twitterTaskCooldown
+      );
+
+      setDailyTelegramCooldown(
+        telegramTaskCooldown
+      );
+
+      setDailyTwitterDone(
+        twitterTaskCooldown > 0 ||
+        legacyTwitterDone
+      );
+
+      setDailyTelegramDone(
+        telegramTaskCooldown > 0 ||
+        legacyTelegramDone
+      );
 
       setAdRewardCooldown(
         getRemainingAdRewardCooldown(
@@ -1223,6 +1297,8 @@ export default function Home() {
           twitterJoined: Boolean(userData.twitterJoined),
           lastTwitterTask: userData.lastTwitterTask || null,
           lastTelegramTask: userData.lastTelegramTask || null,
+          lastTwitterTaskAt: userData.lastTwitterTaskAt || null,
+          lastTelegramTaskAt: userData.lastTelegramTaskAt || null,
           checkinStreak: Number(userData.checkinStreak || 0),
           activeDays:
             Number(
@@ -1566,6 +1642,34 @@ export default function Home() {
                   authoritativeNowTime
                 );
 
+                const freshTwitterTaskCooldown =
+                  getRemainingDailyTaskCooldown(
+                    data.user.lastTwitterTaskAt,
+                    authoritativeNowTime
+                  );
+
+                const freshTelegramTaskCooldown =
+                  getRemainingDailyTaskCooldown(
+                    data.user.lastTelegramTaskAt,
+                    authoritativeNowTime
+                  );
+
+                setDailyTwitterCooldown(
+                  freshTwitterTaskCooldown
+                );
+
+                setDailyTelegramCooldown(
+                  freshTelegramTaskCooldown
+                );
+
+                setDailyTwitterDone(
+                  freshTwitterTaskCooldown > 0
+                );
+
+                setDailyTelegramDone(
+                  freshTelegramTaskCooldown > 0
+                );
+
                 patchUserCache(verifiedUserId, {
                   ...(Number.isFinite(freshBalance)
                     ? { balance: freshBalance }
@@ -1617,6 +1721,18 @@ export default function Home() {
                     ),
                   lastCheckinDate:
                     data.user.lastCheckinDate ||
+                    null,
+                  lastTwitterTask:
+                    data.user.lastTwitterTask ||
+                    null,
+                  lastTelegramTask:
+                    data.user.lastTelegramTask ||
+                    null,
+                  lastTwitterTaskAt:
+                    data.user.lastTwitterTaskAt ||
+                    null,
+                  lastTelegramTaskAt:
+                    data.user.lastTelegramTaskAt ||
                     null,
                 });
               }
@@ -1723,6 +1839,8 @@ export default function Home() {
             twitterJoined: false,
             lastTwitterTask: null,
             lastTelegramTask: null,
+            lastTwitterTaskAt: null,
+            lastTelegramTaskAt: null,
             checkinStreak: 0,
             activeDays: 0,
             recoveryDays: 2,
@@ -2265,6 +2383,26 @@ export default function Home() {
 
       setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
       setAdRewardCooldown(prev => (prev > 0 ? prev - 1 : 0));
+
+      setDailyTwitterCooldown(prev => {
+        if (prev <= 1) {
+          if (prev > 0) {
+            setDailyTwitterDone(false);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+
+      setDailyTelegramCooldown(prev => {
+        if (prev <= 1) {
+          if (prev > 0) {
+            setDailyTelegramDone(false);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
 
       // x3 time is frozen during the APXN 48-hour event.
       if (!isMiningEventActive) {
@@ -2939,7 +3077,9 @@ export default function Home() {
     verifying,
     setCompleted,
     setVerifying,
+    setCooldown,
     cacheField,
+    timestampCacheField,
     confirmationKey,
   }) => {
     if (
@@ -2994,7 +3134,14 @@ export default function Home() {
             data.lastTaskDate ||
             new Date().toISOString().split('T')[0];
 
+          const taskTimestamp =
+            new Date().toISOString();
+
           setCompleted(true);
+          setCooldown(
+            DAILY_TASK_COOLDOWN_SECONDS
+          );
+
           updateTaskConfirmStage(
             confirmationKey,
             0
@@ -3005,6 +3152,8 @@ export default function Home() {
               ? { balance: syncedBalance }
               : {}),
             [cacheField]: taskDate,
+            [timestampCacheField]:
+              taskTimestamp,
           });
 
           return;
@@ -3020,8 +3169,15 @@ export default function Home() {
         data.lastTaskDate ||
         new Date().toISOString().split('T')[0];
 
+      const taskTimestamp =
+        new Date().toISOString();
+
       setBalance(newBalance);
       setCompleted(true);
+      setCooldown(
+        DAILY_TASK_COOLDOWN_SECONDS
+      );
+
       updateTaskConfirmStage(
         confirmationKey,
         0
@@ -3030,6 +3186,8 @@ export default function Home() {
       patchUserCache(userId, {
         balance: newBalance,
         [cacheField]: taskDate,
+        [timestampCacheField]:
+          taskTimestamp,
       });
     } catch (error) {
       console.error('Daily task failed:', error);
@@ -3058,7 +3216,10 @@ export default function Home() {
           verifying: verifyingTwitter,
           setCompleted: setDailyTwitterDone,
           setVerifying: setVerifyingTwitter,
+          setCooldown: setDailyTwitterCooldown,
           cacheField: 'lastTwitterTask',
+          timestampCacheField:
+            'lastTwitterTaskAt',
           confirmationKey: 'dailyTwitter',
         });
       },
@@ -3078,7 +3239,10 @@ export default function Home() {
           verifying: verifyingTelegram,
           setCompleted: setDailyTelegramDone,
           setVerifying: setVerifyingTelegram,
+          setCooldown: setDailyTelegramCooldown,
           cacheField: 'lastTelegramTask',
+          timestampCacheField:
+            'lastTelegramTaskAt',
           confirmationKey: 'dailyTelegram',
         });
       },
@@ -4050,6 +4214,11 @@ export default function Home() {
               <div>
                 <h3 className="font-bold text-white text-lg">Like Today's Post</h3>
                 <p className="text-yellow-400 text-xs">+100 APXN Points</p>
+                {dailyTelegramCooldown > 0 && (
+                  <p className="text-gray-500 text-[10px] mt-1">
+                    Available in {formatTime(dailyTelegramCooldown)}
+                  </p>
+                )}
               </div>
               <button onClick={handleDailyTelegram} disabled={!isDataLoaded || dailyTelegramDone || verifyingTelegram} className={`${dailyTelegramDone ? 'bg-green-600' : (!isDataLoaded || verifyingTelegram) ? 'bg-slate-700 animate-pulse' : 'bg-[#2AABEE]'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                 {getTaskConfirmLabel({
@@ -4070,6 +4239,11 @@ export default function Home() {
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
                 </h3>
                 <p className="text-yellow-400 text-xs">+100 APXN Points</p>
+                {dailyTwitterCooldown > 0 && (
+                  <p className="text-gray-500 text-[10px] mt-1">
+                    Available in {formatTime(dailyTwitterCooldown)}
+                  </p>
+                )}
               </div>
               <button onClick={handleDailyTwitter} disabled={!isDataLoaded || dailyTwitterDone || verifyingTwitter} className={`${dailyTwitterDone ? 'bg-green-600' : (!isDataLoaded || verifyingTwitter) ? 'bg-slate-700 animate-pulse' : 'bg-black border border-slate-700'} px-4 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[80px]`}>
                 {getTaskConfirmLabel({
