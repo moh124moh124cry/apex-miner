@@ -161,6 +161,8 @@ export async function POST(request) {
         last_twitter_task,
         last_telegram_task,
         checkin_streak,
+        active_days,
+        checkin_recovery_days,
         last_checkin_date,
         last_claim,
         mining_session_ends_at,
@@ -298,6 +300,25 @@ export async function POST(request) {
         checkinStreak:
           Number(
             user.checkin_streak || 0
+          ),
+
+        activeDays:
+          Number(
+            user.active_days ??
+              user.checkin_streak ??
+              0
+          ),
+
+        recoveryDays:
+          Math.max(
+            0,
+            Math.min(
+              2,
+              Number(
+                user.checkin_recovery_days ??
+                  2
+              )
+            )
           ),
 
         lastCheckinDate:
