@@ -7,7 +7,7 @@ const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
-const USER_CACHE_VERSION = 2;
+const USER_CACHE_VERSION = 3;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getRemainingAdRewardCooldown(lastAdRewardAt) {
@@ -608,6 +608,10 @@ export default function Home() {
   const [miningEventClockElapsed, setMiningEventClockElapsed] = useState(0);
 
   const [checkinStreak, setCheckinStreak] = useState(0);
+  const [activeDays, setActiveDays] = useState(0);
+  const [checkinRecoveryDays, setCheckinRecoveryDays] = useState(2);
+  const [checkinRewardEligible, setCheckinRewardEligible] = useState(true);
+  const [dailyCheckinV2Enabled, setDailyCheckinV2Enabled] = useState(false);
   const [canCheckIn, setCanCheckIn] = useState(false);
   const [dailyRewardAmt, setDailyRewardAmt] = useState(100);
   const [friendsCount, setFriendsCount] = useState(0);
@@ -808,6 +812,190 @@ export default function Home() {
     let timer = null;
     let cancelled = false;
 
+    const applyCheckinState = (
+      userData,
+      authoritativeNowTime = null
+    ) => {
+      if (cancelled) return;
+
+      const safeNowTime =
+        Number.isFinite(
+          Number(authoritativeNowTime)
+        )
+          ? Number(authoritativeNowTime)
+          : Date.now();
+
+      const todayStr =
+        new Date(safeNowTime)
+          .toISOString()
+          .split('T')[0];
+
+      const yesterday =
+        new Date(safeNowTime);
+
+      yesterday.setUTCDate(
+        yesterday.getUTCDate() - 1
+      );
+
+      const yesterdayStr =
+        yesterday
+          .toISOString()
+          .split('T')[0];
+
+      const v2Enabled =
+        Boolean(
+          userData
+            .dailyCheckinV2Enabled
+        );
+
+      let visibleStreak =
+        Number(
+          userData.checkinStreak || 0
+        );
+
+      const currentActiveDays =
+        Number(
+          userData.activeDays ??
+          userData.checkinStreak ??
+          0
+        );
+
+      const storedRecoveryDays =
+        Math.max(
+          0,
+          Math.min(
+            2,
+            Number(
+              userData.recoveryDays ?? 2
+            )
+          )
+        );
+
+      let visibleRecoveryDays =
+        storedRecoveryDays;
+
+      let rewardEligible =
+        storedRecoveryDays >= 2;
+
+      let rewardAmount = 100;
+      let isCheckinAvailable = true;
+      let lastDayStr = null;
+
+      if (userData.lastCheckinDate) {
+        const lastDate =
+          new Date(
+            userData.lastCheckinDate
+          );
+
+        if (
+          Number.isFinite(
+            lastDate.getTime()
+          )
+        ) {
+          lastDayStr =
+            lastDate
+              .toISOString()
+              .split('T')[0];
+        }
+      }
+
+      if (lastDayStr === todayStr) {
+        isCheckinAvailable = false;
+      }
+
+      if (v2Enabled) {
+        if (!lastDayStr) {
+          visibleRecoveryDays = 2;
+          rewardEligible = true;
+          rewardAmount = 100;
+        } else if (
+          lastDayStr === todayStr
+        ) {
+          visibleRecoveryDays =
+            storedRecoveryDays;
+
+          rewardEligible =
+            storedRecoveryDays >= 2;
+
+          rewardAmount =
+            rewardEligible
+              ? 100
+              : 0;
+        } else if (
+          lastDayStr === yesterdayStr
+        ) {
+          visibleRecoveryDays =
+            storedRecoveryDays;
+
+          const recoveryAfterToday =
+            Math.min(
+              2,
+              storedRecoveryDays + 1
+            );
+
+          rewardEligible =
+            recoveryAfterToday >= 2;
+
+          rewardAmount =
+            rewardEligible
+              ? 100
+              : 0;
+        } else {
+          // A missed UTC day starts recovery.
+          // The database still stores the previous
+          // completed state until today's check-in.
+          visibleRecoveryDays = 0;
+          rewardEligible = false;
+          rewardAmount = 0;
+        }
+      } else {
+        if (
+          lastDayStr &&
+          lastDayStr !== todayStr &&
+          lastDayStr !== yesterdayStr
+        ) {
+          visibleStreak = 0;
+        }
+
+        rewardEligible = true;
+        rewardAmount =
+          ((visibleStreak % 7) + 1) *
+          100;
+      }
+
+      setCheckinStreak(
+        visibleStreak
+      );
+
+      setActiveDays(
+        Number.isFinite(
+          currentActiveDays
+        )
+          ? currentActiveDays
+          : 0
+      );
+
+      setCheckinRecoveryDays(
+        visibleRecoveryDays
+      );
+
+      setCheckinRewardEligible(
+        rewardEligible
+      );
+
+      setDailyCheckinV2Enabled(
+        v2Enabled
+      );
+
+      setCanCheckIn(
+        isCheckinAvailable
+      );
+
+      setDailyRewardAmt(
+        rewardAmount
+      );
+    };
+
     const applyUserState = ({
       verifiedUserId,
       verifiedFirstName,
@@ -888,7 +1076,10 @@ export default function Home() {
       setGroupTaskCompleted(Boolean(userData.groupJoined));
       setTwitterTaskCompleted(Boolean(userData.twitterJoined));
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr =
+        new Date(safeNowTime)
+          .toISOString()
+          .split('T')[0];
 
       setDailyTwitterDone(userData.lastTwitterTask === todayStr);
       setDailyTelegramDone(userData.lastTelegramTask === todayStr);
@@ -919,31 +1110,10 @@ export default function Home() {
         !fromCache
       );
 
-      let currentStreak = Number(userData.checkinStreak || 0);
-      let isCheckinAvailable = true;
-      const now = new Date();
-
-      if (userData.lastCheckinDate) {
-        const lastDate = new Date(userData.lastCheckinDate);
-
-        if (lastDate.toISOString().split('T')[0] === todayStr) {
-          isCheckinAvailable = false;
-        } else {
-          const yesterday = new Date(now);
-          yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-
-          if (
-            lastDate.toISOString().split('T')[0] !==
-            yesterday.toISOString().split('T')[0]
-          ) {
-            currentStreak = 0;
-          }
-        }
-      }
-
-      setCheckinStreak(currentStreak);
-      setCanCheckIn(isCheckinAvailable);
-      setDailyRewardAmt(((currentStreak % 7) + 1) * 100);
+      applyCheckinState(
+        userData,
+        safeNowTime
+      );
 
       const currentMiningSessionEndsAt =
         getMiningSessionEndsAt(
@@ -1054,6 +1224,27 @@ export default function Home() {
           lastTwitterTask: userData.lastTwitterTask || null,
           lastTelegramTask: userData.lastTelegramTask || null,
           checkinStreak: Number(userData.checkinStreak || 0),
+          activeDays:
+            Number(
+              userData.activeDays ??
+              userData.checkinStreak ??
+              0
+            ),
+          recoveryDays:
+            Math.max(
+              0,
+              Math.min(
+                2,
+                Number(
+                  userData.recoveryDays ?? 2
+                )
+              )
+            ),
+          dailyCheckinV2Enabled:
+            Boolean(
+              userData
+                .dailyCheckinV2Enabled
+            ),
           lastCheckinDate: userData.lastCheckinDate || null,
           lastClaim: userData.lastClaim || null,
           miningSessionEndsAt:
@@ -1370,6 +1561,11 @@ export default function Home() {
                   true
                 );
 
+                applyCheckinState(
+                  data.user,
+                  authoritativeNowTime
+                );
+
                 patchUserCache(verifiedUserId, {
                   ...(Number.isFinite(freshBalance)
                     ? { balance: freshBalance }
@@ -1394,6 +1590,34 @@ export default function Home() {
                     freshMiningBoostUntil,
                   miningBoostCount:
                     freshMiningBoostCount,
+                  checkinStreak:
+                    Number(
+                      data.user.checkinStreak || 0
+                    ),
+                  activeDays:
+                    Number(
+                      data.user.activeDays ??
+                      data.user.checkinStreak ??
+                      0
+                    ),
+                  recoveryDays:
+                    Math.max(
+                      0,
+                      Math.min(
+                        2,
+                        Number(
+                          data.user.recoveryDays ?? 2
+                        )
+                      )
+                    ),
+                  dailyCheckinV2Enabled:
+                    Boolean(
+                      data.user
+                        .dailyCheckinV2Enabled
+                    ),
+                  lastCheckinDate:
+                    data.user.lastCheckinDate ||
+                    null,
                 });
               }
             }
@@ -1500,6 +1724,9 @@ export default function Home() {
             lastTwitterTask: null,
             lastTelegramTask: null,
             checkinStreak: 0,
+            activeDays: 0,
+            recoveryDays: 2,
+            dailyCheckinV2Enabled: false,
             lastCheckinDate: null,
             lastClaim:
               registeredUser.lastClaim ||
@@ -2089,7 +2316,11 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ initData }),
+        body: JSON.stringify({
+          initData,
+          clientV2:
+            dailyCheckinV2Enabled,
+        }),
         cache: 'no-store',
       });
 
@@ -2097,17 +2328,93 @@ export default function Home() {
 
       if (!response.ok) {
         if (response.status === 409) {
-          const syncedBalance = Number(data.balance);
-          const syncedStreak = Number(data.checkinStreak);
+          const syncedBalance =
+            Number(data.balance);
 
-          if (Number.isFinite(syncedBalance)) {
-            setBalance(syncedBalance);
+          const syncedStreak =
+            Number(data.checkinStreak);
+
+          const syncedActiveDays =
+            Number(data.activeDays);
+
+          const syncedRecoveryDays =
+            Number(data.recoveryDays);
+
+          const syncedRewardEligible =
+            Boolean(
+              data.rewardEligible
+            );
+
+          const syncedLastCheckinDate =
+            data.lastCheckinDate ||
+            new Date().toISOString();
+
+          if (
+            Number.isFinite(
+              syncedBalance
+            )
+          ) {
+            setBalance(
+              syncedBalance
+            );
           }
 
-          if (Number.isFinite(syncedStreak)) {
-            setCheckinStreak(syncedStreak);
+          if (
+            Number.isFinite(
+              syncedStreak
+            )
+          ) {
+            setCheckinStreak(
+              syncedStreak
+            );
+          }
+
+          if (
+            Number.isFinite(
+              syncedActiveDays
+            )
+          ) {
+            setActiveDays(
+              syncedActiveDays
+            );
+          }
+
+          if (
+            Number.isFinite(
+              syncedRecoveryDays
+            )
+          ) {
+            setCheckinRecoveryDays(
+              Math.max(
+                0,
+                Math.min(
+                  2,
+                  syncedRecoveryDays
+                )
+              )
+            );
+          }
+
+          if (
+            dailyCheckinV2Enabled
+          ) {
+            setCheckinRewardEligible(
+              syncedRewardEligible
+            );
+
             setDailyRewardAmt(
-              ((syncedStreak % 7) + 1) * 100
+              syncedRewardEligible
+                ? 100
+                : 0
+            );
+          } else if (
+            Number.isFinite(
+              syncedStreak
+            )
+          ) {
+            setDailyRewardAmt(
+              ((syncedStreak % 7) + 1) *
+              100
             );
           }
 
@@ -2120,7 +2427,24 @@ export default function Home() {
             ...(Number.isFinite(syncedStreak)
               ? { checkinStreak: syncedStreak }
               : {}),
-            lastCheckinDate: new Date().toISOString(),
+            ...(Number.isFinite(syncedActiveDays)
+              ? { activeDays: syncedActiveDays }
+              : {}),
+            ...(Number.isFinite(syncedRecoveryDays)
+              ? {
+                  recoveryDays:
+                    Math.max(
+                      0,
+                      Math.min(
+                        2,
+                        syncedRecoveryDays
+                      )
+                    ),
+                }
+              : {}),
+            dailyCheckinV2Enabled,
+            lastCheckinDate:
+              syncedLastCheckinDate,
           });
 
           return;
@@ -2129,21 +2453,94 @@ export default function Home() {
         throw new Error(data.error || 'Check-in failed');
       }
 
-      const newBalance = Number(data.balance || 0);
-      const newStreak = Number(data.checkinStreak || 0);
+      const newBalance =
+        Number(data.balance || 0);
+
+      const newStreak =
+        Number(data.checkinStreak || 0);
+
+      const newActiveDays =
+        Number(data.activeDays);
+
+      const newRecoveryDays =
+        Number(data.recoveryDays);
+
+      const newRewardEligible =
+        Boolean(
+          data.rewardEligible
+        );
+
       const lastCheckinDate =
-        data.lastCheckinDate || new Date().toISOString();
+        data.lastCheckinDate ||
+        new Date().toISOString();
 
       setBalance(newBalance);
       setCheckinStreak(newStreak);
+
+      if (
+        Number.isFinite(
+          newActiveDays
+        )
+      ) {
+        setActiveDays(
+          newActiveDays
+        );
+      }
+
+      if (
+        Number.isFinite(
+          newRecoveryDays
+        )
+      ) {
+        setCheckinRecoveryDays(
+          Math.max(
+            0,
+            Math.min(
+              2,
+              newRecoveryDays
+            )
+          )
+        );
+      }
+
       setCanCheckIn(false);
-      setDailyRewardAmt(
-        ((newStreak % 7) + 1) * 100
-      );
+
+      if (dailyCheckinV2Enabled) {
+        setCheckinRewardEligible(
+          newRewardEligible
+        );
+
+        setDailyRewardAmt(
+          newRewardEligible
+            ? 100
+            : 0
+        );
+      } else {
+        setDailyRewardAmt(
+          ((newStreak % 7) + 1) *
+          100
+        );
+      }
 
       patchUserCache(userId, {
         balance: newBalance,
         checkinStreak: newStreak,
+        ...(Number.isFinite(newActiveDays)
+          ? { activeDays: newActiveDays }
+          : {}),
+        ...(Number.isFinite(newRecoveryDays)
+          ? {
+              recoveryDays:
+                Math.max(
+                  0,
+                  Math.min(
+                    2,
+                    newRecoveryDays
+                  )
+                ),
+            }
+          : {}),
+        dailyCheckinV2Enabled,
         lastCheckinDate,
       });
     } catch (error) {
@@ -3544,22 +3941,62 @@ export default function Home() {
             <div className="relative z-10 flex flex-col items-center">
               <h3 className="font-black text-white text-2xl mb-1 drop-shadow-md">Daily Check-In</h3>
               <p className="text-yellow-100 text-[11px] text-center mb-4 font-medium leading-relaxed">
-                Log in daily to increase your reward.<br/> <span className="font-bold text-white">Missing a day resets your streak to 0!</span>
+                {dailyCheckinV2Enabled ? (
+                  <>
+                    Check in every day to earn your daily reward.<br/>
+                    <span className="font-bold text-white">Missing a day pauses rewards until you complete 2 consecutive active days.</span>
+                  </>
+                ) : (
+                  <>
+                    Log in daily to increase your reward.<br/>
+                    <span className="font-bold text-white">Missing a day resets your streak to 0!</span>
+                  </>
+                )}
               </p>
               <div className="flex items-center justify-center gap-3 mb-4 w-full">
                  <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
-                    <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">Current Streak</span>
-                    <span className="text-2xl font-black text-white">{checkinStreak} <span className="text-sm">Days</span>🔥</span>
+                    <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">
+                      {dailyCheckinV2Enabled ? 'Active Days' : 'Current Streak'}
+                    </span>
+                    <span className="text-2xl font-black text-white">
+                      {dailyCheckinV2Enabled ? activeDays : checkinStreak} <span className="text-sm">Days</span>🔥
+                    </span>
                  </div>
                  <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
                     <span className="block text-[9px] text-yellow-200 uppercase tracking-widest mb-1">
-                      {canCheckIn ? "Today's Reward" : "Tomorrow's Reward"}
+                      {dailyCheckinV2Enabled
+                        ? (canCheckIn ? "Today's Reward" : 'Daily Reward')
+                        : (canCheckIn ? "Today's Reward" : "Tomorrow's Reward")}
                     </span>
                     <span className="text-2xl font-black text-yellow-400">+{dailyRewardAmt}</span>
                  </div>
               </div>
+
+              {dailyCheckinV2Enabled && checkinRecoveryDays < 2 && (
+                <div className="w-full mb-4 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-center">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-yellow-100">
+                    Recovery: {checkinRecoveryDays}/2 Active Days
+                  </span>
+                  {!checkinRewardEligible && (
+                    <span className="block mt-1 text-[10px] font-bold text-white">
+                      Daily reward is paused today.
+                    </span>
+                  )}
+                </div>
+              )}
+
               <button onClick={handleDailyCheckIn} disabled={!isDataLoaded || !canCheckIn || isSaving} className={`w-full py-3 rounded-xl text-base font-black uppercase tracking-wider transition-all shadow-lg ${(isDataLoaded && canCheckIn) ? 'bg-white text-orange-600 hover:scale-105 active:scale-95' : 'bg-black/30 text-white/50 cursor-not-allowed border border-white/10'}`}>
-                {!isDataLoaded ? 'Loading...' : (isSaving ? 'Claiming...' : (canCheckIn ? 'Claim Reward' : 'Come Back Tomorrow'))}
+                {!isDataLoaded
+                  ? 'Loading...'
+                  : isSaving
+                    ? (dailyCheckinV2Enabled ? 'Checking In...' : 'Claiming...')
+                    : canCheckIn
+                      ? (
+                          dailyCheckinV2Enabled
+                            ? (dailyRewardAmt > 0 ? 'Claim +100 APXN' : 'Check In • Recovery')
+                            : 'Claim Reward'
+                        )
+                      : 'Come Back Tomorrow'}
               </button>
             </div>
           </div>
@@ -4244,6 +4681,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
