@@ -160,6 +160,9 @@ export async function POST(
     const initData =
       body?.initData;
 
+    const clientV2 =
+      body?.clientV2 === true;
+
     if (
       !initData ||
       typeof initData !== 'string'
@@ -302,10 +305,12 @@ export async function POST(
       error,
     } =
       await supabaseAdmin.rpc(
-        'apex_daily_checkin_rollout',
+        'apex_daily_checkin_client_rollout',
         {
           p_telegram_id:
             telegramId,
+          p_client_v2:
+            clientV2,
         }
       );
 
