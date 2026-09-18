@@ -6,7 +6,7 @@ import { TonConnectUIProvider } from "@tonconnect/ui-react";
 
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
-  "https://apex-miner-rho.vercel.app";
+  "https://apex-miner.vercel.app";
 
 const tonConnectManifestUrl =
   `${appUrl.replace(/\/$/, "")}/tonconnect-manifest.json`;
@@ -39,4 +39,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-
