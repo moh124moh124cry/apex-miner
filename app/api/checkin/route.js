@@ -14,11 +14,12 @@ export const dynamic = 'force-dynamic';
 // Vercel may run multiple server instances, so this map
 // is NOT a security boundary.
 //
-// Supabase apex_daily_checkin remains the final authority
-// for:
+// Supabase remains the final authority for:
 // - Daily reward
 // - Balance
 // - Streak
+// - Active days
+// - Recovery state
 // - Duplicate prevention
 // - Atomic row locking
 //
@@ -55,7 +56,6 @@ function setGateEntry(
   telegramId,
   entry
 ) {
-  // Refresh insertion order.
   dailyCheckinGate.delete(
     telegramId
   );
@@ -65,7 +65,6 @@ function setGateEntry(
     entry
   );
 
-  // Keep memory usage bounded.
   while (
     dailyCheckinGate.size >
     MAX_GATE_ENTRIES
@@ -111,7 +110,6 @@ function getValidGateEntry(
   const today =
     getUtcDayKey();
 
-  // Yesterday's gate must never block today's reward.
   if (
     entry.dayKey &&
     entry.dayKey !== today
@@ -175,7 +173,16 @@ export async function POST(
       );
     }
 
-    // Verify the real Telegram Mini App user.
+    if (initData.length > 8192) {
+      return response(
+        {
+          error:
+            'Invalid Telegram init data',
+        },
+        400
+      );
+    }
+
     const telegram =
       validateTelegramInitData(
         initData
@@ -198,15 +205,8 @@ export async function POST(
       );
 
     // =================================================
-    // 1. Supabase already confirmed that this user
-    //    completed today's check-in.
-    //
-    //    Stop here without touching Supabase again.
-    //
-    //    IMPORTANT:
-    //    Do NOT return balance from local memory.
-    //    The user's balance may have changed since the
-    //    original check-in because of mining or tasks.
+    // Supabase already confirmed that this user
+    // completed today's check-in.
     // =================================================
 
     if (
@@ -225,6 +225,26 @@ export async function POST(
               0
             ),
 
+          activeDays:
+            Number(
+              existingGate
+                .activeDays ||
+              0
+            ),
+
+          recoveryDays:
+            Number(
+              existingGate
+                .recoveryDays ??
+              2
+            ),
+
+          rewardEligible:
+            Boolean(
+              existingGate
+                .rewardEligible
+            ),
+
           lastCheckinDate:
             existingGate
               .lastCheckinDate ||
@@ -235,10 +255,8 @@ export async function POST(
     }
 
     // =================================================
-    // 2. Another request for the same user is already
-    //    reaching Supabase on this Vercel instance.
-    //
-    //    Do not send a duplicate concurrent RPC.
+    // Another request for the same user is already
+    // reaching Supabase on this Vercel instance.
     // =================================================
 
     if (
@@ -256,11 +274,6 @@ export async function POST(
       );
     }
 
-    // =================================================
-    // Mark this user as in-flight before calling
-    // Supabase.
-    // =================================================
-
     setGateEntry(
       telegramId,
       {
@@ -268,12 +281,20 @@ export async function POST(
         inFlight: true,
         completed: false,
         checkinStreak: null,
+        activeDays: null,
+        recoveryDays: null,
+        rewardEligible: null,
         lastCheckinDate: null,
       }
     );
 
     // =================================================
-    // One authoritative Supabase RPC.
+    // Transitional authoritative Supabase RPC.
+    //
+    // IMPORTANT:
+    // It preserves the current production reward
+    // schedule while also returning the new activity
+    // fields needed for the upcoming frontend cutover.
     // =================================================
 
     const {
@@ -281,7 +302,7 @@ export async function POST(
       error,
     } =
       await supabaseAdmin.rpc(
-        'apex_daily_checkin',
+        'apex_daily_checkin_transition',
         {
           p_telegram_id:
             telegramId,
@@ -289,8 +310,6 @@ export async function POST(
       );
 
     if (error) {
-      // Never keep a legitimate user blocked after an
-      // unexpected database error.
       removeGateEntry(
         telegramId
       );
@@ -330,11 +349,6 @@ export async function POST(
 
     // =================================================
     // Supabase says today's reward was already claimed.
-    //
-    // This response comes directly from Supabase, so
-    // returning balance here is safe and authoritative.
-    //
-    // Only completion/streak/date are stored locally.
     // =================================================
 
     if (
@@ -355,6 +369,29 @@ export async function POST(
             0
           );
 
+        const activeDays =
+          Number(
+            result.active_days ||
+            0
+          );
+
+        const recoveryDays =
+          Math.max(
+            0,
+            Math.min(
+              2,
+              Number(
+                result.recovery_days ??
+                2
+              )
+            )
+          );
+
+        const rewardEligible =
+          Boolean(
+            result.reward_eligible
+          );
+
         const lastCheckinDate =
           result.last_checkin_date ||
           null;
@@ -366,6 +403,9 @@ export async function POST(
             inFlight: false,
             completed: true,
             checkinStreak,
+            activeDays,
+            recoveryDays,
+            rewardEligible,
             lastCheckinDate,
           }
         );
@@ -378,6 +418,12 @@ export async function POST(
             balance,
 
             checkinStreak,
+
+            activeDays,
+
+            recoveryDays,
+
+            rewardEligible,
 
             lastCheckinDate,
           },
@@ -417,11 +463,6 @@ export async function POST(
 
     // =================================================
     // Successful check-in.
-    //
-    // Balance is returned directly from Supabase.
-    //
-    // The local gate stores only stable check-in state,
-    // never the user's balance.
     // =================================================
 
     const reward =
@@ -440,6 +481,29 @@ export async function POST(
         0
       );
 
+    const activeDays =
+      Number(
+        result.active_days ||
+        0
+      );
+
+    const recoveryDays =
+      Math.max(
+        0,
+        Math.min(
+          2,
+          Number(
+            result.recovery_days ??
+            2
+          )
+        )
+      );
+
+    const rewardEligible =
+      Boolean(
+        result.reward_eligible
+      );
+
     const lastCheckinDate =
       result.last_checkin_date ||
       null;
@@ -451,6 +515,9 @@ export async function POST(
         inFlight: false,
         completed: true,
         checkinStreak,
+        activeDays,
+        recoveryDays,
+        rewardEligible,
         lastCheckinDate,
       }
     );
@@ -464,11 +531,16 @@ export async function POST(
 
       checkinStreak,
 
+      activeDays,
+
+      recoveryDays,
+
+      rewardEligible,
+
       lastCheckinDate,
     });
 
   } catch (error) {
-    // Release only an unfinished local gate.
     if (gatedTelegramId) {
       const entry =
         dailyCheckinGate.get(
@@ -514,3 +586,4 @@ export async function POST(
     );
   }
 }
+
