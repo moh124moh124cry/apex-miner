@@ -160,6 +160,8 @@ export async function POST(request) {
         twitter_joined,
         last_twitter_task,
         last_telegram_task,
+        last_twitter_task_at,
+        last_telegram_task_at,
         checkin_streak,
         active_days,
         checkin_recovery_days,
@@ -296,6 +298,14 @@ export async function POST(request) {
 
         lastTelegramTask:
           user.last_telegram_task ||
+          null,
+
+        lastTwitterTaskAt:
+          user.last_twitter_task_at ||
+          null,
+
+        lastTelegramTaskAt:
+          user.last_telegram_task_at ||
           null,
 
         checkinStreak:
