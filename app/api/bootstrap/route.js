@@ -163,6 +163,7 @@ export async function POST(request) {
         checkin_streak,
         active_days,
         checkin_recovery_days,
+        daily_checkin_v2_enabled,
         last_checkin_date,
         last_claim,
         mining_session_ends_at,
@@ -319,6 +320,11 @@ export async function POST(request) {
                   2
               )
             )
+          ),
+
+        dailyCheckinV2Enabled:
+          Boolean(
+            user.daily_checkin_v2_enabled
           ),
 
         lastCheckinDate:
