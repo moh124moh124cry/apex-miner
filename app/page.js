@@ -1368,20 +1368,52 @@ export default function Home() {
       }
 
       try {
-        const authResponse = await fetch('/api/auth/telegram', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ initData }),
-          cache: 'no-store',
-        });
+        // Bootstrap validates Telegram and returns the user and event.
+        // Fall back to auth only if bootstrap is temporarily unavailable.
+        let bootstrapData = null;
+        let authData = null;
 
-        if (!authResponse.ok) {
-          throw new Error('Telegram authentication failed');
+        try {
+          const bootstrapResponse = await fetch('/api/bootstrap', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ initData }),
+            cache: 'no-store',
+          });
+
+          if (!bootstrapResponse.ok) {
+            throw new Error('Bootstrap failed');
+          }
+
+          bootstrapData = await bootstrapResponse.json();
+
+          if (
+            !bootstrapData?.success ||
+            !bootstrapData?.telegram?.id
+          ) {
+            throw new Error('Invalid bootstrap result');
+          }
+
+          authData = { user: bootstrapData.telegram };
+        } catch {
+          // Existing users may still use their authenticated local cache.
+          const authResponse = await fetch('/api/auth/telegram', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ initData }),
+            cache: 'no-store',
+          });
+
+          if (!authResponse.ok) {
+            throw new Error('Telegram authentication failed');
+          }
+
+          authData = await authResponse.json();
         }
-
-        const authData = await authResponse.json();
 
         if (cancelled) return;
 
@@ -1409,17 +1441,8 @@ export default function Home() {
           });
 
           try {
-            const bootstrapResponse = await fetch('/api/bootstrap', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ initData }),
-              cache: 'no-store',
-            });
-
-            if (bootstrapResponse.ok) {
-              const data = await bootstrapResponse.json();
+            if (bootstrapData) {
+              const data = bootstrapData;
 
               applyMiningEventState(
                 data?.miningEvent || null
@@ -1745,21 +1768,12 @@ export default function Home() {
           return;
         }
 
-        // Cache miss/new device: only then read the user from Supabase.
-        const bootstrapResponse = await fetch('/api/bootstrap', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ initData }),
-          cache: 'no-store',
-        });
-
-        if (!bootstrapResponse.ok) {
+        // Cache miss/new device: reuse the verified bootstrap response.
+        if (!bootstrapData) {
           throw new Error('Bootstrap failed');
         }
 
-        const data = await bootstrapResponse.json();
+        const data = bootstrapData;
 
         if (cancelled) return;
 
@@ -4855,3 +4869,8 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
+
