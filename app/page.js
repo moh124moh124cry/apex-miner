@@ -777,7 +777,7 @@ export default function Home() {
 
   const getFlagIcon = (countryCode) => {
     if (!countryCode || countryCode === 'Unknown') {
-      return <span className="text-2xl drop-shadow-md">ðŸ‘¤</span>;
+      return <span className="text-2xl drop-shadow-md">👤</span>;
     }
     const lowerCode = countryCode.toLowerCase();
     return (
@@ -822,7 +822,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Connection error:", error);
-      alert("âŒ Connection cancelled or failed.");
+      alert("❌ Connection cancelled or failed.");
     } finally {
       setIsConnecting(false);
     }
@@ -834,9 +834,9 @@ export default function Home() {
       setShowWalletModal(false);
       setManualWalletInput(false);
       setTempAddress('');
-      alert("âœ… Wallet Successfully Linked for TGE!");
+      alert("✅ Wallet Successfully Linked for TGE!");
     } else {
-      alert("âŒ Please enter a valid BSC (BEP-20) address starting with '0x'!");
+      alert("❌ Please enter a valid BSC (BEP-20) address starting with '0x'!");
     }
   };
 
@@ -1368,52 +1368,20 @@ export default function Home() {
       }
 
       try {
-        // Bootstrap validates Telegram and returns the user and event.
-        // Fall back to auth only if bootstrap is temporarily unavailable.
-        let bootstrapData = null;
-        let authData = null;
+        const authResponse = await fetch('/api/auth/telegram', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ initData }),
+          cache: 'no-store',
+        });
 
-        try {
-          const bootstrapResponse = await fetch('/api/bootstrap', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ initData }),
-            cache: 'no-store',
-          });
-
-          if (!bootstrapResponse.ok) {
-            throw new Error('Bootstrap failed');
-          }
-
-          bootstrapData = await bootstrapResponse.json();
-
-          if (
-            !bootstrapData?.success ||
-            !bootstrapData?.telegram?.id
-          ) {
-            throw new Error('Invalid bootstrap result');
-          }
-
-          authData = { user: bootstrapData.telegram };
-        } catch {
-          // Existing users may still use their authenticated local cache.
-          const authResponse = await fetch('/api/auth/telegram', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ initData }),
-            cache: 'no-store',
-          });
-
-          if (!authResponse.ok) {
-            throw new Error('Telegram authentication failed');
-          }
-
-          authData = await authResponse.json();
+        if (!authResponse.ok) {
+          throw new Error('Telegram authentication failed');
         }
+
+        const authData = await authResponse.json();
 
         if (cancelled) return;
 
@@ -1441,8 +1409,17 @@ export default function Home() {
           });
 
           try {
-            if (bootstrapData) {
-              const data = bootstrapData;
+            const bootstrapResponse = await fetch('/api/bootstrap', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ initData }),
+              cache: 'no-store',
+            });
+
+            if (bootstrapResponse.ok) {
+              const data = await bootstrapResponse.json();
 
               applyMiningEventState(
                 data?.miningEvent || null
@@ -1768,12 +1745,21 @@ export default function Home() {
           return;
         }
 
-        // Cache miss/new device: reuse the verified bootstrap response.
-        if (!bootstrapData) {
+        // Cache miss/new device: only then read the user from Supabase.
+        const bootstrapResponse = await fetch('/api/bootstrap', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ initData }),
+          cache: 'no-store',
+        });
+
+        if (!bootstrapResponse.ok) {
           throw new Error('Bootstrap failed');
         }
 
-        const data = bootstrapData;
+        const data = await bootstrapResponse.json();
 
         if (cancelled) return;
 
@@ -2456,7 +2442,7 @@ export default function Home() {
         : null;
 
     if (!initData) {
-      alert('âŒ Please open Apex Miner inside Telegram.');
+      alert('❌ Please open Apex Miner inside Telegram.');
       return;
     }
 
@@ -2697,7 +2683,7 @@ export default function Home() {
       });
     } catch (error) {
       console.error('Check-in failed:', error);
-      alert('âŒ Check-in failed. Please try again.');
+      alert('❌ Check-in failed. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -2732,7 +2718,7 @@ export default function Home() {
 
     if (!initData) {
       alert(
-        'âŒ Please open Apex Miner inside Telegram.'
+        '❌ Please open Apex Miner inside Telegram.'
       );
       return;
     }
@@ -2749,7 +2735,7 @@ export default function Home() {
         'function'
     ) {
       alert(
-        'âš ï¸ Restart ad is not ready yet. Please try again in a moment.'
+        '⚠️ Restart ad is not ready yet. Please try again in a moment.'
       );
       return;
     }
@@ -2998,7 +2984,7 @@ export default function Home() {
         !restartAdCompleted
       ) {
         alert(
-          'âŒ Restart ad was not completed. Mining was not restarted.'
+          '❌ Restart ad was not completed. Mining was not restarted.'
         );
       } else if (
         error?.message &&
@@ -3007,8 +2993,8 @@ export default function Home() {
       ) {
         alert(
           requiresRestartAd
-            ? 'âŒ Mining restart failed. Please try again.'
-            : 'âŒ Claim failed. Please try again.'
+            ? '❌ Mining restart failed. Please try again.'
+            : '❌ Claim failed. Please try again.'
         );
       }
     } finally {
@@ -3031,7 +3017,7 @@ export default function Home() {
     completed,
     loading = false,
   }) => {
-    if (completed) return 'Done âœ“';
+    if (completed) return 'Done ✓';
     if (loading) return 'Wait..';
 
     const stage = Number(
@@ -3076,7 +3062,7 @@ export default function Home() {
       updateTaskConfirmStage(key, 2);
 
       alert(
-        'âš ï¸ Please complete the task, then confirm it one more time.'
+        '⚠️ Please complete the task, then confirm it one more time.'
       );
       return;
     }
@@ -3110,7 +3096,7 @@ export default function Home() {
         : null;
 
     if (!initData) {
-      alert('âŒ Please open Apex Miner inside Telegram.');
+      alert('❌ Please open Apex Miner inside Telegram.');
       return;
     }
 
@@ -3211,7 +3197,7 @@ export default function Home() {
         0
       );
 
-      alert('âŒ Daily task failed. Please try again.');
+      alert('❌ Daily task failed. Please try again.');
     } finally {
       setVerifying(false);
     }
@@ -3282,7 +3268,7 @@ export default function Home() {
         : null;
 
     if (!initData) {
-      alert('âŒ Please open Apex Miner inside Telegram.');
+      alert('❌ Please open Apex Miner inside Telegram.');
       return;
     }
 
@@ -3291,7 +3277,7 @@ export default function Home() {
       'function'
     ) {
       alert(
-        'âš ï¸ Ad is not ready yet. Please try again in a moment.'
+        '⚠️ Ad is not ready yet. Please try again in a moment.'
       );
       return;
     }
@@ -3391,7 +3377,7 @@ export default function Home() {
       });
 
       alert(
-        'âœ… +150 APXN added to your balance!'
+        '✅ +150 APXN added to your balance!'
       );
     } catch (error) {
       console.error(
@@ -3400,7 +3386,7 @@ export default function Home() {
       );
 
       alert(
-        'âŒ Ad was not completed. No reward was claimed.'
+        '❌ Ad was not completed. No reward was claimed.'
       );
     } finally {
       setIsWatchingAd(false);
@@ -3428,7 +3414,7 @@ export default function Home() {
         : null;
 
     if (!initData) {
-      alert('âŒ Please open Apex Miner inside Telegram.');
+      alert('❌ Please open Apex Miner inside Telegram.');
       return;
     }
 
@@ -3437,7 +3423,7 @@ export default function Home() {
       'function'
     ) {
       alert(
-        'âš ï¸ Ad is not ready yet. Please try again in a moment.'
+        '⚠️ Ad is not ready yet. Please try again in a moment.'
       );
       return;
     }
@@ -3522,7 +3508,7 @@ export default function Home() {
           });
 
           alert(
-            'âš¡ Your x3 Mining Boost is already active.'
+            '⚡ Your x3 Mining Boost is already active.'
           );
 
           return;
@@ -3599,7 +3585,7 @@ export default function Home() {
       });
 
       alert(
-        'âš¡ x3 Mining Boost activated for 24 hours!'
+        '⚡ x3 Mining Boost activated for 24 hours!'
       );
     } catch (error) {
       console.error(
@@ -3608,7 +3594,7 @@ export default function Home() {
       );
 
       alert(
-        'âŒ Ad was not completed. Mining Boost was not activated.'
+        '❌ Ad was not completed. Mining Boost was not activated.'
       );
     } finally {
       setIsWatchingBoostAd(false);
@@ -3636,7 +3622,7 @@ export default function Home() {
         : null;
 
     if (!initData) {
-      alert('âŒ Please open Apex Miner inside Telegram.');
+      alert('❌ Please open Apex Miner inside Telegram.');
       return;
     }
 
@@ -3714,7 +3700,7 @@ export default function Home() {
         error?.message ||
         'Task failed. Please try again.';
 
-      alert(`âŒ ${message}`);
+      alert(`❌ ${message}`);
     } finally {
       setIsSaving(false);
     }
@@ -3776,18 +3762,18 @@ export default function Home() {
 
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
-    const shareText = "ðŸš€ Join Apex Network on BSC and mine $APXN Points! Early pioneer welcome bonus active:";
+    const shareText = "🚀 Join Apex Network on BSC and mine $APXN Points! Early pioneer welcome bonus active:";
     window.open(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`https://t.me/ApxMinerBot/app?startapp=${userId}`);
-    alert("âœ… Invite link copied!");
+    alert("✅ Invite link copied!");
   };
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText("contact@apxn.network");
-    alert("âœ… Email address copied to clipboard!");
+    alert("✅ Email address copied to clipboard!");
   };
 
   const formatTime = (totalSeconds) => {
@@ -3810,7 +3796,7 @@ export default function Home() {
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
-              <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">âœ–</button>
+              <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✖</button>
 
               {!manualWalletInput ? (
                 <>
@@ -3823,11 +3809,11 @@ export default function Home() {
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
-                        <span className="text-2xl w-7 text-center">ðŸ¦Š</span>
+                        <span className="text-2xl w-7 text-center">🦊</span>
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
-                        <span className="text-2xl w-7 text-center">ðŸ›¡ï¸</span>
+                        <span className="text-2xl w-7 text-center">🛡️</span>
                         <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
                      </button>
                      <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
@@ -3839,7 +3825,7 @@ export default function Home() {
               ) : (
                 <div className="flex flex-col items-center animate-in fade-in duration-300">
                    <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-500/50">
-                     <span className="text-2xl">ðŸ”—</span>
+                     <span className="text-2xl">🔗</span>
                    </div>
                    <h3 className="text-lg font-black text-white mb-2 text-center">Link Wallet Address</h3>
                    <p className="text-xs text-gray-400 text-center mb-6 leading-relaxed">
@@ -3876,7 +3862,7 @@ export default function Home() {
           <div className="bg-gradient-to-b from-yellow-900/50 to-slate-900 border border-yellow-500/50 rounded-3xl w-full max-w-sm p-6 relative shadow-[0_0_40px_rgba(234,179,8,0.3)] animate-in zoom-in-90 duration-500 overflow-hidden">
             <div className="flex flex-col items-center text-center relative z-10">
               <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-400/50 shadow-inner">
-                 <span className="text-4xl">ðŸ†</span>
+                 <span className="text-4xl">🏆</span>
               </div>
               <h2 className="text-2xl font-black text-white mb-2">Welcome to Apex Network!</h2>
               <p className="text-gray-300 text-sm mb-4 leading-relaxed">
@@ -3894,7 +3880,7 @@ export default function Home() {
                  )}
               </div>
               <button onClick={() => setShowWelcome(false)} className="w-full py-4 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-black text-lg shadow-[0_0_20px_rgba(245,158,11,0.5)] active:scale-95 transition-all">
-                Claim & Start Mining â›ï¸
+                Claim & Start Mining ⛏️
               </button>
             </div>
           </div>
@@ -3910,7 +3896,7 @@ export default function Home() {
 
           <button onClick={() => setShowWalletModal(true)} className={`border font-bold px-4 py-2 rounded-xl text-xs transition-colors flex items-center gap-2 ${walletAddress ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-700 text-white hover:border-yellow-500'}`}>
             {walletAddress ? (
-               <span>âœ…</span>
+               <span>✅</span>
             ) : (
                <img src="/binance-logo-1.png" alt="Binance" className="w-4 h-4 object-contain" />
             )}
@@ -3937,7 +3923,7 @@ export default function Home() {
           {isMiningEventActive && (
             <div className="w-full mt-5 rounded-2xl border border-yellow-400/60 bg-gradient-to-r from-yellow-950/70 via-orange-950/60 to-yellow-950/70 p-4 text-center shadow-[0_0_24px_rgba(250,204,21,0.16)]">
               <div className="text-xl font-black text-yellow-300">
-                ðŸŽ‰ âœ… APXN
+                🎉 ✅ APXN
               </div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-yellow-100/70 font-bold">
                 48H Mining Event
@@ -3958,12 +3944,12 @@ export default function Home() {
                  {activeFriendsCount > 0 && <span className="text-[9px] text-green-400">Includes +5% per active friend</span>}
                  {isMiningBoostActive && (
                    <span className="text-[9px] text-fuchsia-400 font-bold">
-                     âš¡ x3 base speed active
+                     ⚡ x3 base speed active
                    </span>
                  )}
                  {hasFrozenMiningBoost && (
                    <span className="text-[9px] text-cyan-400 font-bold">
-                     â¸ x3 saved time is frozen
+                     ⏸ x3 saved time is frozen
                    </span>
                  )}
                </div>
@@ -3978,15 +3964,15 @@ export default function Home() {
                 : 'bg-slate-900/60 border-slate-800'
             }`}>
               <div className="flex flex-col pr-3">
-                <span className="text-white text-sm font-black">âš¡ x3 Mining Boost</span>
+                <span className="text-white text-sm font-black">⚡ x3 Mining Boost</span>
                 <span className="text-[10px] text-gray-400 mt-1">
                   {isMiningEventActive
                     ? hasFrozenMiningBoost
-                      ? `Frozen â€¢ ${formatTime(miningBoostRemaining)} saved`
+                      ? `Frozen • ${formatTime(miningBoostRemaining)} saved`
                       : 'Temporarily frozen during the APXN 48h event'
                     : isMiningBoostActive
-                    ? `Active â€¢ ${formatTime(miningBoostRemaining)} left`
-                    : 'Watch an ad â†’ x3 base mining speed for 24h'}
+                    ? `Active • ${formatTime(miningBoostRemaining)} left`
+                    : 'Watch an ad → x3 base mining speed for 24h'}
                 </span>
               </div>
 
@@ -4038,8 +4024,8 @@ export default function Home() {
                  : 'text-emerald-400'
              }`}>
                {isMiningPaused
-                 ? 'â¸ Mining Paused â€¢ Watch ad to restart mining'
-                 : `â— Mining Active â€¢ ${formatTime(miningSessionRemaining)} left`}
+                 ? '⏸ Mining Paused • Watch ad to restart mining'
+                 : `● Mining Active • ${formatTime(miningSessionRemaining)} left`}
              </div>
           </div>
 
@@ -4104,7 +4090,7 @@ export default function Home() {
                   : (isWatchingAd || isWatchingBoostAd)
                     ? 'WAIT...'
                     : isMiningPaused
-                      ? 'WATCH AD â€¢ RESTART MINING'
+                      ? 'WATCH AD • RESTART MINING'
                       : claimCooldown > 0
                         ? `WAIT ${formatTime(claimCooldown)}`
                         : 'CLAIM POINTS'
@@ -4137,7 +4123,7 @@ export default function Home() {
                       {dailyCheckinV2Enabled ? 'Active Days' : 'Current Streak'}
                     </span>
                     <span className="text-2xl font-black text-white">
-                      {dailyCheckinV2Enabled ? activeDays : checkinStreak} <span className="text-sm">Days</span>ðŸ”¥
+                      {dailyCheckinV2Enabled ? activeDays : checkinStreak} <span className="text-sm">Days</span>🔥
                     </span>
                  </div>
                  <div className="flex-1 bg-black/20 rounded-xl px-2 py-3 text-center backdrop-blur-sm border border-white/10">
@@ -4171,7 +4157,7 @@ export default function Home() {
                     : canCheckIn
                       ? (
                           dailyCheckinV2Enabled
-                            ? (dailyRewardAmt > 0 ? 'Claim +100 APXN' : 'Check In â€¢ Recovery')
+                            ? (dailyRewardAmt > 0 ? 'Claim +100 APXN' : 'Check In • Recovery')
                             : 'Claim Reward'
                         )
                       : 'Come Back Tomorrow'}
@@ -4219,7 +4205,7 @@ export default function Home() {
                   : isWatchingBoostAd || isWatchingRestartAd
                   ? 'Wait..'
                   : adRewardCooldown > 0
-                  ? 'Done âœ“'
+                  ? 'Done ✓'
                   : 'WATCH'}
               </button>
             </div>
@@ -4377,11 +4363,11 @@ export default function Home() {
 
       {activeTab === 'boosts' && (
         <div className="flex-1 w-full flex flex-col px-4 pt-4 overflow-y-auto">
-          <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store ðŸ›’</h2>
+          <h2 className="text-2xl font-bold text-white mb-2 text-center">Upgrade Store 🛒</h2>
 
           <div className="mt-2 mb-6 bg-red-900/40 border border-red-500/50 rounded-lg p-4 shadow-lg shadow-red-900/20">
             <div className="flex items-start gap-3">
-              <span className="text-xl">âš ï¸</span>
+              <span className="text-xl">⚠️</span>
               <div>
                 <h3 className="text-red-400 font-bold text-sm tracking-wide uppercase mb-1">
                   Mandatory KYC Requirement
@@ -4406,7 +4392,7 @@ export default function Home() {
             },
             {
               title: "Level 2: Telegram Stars",
-              currency: "â­ï¸ Stars",
+              currency: "⭐️ Stars",
               items: [
                 { name: "Stellar Rig", price: "10", boost: "+0.006/sec" },
                 { name: "Nova Core", price: "20", boost: "+0.007/sec" },
@@ -4416,7 +4402,7 @@ export default function Home() {
             },
             {
               title: "Level 3: TON Elite",
-              currency: "ðŸ’Ž TON",
+              currency: "💎 TON",
               items: [
                 { name: "Apex Quantum", price: "0.1", boost: "+0.03/sec" },
                 { name: "Titan Node", price: "0.2", boost: "+0.04/sec" },
@@ -4437,7 +4423,7 @@ export default function Home() {
                     className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 overflow-hidden grayscale opacity-75 transition-all hover:grayscale-0 hover:opacity-100 shadow-md"
                   >
                     <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold text-gray-300 backdrop-blur-sm z-10 flex items-center gap-1">
-                      ðŸ”’ Soon
+                      🔒 Soon
                     </div>
                     <div className="text-center mt-4">
                       <h3 className="font-bold text-sm text-gray-200">{item.name}</h3>
@@ -4479,7 +4465,7 @@ export default function Home() {
                         <img src="/binance-logo-1.png" alt="Binance" className="w-3 h-3 object-contain" /> BINANCE ECOSYSTEM
                       </span>
                       <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
-                        <span>ðŸ¥ž</span> PANCAKESWAP
+                        <span>🥞</span> PANCAKESWAP
                       </span>
                    </div>
                 </div>
@@ -4492,22 +4478,22 @@ export default function Home() {
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Core Features</h2>
                    <div className="grid grid-cols-2 gap-3 mb-8">
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
-                         <span className="text-3xl block mb-2">âš¡</span>
+                         <span className="text-3xl block mb-2">⚡</span>
                          <h3 className="font-bold text-white text-sm">Cloud Mining</h3>
                          <p className="text-gray-400 text-[10px] mt-1">Automated APXN points generation.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
-                         <span className="text-3xl block mb-2">ðŸ›¡ï¸</span>
+                         <span className="text-3xl block mb-2">🛡️</span>
                          <h3 className="font-bold text-white text-sm">BEP-20 Security</h3>
                          <p className="text-gray-400 text-[10px] mt-1">Audited smart contract & liquidity.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
-                         <span className="text-3xl block mb-2">ðŸš€</span>
+                         <span className="text-3xl block mb-2">🚀</span>
                          <h3 className="font-bold text-white text-sm">PancakeSwap LP</h3>
                          <p className="text-gray-400 text-[10px] mt-1">Guaranteed decentralized trading.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
-                         <span className="text-3xl block mb-2">ðŸ‘¥</span>
+                         <span className="text-3xl block mb-2">👥</span>
                          <h3 className="font-bold text-white text-sm">Community</h3>
                          <p className="text-gray-400 text-[10px] mt-1">Earn massive referral rewards.</p>
                       </div>
@@ -4516,10 +4502,10 @@ export default function Home() {
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Join Our Community</h2>
                    <div className="flex flex-col gap-3 w-full mb-8">
                      <button onClick={() => window.open('https://t.me/ApexMiner_Official', '_blank')} className="w-full bg-[#2AABEE] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                        <span>ðŸ“¢</span> Official Channel
+                        <span>📢</span> Official Channel
                      </button>
                      <button onClick={() => window.open('https://t.me/ApexMinerGroup', '_blank')} className="w-full bg-[#229ED9] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                        <span>ðŸ’¬</span> Global Group
+                        <span>💬</span> Global Group
                      </button>
                      <button onClick={() => window.open('https://x.com/ApexNetworkApp', '_blank')} className="w-full bg-black border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
                         <svg viewBox="0 0 24 24" aria-hidden="true" className="w-4 h-4 fill-white"><g><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></g></svg>
@@ -4530,17 +4516,17 @@ export default function Home() {
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Official Links</h2>
                    <div className="flex flex-col gap-3 w-full mb-10">
                      <button onClick={() => window.open('https://apxn.network', '_blank')} className="w-full bg-slate-900 border border-yellow-500/30 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                        <span>ðŸŒ</span> apxn.network
+                        <span>🌐</span> apxn.network
                      </button>
                      <button onClick={handleCopyEmail} className="w-full bg-slate-900 border border-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                        <span>ðŸ“§</span> Support : contact@apxn.network
+                        <span>📧</span> Support : contact@apxn.network
                      </button>
                    </div>
 
                    <div className="bg-gradient-to-br from-red-950/60 to-black p-5 rounded-2xl border border-red-900/50 shadow-[0_10px_30px_rgba(153,27,27,0.3)] mb-8 relative overflow-hidden">
                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900"></div>
                      <div className="flex items-center gap-2 mb-3">
-                       <span className="text-red-500 text-xl">âš ï¸</span>
+                       <span className="text-red-500 text-xl">⚠️</span>
                        <h3 className="text-red-500 font-black tracking-widest text-sm uppercase">Legal Disclaimer</h3>
                      </div>
                      <p className="text-gray-400 text-[11px] leading-relaxed mb-3 font-medium">
@@ -4750,7 +4736,7 @@ export default function Home() {
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Smart Contract & Transparency</h2>
                 <div className="bg-slate-900/80 p-4 rounded-xl border border-emerald-500/50 mb-6 flex flex-col gap-3 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
                   <div className="flex items-center gap-2">
-                     <span className="text-xl">ðŸ›¡ï¸</span>
+                     <span className="text-xl">🛡️</span>
                      <h3 className="font-bold text-emerald-400 text-sm">Verified & Audited Contract</h3>
                   </div>
                   <p className="text-[11px] text-gray-300 leading-relaxed">
@@ -4761,14 +4747,14 @@ export default function Home() {
                     <span className="block text-[11px] font-mono text-yellow-400 break-all">0x88074bA197BBB0a3AFF891E52d05764F98509956</span>
                   </div>
                   <a href="https://bscscan.com/token/0x88074bA197BBB0a3AFF891E52d05764F98509956#transactions" target="_blank" rel="noopener noreferrer" className="mt-2 w-full bg-emerald-600/20 border border-emerald-500/50 text-emerald-400 py-2 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-2 hover:bg-emerald-600/40 transition-colors">
-                    <span>ðŸ”</span> Verify on BscScan
+                    <span>🔍</span> Verify on BscScan
                   </a>
                 </div>
 
                 <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Initial Coin Offering (ICO)</h2>
                 <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-500/50 mb-8 relative overflow-hidden">
                   <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[9px] font-black px-2 py-1 rounded-bl-lg uppercase">Active Phase</div>
-                  <h3 className="font-bold text-white text-sm mb-2 flex items-center gap-2">ðŸŽŸï¸ Ticket-Based Presale</h3>
+                  <h3 className="font-bold text-white text-sm mb-2 flex items-center gap-2">🎟️ Ticket-Based Presale</h3>
                   <p className="text-[11px] text-gray-300 leading-relaxed mb-3">
                     Before our official listing and liquidity injection on PancakeSwap, $APXN is exclusively available through our early-access Ticket System inside this app.
                   </p>
@@ -4851,24 +4837,21 @@ export default function Home() {
 
       <div className="fixed bottom-0 left-0 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-2 flex justify-between items-center z-50 px-2">
         <button onClick={() => setActiveTab('mine')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'mine' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
-          <span className="text-xl leading-none">â›ï¸</span><span className="text-[10px] font-bold leading-none mt-1">Mine</span>
+          <span className="text-xl leading-none">⛏️</span><span className="text-[10px] font-bold leading-none mt-1">Mine</span>
         </button>
         <button onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'tasks' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
-          <span className="text-xl leading-none">ðŸ“‹</span><span className="text-[10px] font-bold leading-none mt-1">Earn</span>
+          <span className="text-xl leading-none">📋</span><span className="text-[10px] font-bold leading-none mt-1">Earn</span>
         </button>
         <button onClick={() => setActiveTab('friends')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'friends' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
-          <span className="text-xl leading-none">ðŸ‘¥</span><span className="text-[10px] font-bold leading-none mt-1">Friends</span>
+          <span className="text-xl leading-none">👥</span><span className="text-[10px] font-bold leading-none mt-1">Friends</span>
         </button>
         <button onClick={() => setActiveTab('boosts')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'boosts' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
-          <span className="text-xl leading-none">ðŸš€</span><span className="text-[10px] font-bold leading-none mt-1">Boosts</span>
+          <span className="text-xl leading-none">🚀</span><span className="text-[10px] font-bold leading-none mt-1">Boosts</span>
         </button>
         <button onClick={() => setActiveTab('discover')} className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 ${activeTab === 'discover' ? 'text-yellow-400 scale-110 transition-transform' : 'text-gray-500 hover:text-gray-300'}`}>
-          <span className="text-xl leading-none">ðŸŒ</span><span className="text-[10px] font-bold leading-none mt-1">Discover</span>
+          <span className="text-xl leading-none">🌍</span><span className="text-[10px] font-bold leading-none mt-1">Discover</span>
         </button>
       </div>
     </main>
   );
 }
-
-
-
