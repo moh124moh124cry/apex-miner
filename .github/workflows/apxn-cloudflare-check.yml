@@ -1,4 +1,4 @@
-name: APXN Cloudflare compatibility check
+name: APXN Cloudflare build probe
 
 on:
   workflow_dispatch:
@@ -12,29 +12,46 @@ on:
       - app/**
       - lib/**
       - next.config.mjs
+      - postcss.config.js
+      - tailwind.config.js
 
 permissions:
   contents: read
 
 jobs:
-  check-vinext-compatibility:
-    name: Check Next.js app for Cloudflare compatibility
+  probe-cloudflare-build:
+    name: Test Cloudflare build without publishing
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
-      - name: Check out Cloudflare migration branch
+      - name: Check out experimental branch
         uses: actions/checkout@v4
 
-      - name: Prepare Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
 
-      - name: Install original APXN dependencies without changing lockfile
+      - name: Install original APXN packages
         run: npm ci
 
-      - name: Check Cloudflare vinext compatibility (report only)
+      - name: Report Cloudflare compatibility
         run: npx --yes vinext@latest check
+
+      # The initializer changes files only inside this temporary GitHub
+      # Actions runner. Nothing is committed or deployed to either host.
+      - name: Prepare temporary Cloudflare build configuration
+        run: npx --yes vinext@latest init --platform=cloudflare --skip-check
+
+      # Fake, nonfunctional placeholders are used to test compilation.
+      # NEVER put the real BOT_TOKEN or Supabase service key in this file.
+      - name: Build temporary Cloudflare bundle (no deployment)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key-not-a-real-credential
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key-not-a-real-credential
+          BOT_TOKEN: 000000000:ci-placeholder-not-a-real-bot-token
+        run: npm run build:vinext
 
