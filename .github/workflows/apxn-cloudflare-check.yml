@@ -1,0 +1,40 @@
+name: APXN Cloudflare compatibility check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cloudflare-migration
+    paths:
+      - .github/workflows/apxn-cloudflare-check.yml
+      - package.json
+      - package-lock.json
+      - app/**
+      - lib/**
+      - next.config.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  check-vinext-compatibility:
+    name: Check Next.js app for Cloudflare compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out Cloudflare migration branch
+        uses: actions/checkout@v4
+
+      - name: Prepare Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install original APXN dependencies without changing lockfile
+        run: npm ci
+
+      - name: Check Cloudflare vinext compatibility (report only)
+        run: npx --yes vinext@latest check
+
