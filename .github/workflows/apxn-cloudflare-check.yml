@@ -40,13 +40,18 @@ jobs:
       - name: Report Cloudflare compatibility
         run: npx --yes vinext@latest check
 
-      # The initializer changes files only inside this temporary GitHub
-      # Actions runner. Nothing is committed or deployed to either host.
+      # vinext needs React 19, while Next 14 requires React 18.
+      # Remove Next ONLY inside this temporary GitHub Actions runner.
+      # No change is committed, and Vercel production is untouched.
+      - name: Isolate Cloudflare build from Next 14 dependency conflict
+        run: npm uninstall next eslint-config-next
+
+      # Changes here stay in the temporary runner; nothing is committed.
       - name: Prepare temporary Cloudflare build configuration
         run: npx --yes vinext@latest init --platform=cloudflare --skip-check
 
-      # Fake, nonfunctional placeholders are used to test compilation.
-      # NEVER put the real BOT_TOKEN or Supabase service key in this file.
+      # These placeholders are NOT real Supabase or Telegram credentials.
+      # Nothing is deployed and no user balances are touched.
       - name: Build temporary Cloudflare bundle (no deployment)
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
