@@ -40,18 +40,16 @@ jobs:
       - name: Report Cloudflare compatibility
         run: npx --yes vinext@latest check
 
-      # vinext needs React 19, while Next 14 requires React 18.
-      # Remove Next ONLY inside this temporary GitHub Actions runner.
-      # No change is committed, and Vercel production is untouched.
+      # Next.js 14 requires React 18, while this vinext build uses React 19.
+      # This operation takes place ONLY in the temporary Actions runner.
       - name: Isolate Cloudflare build from Next 14 dependency conflict
         run: npm uninstall next eslint-config-next
 
-      # Changes here stay in the temporary runner; nothing is committed.
+      # No changes are committed to GitHub by this job.
       - name: Prepare temporary Cloudflare build configuration
         run: npx --yes vinext@latest init --platform=cloudflare --skip-check
 
-      # These placeholders are NOT real Supabase or Telegram credentials.
-      # Nothing is deployed and no user balances are touched.
+      # Fake credentials are for compilation only. Never put real secrets here.
       - name: Build temporary Cloudflare bundle (no deployment)
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
@@ -59,4 +57,22 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key-not-a-real-credential
           BOT_TOKEN: 000000000:ci-placeholder-not-a-real-bot-token
         run: npm run build:vinext
+
+      # Save configuration ONLY, not .env files or the built bundle.
+      # The artifact lets us inspect vinext's generated files before any deploy.
+      - name: Export generated configuration for review (no deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apxn-cloudflare-generated-config
+          retention-days: 3
+          if-no-files-found: error
+          include-hidden-files: true
+          path: |
+            package.json
+            package-lock.json
+            vite.config.ts
+            wrangler.jsonc
+            postcss.config.cjs
+            tailwind.config.cjs
+            .gitignore
 
