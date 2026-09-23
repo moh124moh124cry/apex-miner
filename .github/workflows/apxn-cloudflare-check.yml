@@ -1,4 +1,4 @@
-name: APXN Cloudflare build probe
+name: APXN Cloudflare direct build check
 
 on:
   workflow_dispatch:
@@ -11,21 +11,27 @@ on:
       - package-lock.json
       - app/**
       - lib/**
+      - public/**
       - next.config.mjs
+      - vite.config.ts
+      - wrangler.jsonc
       - postcss.config.js
+      - postcss.config.cjs
       - tailwind.config.js
+      - tailwind.config.cjs
+      - .gitignore
 
 permissions:
   contents: read
 
 jobs:
-  probe-cloudflare-build:
-    name: Test Cloudflare build without publishing
+  direct-cloudflare-build:
+    name: Build committed APXN Cloudflare configuration
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Check out experimental branch
+      - name: Check out Cloudflare migration branch
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -34,45 +40,21 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Install original APXN packages
+      - name: Install exactly the committed dependencies
         run: npm ci
 
-      - name: Report Cloudflare compatibility
-        run: npx --yes vinext@latest check
+      - name: Check committed vinext compatibility
+        run: npm exec -- vinext check
 
-      # Next.js 14 requires React 18, while this vinext build uses React 19.
-      # This operation takes place ONLY in the temporary Actions runner.
-      - name: Isolate Cloudflare build from Next 14 dependency conflict
-        run: npm uninstall next eslint-config-next
-
-      # No changes are committed to GitHub by this job.
-      - name: Prepare temporary Cloudflare build configuration
-        run: npx --yes vinext@latest init --platform=cloudflare --skip-check
-
-      # Fake credentials are for compilation only. Never put real secrets here.
-      - name: Build temporary Cloudflare bundle (no deployment)
+      # Compile the actual files committed to cloudflare-migration.
+      # Do NOT run vinext init or uninstall packages in this test.
+      # The placeholder values are NOT real credentials.
+      # No requests are sent to Telegram or the real Supabase project.
+      - name: Build committed Cloudflare app without deploying
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key-not-a-real-credential
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key-not-a-real-credential
           BOT_TOKEN: 000000000:ci-placeholder-not-a-real-bot-token
         run: npm run build:vinext
-
-      # Save configuration ONLY, not .env files or the built bundle.
-      # The artifact lets us inspect vinext's generated files before any deploy.
-      - name: Export generated configuration for review (no deployment)
-        uses: actions/upload-artifact@v4
-        with:
-          name: apxn-cloudflare-generated-config
-          retention-days: 3
-          if-no-files-found: error
-          include-hidden-files: true
-          path: |
-            package.json
-            package-lock.json
-            vite.config.ts
-            wrangler.jsonc
-            postcss.config.cjs
-            tailwind.config.cjs
-            .gitignore
 
