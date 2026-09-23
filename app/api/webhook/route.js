@@ -1,6 +1,5 @@
 import { Telegraf } from 'telegraf';
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -771,14 +770,18 @@ function safeEqualSecret(received, expected) {
     return false;
   }
 
-  const receivedBuffer = Buffer.from(received);
-  const expectedBuffer = Buffer.from(expected);
-
-  if (receivedBuffer.length !== expectedBuffer.length) {
+  // Telegram secret_token is ASCII. Avoid Node Buffer/crypto reliance in
+  // the Cloudflare request path while comparing every character.
+  if (received.length !== expected.length) {
     return false;
   }
 
-  return crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= received.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+
+  return mismatch === 0;
 }
 
 // ======================================================
@@ -786,6 +789,8 @@ function safeEqualSecret(received, expected) {
 // ======================================================
 
 export async function POST(req) {
+  let stage = 'configuration';
+
   try {
     const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
 
@@ -803,6 +808,7 @@ export async function POST(req) {
     const receivedSecret =
       req.headers.get('x-telegram-bot-api-secret-token') || '';
 
+    stage = 'secret_validation';
     if (!safeEqualSecret(receivedSecret, webhookSecret)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -810,7 +816,10 @@ export async function POST(req) {
       );
     }
 
+    stage = 'parse_update';
     const body = await req.json();
+
+    stage = 'telegraf_handle_update';
     await bot.handleUpdate(body);
 
     return NextResponse.json(
@@ -818,7 +827,20 @@ export async function POST(req) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Webhook Error:', error);
+    // Never print bot tokens, webhook secrets, or incoming messages.
+    // Telegram API URLs can contain the bot token.
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const sanitizedMessage = rawMessage
+      .replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot[REDACTED]')
+      .replaceAll(process.env.BOT_TOKEN || '[missing_token]', '[REDACTED]')
+      .replaceAll(process.env.TELEGRAM_WEBHOOK_SECRET || '[missing_secret]', '[REDACTED]');
+
+    console.error(JSON.stringify({
+      tag: 'APXN_WEBHOOK_FAILURE',
+      stage,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      message: sanitizedMessage,
+    }));
 
     return NextResponse.json(
       { error: 'Failed to process request' },
