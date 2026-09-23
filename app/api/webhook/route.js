@@ -7,6 +7,59 @@ export const dynamic = 'force-dynamic';
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // ======================================================
+// Cloudflare-compatible Telegram API transport
+// ======================================================
+// Telegraf creates a fresh Telegram client for each incoming update, so
+// changing bot.telegram.callApi alone does not reach ctx.telegram.
+// Patch the shared Telegram prototype to use Workers-native fetch instead of
+// node-fetch's Node HTTP ClientRequest path (processHeader failure on Workers).
+// This bot currently calls Telegram's JSON methods only: getMe, sendMessage,
+// getChatMember, deleteMessage and restrictChatMember. File upload methods
+// require a separate multipart transport if introduced in the future.
+const telegramApiPrototype = Object.getPrototypeOf(bot.telegram);
+
+telegramApiPrototype.callApi = async function callApiWithNativeFetch(
+  method,
+  payload = {},
+  { signal } = {}
+) {
+  const apiRoot = (this.options?.apiRoot || 'https://api.telegram.org')
+    .replace(/\/+$/, '');
+  const apiMode = this.options?.apiMode || 'bot';
+  const testEnv = this.options?.testEnv ? '/test' : '';
+  const apiUrl = `${apiRoot}/${apiMode}${this.token}${testEnv}/${method}`;
+
+  // Never log apiUrl: Telegram embeds BOT_TOKEN in its API URL.
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload ?? {}),
+    signal,
+  });
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      `Telegram API ${method}: non-JSON response (HTTP ${response.status})`
+    );
+  }
+
+  if (!response.ok || data?.ok !== true) {
+    const error = new Error(
+      `Telegram API ${method}: ${data?.description || `HTTP ${response.status}`}`
+    );
+    error.name = 'TelegramApiError';
+    error.code = data?.error_code || response.status;
+    error.parameters = data?.parameters;
+    throw error;
+  }
+
+  return data.result;
+};
+
+// ======================================================
 // Moderation configuration
 // ======================================================
 
