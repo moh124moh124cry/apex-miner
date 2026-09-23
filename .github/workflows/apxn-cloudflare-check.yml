@@ -57,4 +57,4 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key-not-a-real-credential
           BOT_TOKEN: 000000000:ci-placeholder-not-a-real-bot-token
         run: npm run build:vinext
-
+# Trigger first Cloudflare build for apxn-miner-preview
