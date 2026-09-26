@@ -29,49 +29,40 @@ function response(
 }
 
 // =====================================================
-// Vercel country detection
+// Country detection for Cloudflare Workers and Vercel
 // =====================================================
 //
-// Vercel provides the visitor country through:
-// x-vercel-ip-country
+// Cloudflare supplies the visitor country through
+// request.cf.country and cf-ipcountry. The old Vercel
+// header alone is not available after the migration.
 //
-// We only accept a valid 2-letter country code.
-//
-// Country detection is informational only.
-// It never affects authentication, rewards,
-// mining or referral eligibility.
+// Country is informational only. Never use it to
+// determine authentication, rewards or eligibility.
 // =====================================================
 
 function getCountryCode(request) {
-  const rawCountry =
-    request.headers.get(
-      'x-vercel-ip-country'
-    );
+  const candidates = [
+    request.cf?.country,
+    request.headers.get('cf-ipcountry'),
+    request.headers.get('x-vercel-ip-country'),
+  ];
 
-  if (!rawCountry) {
-    return null;
-  }
-
-  const country =
-    String(rawCountry)
+  for (const rawCountry of candidates) {
+    const country = String(rawCountry || '')
       .trim()
       .toUpperCase();
 
-  if (
-    !/^[A-Z]{2}$/.test(
-      country
-    )
-  ) {
-    return null;
+    if (
+      /^[A-Z]{2}$/.test(country) &&
+      country !== 'XX' &&
+      country !== 'EU' &&
+      country !== 'T1'
+    ) {
+      return country;
+    }
   }
 
-  // Vercel/proxies may use XX when the country
-  // cannot be determined.
-  if (country === 'XX') {
-    return null;
-  }
-
-  return country;
+  return null;
 }
 
 // =====================================================
@@ -274,7 +265,7 @@ export async function POST(
       );
 
     // =================================================
-    // Store the Vercel country only for a newly-created
+    // Store the detected country only for a newly-created
     // account.
     //
     // Do NOT overwrite an existing user's country when
