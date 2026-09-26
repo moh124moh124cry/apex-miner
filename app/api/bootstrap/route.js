@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from 'cloudflare:workers';
 import { supabaseAdmin } from '../../../lib/supabase-admin';
 import { validateTelegramInitData } from '../../../lib/telegram-auth';
 
@@ -39,6 +40,44 @@ function getCountryCode(request) {
   }
 
   return null;
+}
+
+// Daily social links come from Cloudflare WORKER RUNTIME variables,
+// never from NEXT_PUBLIC_* values inlined into the browser build.
+// These are public URLs; invalid or unconfigured links stay hidden.
+function safeDailyTaskLink(value, allowedHosts) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return '';
+  }
+
+  try {
+    const link = new URL(value.trim());
+    if (
+      link.protocol !== 'https:' ||
+      !allowedHosts.includes(link.hostname.toLowerCase()) ||
+      link.username ||
+      link.password
+    ) {
+      return '';
+    }
+
+    return link.href;
+  } catch {
+    return '';
+  }
+}
+
+function getDailyTaskLinks() {
+  return {
+    telegram: safeDailyTaskLink(
+      env.NEXT_PUBLIC_DAILY_TELEGRAM_LINK,
+      ['t.me', 'telegram.me', 'www.t.me']
+    ),
+    twitter: safeDailyTaskLink(
+      env.NEXT_PUBLIC_DAILY_TWITTER_LINK,
+      ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com']
+    ),
+  };
 }
 
 async function getMiningEventState() {
@@ -231,6 +270,8 @@ export async function POST(request) {
 
         miningEvent,
 
+        dailyTaskLinks: getDailyTaskLinks(),
+
         telegram: {
           id:
             telegram.user.id,
@@ -309,6 +350,8 @@ export async function POST(request) {
        * by the Supabase RPC.
        */
       miningEvent,
+
+      dailyTaskLinks: getDailyTaskLinks(),
 
       user: {
         telegramId:
@@ -504,4 +547,5 @@ export async function POST(request) {
     );
   }
 }
+
 
