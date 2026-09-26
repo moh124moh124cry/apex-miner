@@ -11,6 +11,36 @@ const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
 const USER_CACHE_VERSION = 4;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Limit a stuck ad to this single mining restart attempt. The normal
+// 12-hour Claim and other rewarded ad tasks are deliberately unchanged.
+const MINING_RESTART_AD_TIMEOUT_MS = 90 * 1000;
+
+async function showMiningRestartAdSafely() {
+  let timeoutId;
+
+  try {
+    // Only a successfully finished rewarded interstitial may restart mining.
+    // Monetag can otherwise silently resolve when there is no ad feed.
+    await Promise.race([
+      Promise.resolve().then(() =>
+        window.show_11803132({
+          type: 'end',
+          catchIfNoFeed: true,
+        })
+      ),
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error('MINING_RESTART_AD_TIMEOUT'));
+        }, MINING_RESTART_AD_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
 function getRemainingAdRewardCooldown(lastAdRewardAt) {
   if (!lastAdRewardAt) return 0;
 
@@ -2760,7 +2790,7 @@ export default function Home() {
           true
         );
 
-        await window.show_11803132();
+        await showMiningRestartAdSafely();
         restartAdCompleted = true;
       }
 
@@ -2992,6 +3022,16 @@ export default function Home() {
           : 'Claim failed:',
         error
       );
+
+      if (
+        requiresRestartAd &&
+        error?.message === 'MINING_RESTART_AD_TIMEOUT'
+      ) {
+        // Refresh only after a real hang to dismiss the third-party ad
+        // overlay. Do not call the mining API or credit any points.
+        window.location.reload();
+        return;
+      }
 
       if (
         requiresRestartAd &&
@@ -4869,6 +4909,8 @@ export default function Home() {
     </main>
   );
 }
+
+
 
 
 
