@@ -14,6 +14,33 @@ function response(body, status = 200) {
   });
 }
 
+// Detect country from the same Cloudflare / Vercel sources
+// as registration. Country is informational only.
+function getCountryCode(request) {
+  const candidates = [
+    request.cf?.country,
+    request.headers.get('cf-ipcountry'),
+    request.headers.get('x-vercel-ip-country'),
+  ];
+
+  for (const rawCountry of candidates) {
+    const country = String(rawCountry || '')
+      .trim()
+      .toUpperCase();
+
+    if (
+      /^[A-Z]{2}$/.test(country) &&
+      country !== 'XX' &&
+      country !== 'EU' &&
+      country !== 'T1'
+    ) {
+      return country;
+    }
+  }
+
+  return null;
+}
+
 async function getMiningEventState() {
   const { data, error } = await supabaseAdmin.rpc(
     'apex_mining_event_state'
@@ -230,6 +257,42 @@ export async function POST(request) {
       });
     }
 
+    // For existing users whose country was not saved before
+    // the Cloudflare migration fix, fill the NULL country once
+    // on their next authenticated app open. Never overwrite a
+    // populated country, including if two app opens race.
+    // No additional database write for the vast majority of
+    // users who already have their country recorded.
+    let resolvedCountry = user.country || null;
+
+    if (!resolvedCountry) {
+      const detectedCountry = getCountryCode(request);
+
+      if (detectedCountry) {
+        const {
+          data: savedCountry,
+          error: countryError,
+        } = await supabaseAdmin
+          .from('users')
+          .update({ country: detectedCountry })
+          .eq('telegram_id', telegramId)
+          .is('country', null)
+          .select('country')
+          .maybeSingle();
+
+        if (countryError) {
+          // Country is informational. Do not block mining
+          // or the rest of the dashboard on a failed save.
+          console.error(
+            'Existing user country save error:',
+            countryError.code
+          );
+        } else if (savedCountry?.country) {
+          resolvedCountry = savedCountry.country;
+        }
+      }
+    }
+
     return response({
       success: true,
       exists: true,
@@ -349,7 +412,7 @@ export async function POST(request) {
           null,
 
         country:
-          user.country ||
+          resolvedCountry ||
           'Unknown',
 
         lastAdRewardAt:
