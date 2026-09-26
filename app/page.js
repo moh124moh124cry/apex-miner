@@ -634,8 +634,10 @@ export default function Home() {
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false);
   const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false);
 
-  const dailyTwitterLink = process.env.NEXT_PUBLIC_DAILY_TWITTER_LINK || '';
-  const dailyTelegramLink = process.env.NEXT_PUBLIC_DAILY_TELEGRAM_LINK || '';
+  // Links arrive with the existing /api/bootstrap response from
+  // Cloudflare WORKER RUNTIME variables; never inline them at build time.
+  const [dailyTwitterLink, setDailyTwitterLink] = useState('');
+  const [dailyTelegramLink, setDailyTelegramLink] = useState('');
 
   const [dailyTwitterDone, setDailyTwitterDone] = useState(false);
   const [dailyTelegramDone, setDailyTelegramDone] = useState(false);
@@ -1446,6 +1448,21 @@ export default function Home() {
         }
 
         if (cancelled) return;
+
+        // Keep both cached and newly registered users on the same
+        // current links without an extra network request. If bootstrap
+        // failed, keep the tasks hidden rather than show stale links.
+        const runtimeTaskLinks = bootstrapData?.dailyTaskLinks;
+        setDailyTwitterLink(
+          typeof runtimeTaskLinks?.twitter === 'string'
+            ? runtimeTaskLinks.twitter
+            : ''
+        );
+        setDailyTelegramLink(
+          typeof runtimeTaskLinks?.telegram === 'string'
+            ? runtimeTaskLinks.telegram
+            : ''
+        );
 
         const verifiedUserId = String(authData.user.id);
         const verifiedFirstName =
@@ -4909,6 +4926,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
