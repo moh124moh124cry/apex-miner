@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { TonConnectButton } from '@tonconnect/ui-react';
 
-const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
 const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const DAILY_TASK_COOLDOWN_SECONDS = 24 * 60 * 60;
@@ -11,9 +10,10 @@ const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
 const USER_CACHE_VERSION = 4;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Limit a stuck ad to this single mining restart attempt. The normal
-// 12-hour Claim and other rewarded ad tasks are deliberately unchanged.
+// Limit a stuck ad to a single mining restart attempt. Other rewarded
+// ad tasks are deliberately unchanged.
 const MINING_RESTART_AD_TIMEOUT_MS = 90 * 1000;
+const PH_RESTART_AD_WAIT_MS = 3 * 1000;
 
 async function showMiningRestartAdSafely() {
   let timeoutId;
@@ -39,6 +39,69 @@ async function showMiningRestartAdSafely() {
       window.clearTimeout(timeoutId);
     }
   }
+}
+
+// Wait at most three seconds for a Philippine account to find an ad.
+// Preloading never shows an ad. Do not limit the visible ad to 3 seconds.
+async function showPhilippinesMiningRestartAd() {
+  const startedAt = Date.now();
+
+  while (
+    typeof window.show_11803132 !== 'function' &&
+    Date.now() - startedAt < PH_RESTART_AD_WAIT_MS
+  ) {
+    await new Promise(resolve => window.setTimeout(resolve, 100));
+  }
+
+  if (typeof window.show_11803132 !== 'function') {
+    return false;
+  }
+
+  let timeoutId;
+
+  try {
+    const remainingMs = Math.max(
+      1,
+      PH_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
+    );
+
+    // Monetag's preload operation cannot open a visible ad.
+    await Promise.race([
+      Promise.resolve().then(() =>
+        window.show_11803132({
+          type: 'preload',
+          timeout: Math.max(1, Math.ceil(remainingMs / 1000)),
+          catchIfNoFeed: true,
+        })
+      ),
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error('PH_RESTART_AD_UNAVAILABLE'));
+        }, remainingMs);
+      }),
+    ]);
+  } catch {
+    const remainingMs = Math.max(
+      0,
+      PH_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
+    );
+
+    if (remainingMs > 0) {
+      await new Promise(resolve =>
+        window.setTimeout(resolve, remainingMs)
+      );
+    }
+
+    return false;
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  // A started ad must complete normally; do not bypass a skipped ad.
+  await showMiningRestartAdSafely();
+  return true;
 }
 
 function getRemainingAdRewardCooldown(lastAdRewardAt) {
@@ -620,13 +683,13 @@ export default function Home() {
   const [balance, setBalance] = useState(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [miningDelta, setMiningDelta] = useState(0);
-  const [claimCooldown, setClaimCooldown] = useState(0);
   const [miningSessionRemaining, setMiningSessionRemaining] =
     useState(MINING_SESSION_DURATION_SECONDS);
   const [miningSessionEndsAt, setMiningSessionEndsAt] =
     useState(null);
   const [isWatchingRestartAd, setIsWatchingRestartAd] = useState(false);
   const [activeTab, setActiveTab] = useState('mine');
+  const [miningCountry, setMiningCountry] = useState('');
 
   const [discoverView, setDiscoverView] = useState('about');
 
@@ -1136,6 +1199,7 @@ export default function Home() {
       setUserName(verifiedUsername);
 
       setBalance(Number(userData.balance || 0));
+      setMiningCountry(String(userData.country || '').toUpperCase());
       setDbMiningRate(currentDbRate);
       setTotalMiningRate(cachedTotalRate);
 
@@ -1264,7 +1328,7 @@ export default function Home() {
                   lastTime
                 ) / 1000
               )
-            : CLAIM_COOLDOWN_SECONDS;
+            : MINING_SESSION_DURATION_SECONDS;
 
         if (diffSeconds > 0) {
           setMiningDelta(
@@ -1295,22 +1359,8 @@ export default function Home() {
           setMiningDelta(0);
         }
 
-        if (
-          diffSeconds <
-          CLAIM_COOLDOWN_SECONDS
-        ) {
-          setClaimCooldown(
-            Math.floor(
-              CLAIM_COOLDOWN_SECONDS -
-              diffSeconds
-            )
-          );
-        } else {
-          setClaimCooldown(0);
-        }
       } else {
         setMiningDelta(0);
-        setClaimCooldown(0);
       }
 
       setIsDataLoaded(true);
@@ -1355,6 +1405,7 @@ export default function Home() {
             ),
           lastCheckinDate: userData.lastCheckinDate || null,
           lastClaim: userData.lastClaim || null,
+          country: String(userData.country || '').toUpperCase(),
           miningSessionEndsAt:
             userData.miningSessionEndsAt ||
             null,
@@ -1512,6 +1563,8 @@ export default function Home() {
                 data?.exists &&
                 data?.user
               ) {
+                setMiningCountry(String(data.user.country || '').toUpperCase());
+
                 if (Number.isFinite(freshBalance)) {
                   setBalance(freshBalance);
                 }
@@ -1666,21 +1719,9 @@ export default function Home() {
                         ) / 1000
                       );
 
-                    setClaimCooldown(
-                      elapsedSeconds <
-                        CLAIM_COOLDOWN_SECONDS
-                        ? Math.floor(
-                            CLAIM_COOLDOWN_SECONDS -
-                            elapsedSeconds
-                          )
-                        : 0
-                    );
-                  } else {
-                    setClaimCooldown(0);
                   }
                 } else {
                   setMiningDelta(0);
-                  setClaimCooldown(0);
                 }
 
                 setDbMiningRate(
@@ -1750,6 +1791,7 @@ export default function Home() {
                     freshTotalMiningRate,
                   lastClaim:
                     freshLastClaim,
+                  country: String(data.user.country || '').toUpperCase(),
                   miningSessionEndsAt:
                     freshMiningSessionEndsAt,
                   lastAdRewardAt:
@@ -1893,6 +1935,7 @@ export default function Home() {
             totalMiningRate: Number(
               registeredUser.miningRate || 0.00025
             ),
+            country: registeredUser.country || '',
             friendsCount: 0,
             activeFriendsCount: 0,
             channelJoined: false,
@@ -2442,7 +2485,6 @@ export default function Home() {
         );
       }
 
-      setClaimCooldown(prev => (prev > 0 ? prev - 1 : 0));
       setAdRewardCooldown(prev => (prev > 0 ? prev - 1 : 0));
 
       setDailyTwitterCooldown(prev => {
@@ -2751,61 +2793,48 @@ export default function Home() {
   };
 
   const handleClaim = async () => {
-    const requiresRestartAd =
-      isMiningPaused;
-
+    // Claim pending points only when a 24-hour session is restarted.
     if (
       !isDataLoaded ||
+      !isMiningPaused ||
       isSaving ||
       isWatchingRestartAd ||
       isWatchingAd ||
-      isWatchingBoostAd ||
-      (
-        !requiresRestartAd &&
-        claimCooldown > 0
-      ) ||
-      (
-        !requiresRestartAd &&
-        miningDelta < 0.0001
-      )
+      isWatchingBoostAd
     ) {
       return;
     }
 
+    const requiresRestartAd = true;
     const initData =
       typeof window !== 'undefined'
         ? window.Telegram?.WebApp?.initData
         : null;
 
     if (!initData) {
-      alert(
-        '❌ Please open Apex Miner inside Telegram.'
-      );
+      alert('❌ Please open Apex Miner inside Telegram.');
       return;
     }
 
-    // A normal 12-hour Claim is permanently ad-free.
-    // Only an expired 24-hour mining session requires
-    // the Monetag restart ad.
-    let restartAdCompleted =
-      !requiresRestartAd;
-
-    if (
-      requiresRestartAd &&
-      typeof window.show_11803132 !==
-        'function'
-    ) {
-      alert(
-        '⚠️ Restart ad is not ready yet. Please try again in a moment.'
-      );
-      return;
-    }
+    let restartAdCompleted = false;
+    let restartMode = 'ad_completed';
 
     try {
-      if (requiresRestartAd) {
-        setIsWatchingRestartAd(
-          true
-        );
+      setIsWatchingRestartAd(true);
+
+      if (miningCountry === 'PH') {
+        restartAdCompleted = await showPhilippinesMiningRestartAd();
+
+        if (!restartAdCompleted) {
+          restartMode = 'ph_ad_unavailable';
+        }
+      } else {
+        if (typeof window.show_11803132 !== 'function') {
+          alert(
+            '⚠️ Restart ad is not ready yet. Please try again in a moment.'
+          );
+          return;
+        }
 
         await showMiningRestartAdSafely();
         restartAdCompleted = true;
@@ -2813,26 +2842,14 @@ export default function Home() {
 
       setIsSaving(true);
 
-      const endpoint =
-        requiresRestartAd
-          ? '/api/mining/restart'
-          : '/api/mining/claim';
-
-      const response =
-        await fetch(
-          endpoint,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              initData,
-            }),
-            cache: 'no-store',
-          }
-        );
+      const response = await fetch('/api/mining/restart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initData, restartMode }),
+        cache: 'no-store',
+      });
 
       const data =
         await response.json();
@@ -2844,18 +2861,6 @@ export default function Home() {
         ) {
           setMiningSessionRemaining(
             0
-          );
-        }
-
-        if (
-          !requiresRestartAd &&
-          response.status === 429 &&
-          data.retryAfter
-        ) {
-          setClaimCooldown(
-            Number(
-              data.retryAfter
-            )
           );
         }
 
@@ -2917,13 +2922,6 @@ export default function Home() {
       );
 
       setMiningDelta(0);
-
-      setClaimCooldown(
-        Number(
-          data.cooldown ||
-          CLAIM_COOLDOWN_SECONDS
-        )
-      );
 
       const returnedMiningSessionEndsAt =
         data.miningSessionEndsAt ||
@@ -4095,7 +4093,7 @@ export default function Home() {
                  : 'text-emerald-400'
              }`}>
                {isMiningPaused
-                 ? '⏸ Mining Paused • Watch ad to restart mining'
+                 ? '⏸ Mining Paused • Restart to claim points'
                  : `● Mining Active • ${formatTime(miningSessionRemaining)} left`}
              </div>
           </div>
@@ -4133,17 +4131,14 @@ export default function Home() {
               isWatchingRestartAd ||
               isWatchingAd ||
               isWatchingBoostAd ||
-              (
-                !isMiningPaused &&
-                claimCooldown > 0
-              )
+              !isMiningPaused
             }
             className={`w-full py-4 mt-auto mb-4 rounded-2xl text-lg font-bold shadow-[0_4px_20px_rgba(245,158,11,0.4)] transition-all ${
               !isDataLoaded
                 ? 'bg-slate-800 text-gray-500 cursor-wait'
                 : (isSaving || isWatchingRestartAd || isWatchingAd || isWatchingBoostAd)
                 ? 'bg-slate-700 text-gray-300 animate-pulse'
-                : (!isMiningPaused && claimCooldown > 0)
+                : !isMiningPaused
                 ? 'bg-slate-800 border border-slate-700 text-gray-400 cursor-not-allowed shadow-none'
                 : 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white active:scale-95'
             }`}
@@ -4162,9 +4157,7 @@ export default function Home() {
                     ? 'WAIT...'
                     : isMiningPaused
                       ? 'WATCH AD • RESTART MINING'
-                      : claimCooldown > 0
-                        ? `WAIT ${formatTime(claimCooldown)}`
-                        : 'CLAIM POINTS'
+                      : `MINING ACTIVE • ${formatTime(miningSessionRemaining)}`
             }
           </button>
         </div>
@@ -4926,6 +4919,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
