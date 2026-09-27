@@ -5,7 +5,7 @@ import { validateTelegramInitData } from '../../../../lib/telegram-auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CLAIM_COOLDOWN_SECONDS = 12 * 60 * 60;
+const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 
 function response(
   body,
@@ -71,8 +71,72 @@ export async function POST(
         telegram.user.id
       );
 
-    // The frontend calls this route only after the
-    // Monetag restart ad promise completes successfully.
+    // Preserve compatibility with existing Mini App releases.
+    // The ad-free mode is deliberately limited to Philippine
+    // accounts whose saved country is PH in the database.
+    const restartMode =
+      body?.restartMode ||
+      'ad_completed';
+
+    if (
+      restartMode !== 'ad_completed' &&
+      restartMode !== 'ph_ad_unavailable'
+    ) {
+      return response(
+        {
+          error: 'Invalid mining restart mode',
+        },
+        400
+      );
+    }
+
+    if (restartMode === 'ph_ad_unavailable') {
+      const {
+        data: countryUser,
+        error: countryError,
+      } =
+        await supabaseAdmin
+          .from('users')
+          .select('country')
+          .eq('telegram_id', telegramId)
+          .maybeSingle();
+
+      if (countryError) {
+        console.error(
+          'Philippines mining restart country lookup error:',
+          countryError.code
+        );
+
+        return response(
+          { error: 'Database error' },
+          500
+        );
+      }
+
+      if (!countryUser) {
+        return response(
+          { error: 'User not found' },
+          404
+        );
+      }
+
+      if (
+        String(countryUser.country || '')
+          .trim()
+          .toUpperCase() !== 'PH'
+      ) {
+        return response(
+          {
+            error: 'Ad-free mining restart is limited to Philippine accounts',
+          },
+          403
+        );
+      }
+    }
+
+    // In the normal mode, the frontend calls after an
+    // ad completes. In PH no-feed mode, the server checks
+    // the persisted country before reaching Supabase.
     //
     // Supabase remains the final authority:
     // - the old 24-hour session must already be expired
@@ -246,11 +310,9 @@ export async function POST(
         result.last_claim ||
         null,
 
-      cooldown:
-        Number(
-          result.cooldown ||
-          CLAIM_COOLDOWN_SECONDS
-        ),
+      // Points are claimed at the 24-hour restart only.
+      // Do not expose the retired 12-hour claim cooldown.
+      cooldown: MINING_SESSION_DURATION_SECONDS,
 
       miningSessionEndsAt:
         sessionUser
@@ -295,4 +357,5 @@ export async function POST(
     );
   }
 }
+
 
