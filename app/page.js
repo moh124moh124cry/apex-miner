@@ -7,7 +7,11 @@ const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const DAILY_TASK_COOLDOWN_SECONDS = 24 * 60 * 60;
 const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
-const USER_CACHE_VERSION = 4;
+const STARS_BOOST_DURATION_SECONDS = 48 * 60 * 60;
+const STARS_BOOST_REWARD_POINTS = 10000;
+const STARS_BOOST_RATE_PER_SECOND =
+  STARS_BOOST_REWARD_POINTS / STARS_BOOST_DURATION_SECONDS;
+const USER_CACHE_VERSION = 5;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Limit a stuck ad to a single mining restart attempt. Other rewarded
@@ -247,6 +251,32 @@ function getRemainingMiningBoost(boostUntil) {
   return Math.ceil(remainingSeconds);
 }
 
+function getRemainingStarsBoost(
+  boostUntil,
+  nowTime = Date.now()
+) {
+  if (!boostUntil) return 0;
+
+  const untilTime =
+    new Date(boostUntil).getTime();
+
+  const safeNowTime =
+    Number.isFinite(Number(nowTime))
+      ? Number(nowTime)
+      : Date.now();
+
+  if (!Number.isFinite(untilTime)) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.ceil(
+      (untilTime - safeNowTime) / 1000
+    )
+  );
+}
+
 function getEventAwareMiningBoostRemaining({
   boostStartedAt,
   boostUntil,
@@ -392,6 +422,8 @@ function calculateEstimatedMiningDelta({
   eventStartsAt = null,
   eventEndsAt = null,
   eventBaseRate = 0.02,
+  starsBoostStartedAt = null,
+  starsBoostUntil = null,
   nowTime = Date.now(),
 }) {
   if (!lastClaim) return 0;
@@ -423,10 +455,6 @@ function calculateEstimatedMiningDelta({
       : lastClaimTime +
           MINING_SESSION_DURATION_SECONDS * 1000
   );
-
-  if (accrualEndTime <= lastClaimTime) {
-    return 0;
-  }
 
   const elapsedSeconds = Math.max(
     0,
@@ -590,10 +618,37 @@ function calculateEstimatedMiningDelta({
       boostedSeconds
   );
 
+  const starsBoostStartTime =
+    starsBoostStartedAt
+      ? new Date(
+          starsBoostStartedAt
+        ).getTime()
+      : NaN;
+
+  const starsBoostUntilTime =
+    starsBoostUntil
+      ? new Date(
+          starsBoostUntil
+        ).getTime()
+      : NaN;
+
+  const starsBoostSeconds =
+    getOverlapSeconds(
+      lastClaimTime,
+      safeNowTime,
+      starsBoostStartTime,
+      starsBoostUntilTime
+    );
+
+  const starsBoostDelta =
+    starsBoostSeconds *
+    STARS_BOOST_RATE_PER_SECOND;
+
   return (
     normalSeconds * normalRate +
     boostedSeconds * boostedRate +
-    eventSeconds * eventRate
+    eventSeconds * eventRate +
+    starsBoostDelta
   );
 }
 
@@ -730,6 +785,12 @@ export default function Home() {
   const [isWatchingBoostAd, setIsWatchingBoostAd] = useState(false);
   const [isMiningBoostStatusLoaded, setIsMiningBoostStatusLoaded] = useState(false);
 
+  const [starsBoostStartedAt, setStarsBoostStartedAt] = useState(null);
+  const [starsBoostUntil, setStarsBoostUntil] = useState(null);
+  const [starsBoostRemaining, setStarsBoostRemaining] = useState(0);
+  const [showStarsBoostModal, setShowStarsBoostModal] = useState(false);
+  const [isBuyingStarsBoost, setIsBuyingStarsBoost] = useState(false);
+
   const [miningEventStatusLoaded, setMiningEventStatusLoaded] = useState(false);
   const [miningEventPhase, setMiningEventPhase] = useState('unknown');
   const [miningEventRemaining, setMiningEventRemaining] = useState(0);
@@ -789,6 +850,9 @@ export default function Home() {
   const hasFrozenMiningBoost =
     isMiningEventActive &&
     miningBoostRemaining > 0;
+
+  const isStarsBoostActive =
+    starsBoostRemaining > 0;
 
   const isMiningPaused =
     isDataLoaded &&
@@ -1150,6 +1214,12 @@ export default function Home() {
       const currentMiningBoostUntil =
         userData.miningBoostUntil || null;
 
+      const currentStarsBoostStartedAt =
+        userData.starsBoostStartedAt || null;
+
+      const currentStarsBoostUntil =
+        userData.starsBoostUntil || null;
+
       const eventActive =
         Boolean(eventData?.active);
 
@@ -1180,6 +1250,12 @@ export default function Home() {
           : getRemainingMiningBoost(
               currentMiningBoostUntil
             );
+
+      const currentStarsBoostRemaining =
+        getRemainingStarsBoost(
+          currentStarsBoostUntil,
+          safeNowTime
+        );
 
       const visibleBaseRate =
         eventActive
@@ -1280,6 +1356,18 @@ export default function Home() {
         !fromCache
       );
 
+      setStarsBoostStartedAt(
+        currentStarsBoostStartedAt
+      );
+
+      setStarsBoostUntil(
+        currentStarsBoostUntil
+      );
+
+      setStarsBoostRemaining(
+        currentStarsBoostRemaining
+      );
+
       applyCheckinState(
         userData,
         safeNowTime
@@ -1352,6 +1440,10 @@ export default function Home() {
                 eventData?.endsAt || null,
               eventBaseRate:
                 currentEventBaseRate,
+              starsBoostStartedAt:
+                currentStarsBoostStartedAt,
+              starsBoostUntil:
+                currentStarsBoostUntil,
               nowTime: safeNowTime,
             })
           );
@@ -1417,6 +1509,12 @@ export default function Home() {
             currentMiningBoostUntil,
           miningBoostCount:
             Number(userData.miningBoostCount || 0),
+          starsBoostStartedAt:
+            currentStarsBoostStartedAt,
+          starsBoostUntil:
+            currentStarsBoostUntil,
+          starsBoostCount:
+            Number(userData.starsBoostCount || 0),
         });
       }
     };
@@ -1588,6 +1686,18 @@ export default function Home() {
                 const freshMiningBoostUntil =
                   data.user.miningBoostUntil || null;
 
+                const freshStarsBoostStartedAt =
+                  data.user.starsBoostStartedAt || null;
+
+                const freshStarsBoostUntil =
+                  data.user.starsBoostUntil || null;
+
+                const freshStarsBoostRemaining =
+                  getRemainingStarsBoost(
+                    freshStarsBoostUntil,
+                    authoritativeNowTime
+                  );
+
                 const freshMiningBoostRemaining =
                   eventData
                     ? getEventAwareMiningBoostRemaining({
@@ -1695,6 +1805,10 @@ export default function Home() {
                         Number(
                           eventData?.baseRate || 0.02
                         ),
+                      starsBoostStartedAt:
+                        freshStarsBoostStartedAt,
+                      starsBoostUntil:
+                        freshStarsBoostUntil,
                       nowTime:
                         authoritativeNowTime,
                     })
@@ -1746,6 +1860,18 @@ export default function Home() {
 
                 setIsMiningBoostStatusLoaded(
                   true
+                );
+
+                setStarsBoostStartedAt(
+                  freshStarsBoostStartedAt
+                );
+
+                setStarsBoostUntil(
+                  freshStarsBoostUntil
+                );
+
+                setStarsBoostRemaining(
+                  freshStarsBoostRemaining
                 );
 
                 applyCheckinState(
@@ -1806,6 +1932,14 @@ export default function Home() {
                     freshMiningBoostUntil,
                   miningBoostCount:
                     freshMiningBoostCount,
+                  starsBoostStartedAt:
+                    freshStarsBoostStartedAt,
+                  starsBoostUntil:
+                    freshStarsBoostUntil,
+                  starsBoostCount:
+                    Number(
+                      data.user.starsBoostCount || 0
+                    ),
                   checkinStreak:
                     Number(
                       data.user.checkinStreak || 0
@@ -1962,6 +2096,9 @@ export default function Home() {
             miningBoostStartedAt: null,
             miningBoostUntil: null,
             miningBoostCount: 0,
+            starsBoostStartedAt: null,
+            starsBoostUntil: null,
+            starsBoostCount: 0,
           },
         });
 
@@ -2036,12 +2173,24 @@ export default function Home() {
         const freshBoostUntil =
           data.user.miningBoostUntil || null;
 
+        const freshStarsBoostStartedAt =
+          data.user.starsBoostStartedAt || null;
+
+        const freshStarsBoostUntil =
+          data.user.starsBoostUntil || null;
+
         const authoritativeNowTime =
           eventData.serverNow
             ? new Date(
                 eventData.serverNow
               ).getTime()
             : Date.now();
+
+        const freshStarsBoostRemaining =
+          getRemainingStarsBoost(
+            freshStarsBoostUntil,
+            authoritativeNowTime
+          );
 
         const freshBoostRemaining =
           getEventAwareMiningBoostRemaining({
@@ -2110,6 +2259,31 @@ export default function Home() {
           freshBoostRemaining
         );
         setIsMiningBoostStatusLoaded(true);
+
+        setStarsBoostStartedAt(
+          freshStarsBoostStartedAt
+        );
+
+        setStarsBoostUntil(
+          freshStarsBoostUntil
+        );
+
+        setStarsBoostRemaining(
+          freshStarsBoostRemaining
+        );
+
+        if (userId) {
+          patchUserCache(userId, {
+            starsBoostStartedAt:
+              freshStarsBoostStartedAt,
+            starsBoostUntil:
+              freshStarsBoostUntil,
+            starsBoostCount:
+              Number(
+                data.user.starsBoostCount || 0
+              ),
+          });
+        }
       }
     } catch {
       // The previously confirmed server state remains in place.
@@ -2343,6 +2517,14 @@ export default function Home() {
                 miningEventEndsAt,
               eventBaseRate:
                 miningEventBaseRate,
+              starsBoostStartedAt:
+                starsBoostStartedAt ||
+                cachedUser?.starsBoostStartedAt ||
+                null,
+              starsBoostUntil:
+                starsBoostUntil ||
+                cachedUser?.starsBoostUntil ||
+                null,
               nowTime:
                 getAuthoritativeNowTime(),
             })
@@ -2374,6 +2556,8 @@ export default function Home() {
     miningEventStartsAt,
     miningEventEndsAt,
     miningEventBaseRate,
+    starsBoostStartedAt,
+    starsBoostUntil,
   ]);
 
   // Friends are fetched only when the Friends tab is actually opened.
@@ -2393,7 +2577,7 @@ export default function Home() {
       const initData =
         typeof window !== 'undefined'
           ? window.Telegram?.WebApp?.initData
-          : null;
+        : null;
 
       if (!initData) {
         setFriendsLoaded(true);
@@ -2523,6 +2707,35 @@ export default function Home() {
   ]);
 
   useEffect(() => {
+    if (
+      !isDataLoaded ||
+      !starsBoostUntil
+    ) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setStarsBoostRemaining(prev => {
+        if (prev <= 0) {
+          return 0;
+        }
+
+        setMiningDelta(delta =>
+          delta +
+          STARS_BOOST_RATE_PER_SECOND
+        );
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    isDataLoaded,
+    starsBoostUntil,
+  ]);
+
+  useEffect(() => {
     setTotalMiningRate(
       getEffectiveMiningRate(
         effectiveBaseMiningRate,
@@ -2535,6 +2748,133 @@ export default function Home() {
     activeFriendsCount,
     isMiningBoostActive,
   ]);
+
+  const handleBuyStarsBoost = async () => {
+    if (
+      !isDataLoaded ||
+      isBuyingStarsBoost ||
+      isStarsBoostActive
+    ) {
+      return;
+    }
+
+    const telegram =
+      typeof window !== 'undefined'
+        ? window.Telegram?.WebApp
+        : null;
+
+    const initData =
+      telegram?.initData || null;
+
+    if (
+      !telegram ||
+      !initData ||
+      typeof telegram.openInvoice !== 'function'
+    ) {
+      alert(
+        '❌ Please open Apex Network inside Telegram to use Telegram Stars.'
+      );
+      return;
+    }
+
+    setIsBuyingStarsBoost(true);
+
+    try {
+      const response = await fetch(
+        '/api/stars/boost/invoice',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            initData,
+          }),
+          cache: 'no-store',
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (
+          response.status === 409 &&
+          data?.active
+        ) {
+          setIsBuyingStarsBoost(false);
+          await refreshMiningEventState();
+          setShowStarsBoostModal(true);
+          return;
+        }
+
+        throw new Error(
+          data?.error ||
+            'Could not create Telegram Stars invoice'
+        );
+      }
+
+      const invoiceLink =
+        data?.invoiceLink;
+
+      if (!invoiceLink) {
+        throw new Error(
+          'Telegram invoice link is missing'
+        );
+      }
+
+      telegram.openInvoice(
+        invoiceLink,
+        async status => {
+          setIsBuyingStarsBoost(false);
+
+          if (status === 'paid') {
+            setShowStarsBoostModal(false);
+
+            // Telegram confirms payment to the bot webhook.
+            // Refresh server-authoritative boost state after
+            // giving the webhook a short moment to activate it.
+            for (
+              let attempt = 0;
+              attempt < 4;
+              attempt += 1
+            ) {
+              await new Promise(resolve =>
+                window.setTimeout(
+                  resolve,
+                  900
+                )
+              );
+
+              await refreshMiningEventState();
+            }
+
+            alert(
+              '✅ 48H Mining Boost activated!\n\n⛏️ 10,000 APXN POINTS\n⭐ 10 Telegram Stars\n⏱ 48 hours'
+            );
+            return;
+          }
+
+          if (status === 'failed') {
+            alert(
+              '❌ Telegram Stars payment failed. Please try again.'
+            );
+          }
+        }
+      );
+    } catch (error) {
+      console.error(
+        'Stars boost purchase failed:',
+        error
+      );
+
+      setIsBuyingStarsBoost(false);
+
+      alert(
+        '❌ Could not start the Telegram Stars payment. Please try again.'
+      );
+    }
+  };
 
   const handleDailyCheckIn = async () => {
     if (!isDataLoaded || !canCheckIn || isSaving) return;
@@ -3862,6 +4202,107 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-slate-950 font-sans overflow-hidden relative pb-28">
+      {showStarsBoostModal && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-sm overflow-hidden rounded-[28px] border border-fuchsia-400/50 bg-slate-950 p-6 text-center shadow-[0_0_55px_rgba(217,70,239,0.28)]">
+            <div className="pointer-events-none absolute -left-16 -top-16 h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl"></div>
+            <div className="pointer-events-none absolute -bottom-16 -right-16 h-40 w-40 rounded-full bg-yellow-400/20 blur-3xl"></div>
+
+            <button
+              onClick={() => {
+                if (!isBuyingStarsBoost) {
+                  setShowStarsBoostModal(false);
+                }
+              }}
+              className="absolute right-4 top-4 z-10 text-xl text-gray-400 transition-colors hover:text-white"
+              aria-label="Close 48H boost"
+            >
+              ✖
+            </button>
+
+            <div className="relative z-10">
+              <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border border-fuchsia-300/70 bg-gradient-to-br from-violet-700 via-fuchsia-600 to-amber-400 shadow-[0_0_32px_rgba(217,70,239,0.55)]">
+                <div className="relative text-5xl drop-shadow-[0_0_10px_rgba(255,255,255,0.75)]">
+                  ⛏️
+                  <span className="absolute -right-4 -top-3 text-3xl drop-shadow-[0_0_10px_rgba(250,204,21,0.9)]">
+                    ⚡
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-fuchsia-300">
+                APXN 48H Mining Boost
+              </div>
+
+              <h3 className="mt-2 text-3xl font-black text-white">
+                10,000 APXN POINTS
+              </h3>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 p-3">
+                  <span className="block text-[9px] font-bold uppercase tracking-widest text-yellow-200">
+                    Price
+                  </span>
+                  <span className="mt-1 block text-xl font-black text-yellow-300">
+                    10 ⭐
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-fuchsia-400/30 bg-fuchsia-400/10 p-3">
+                  <span className="block text-[9px] font-bold uppercase tracking-widest text-fuchsia-200">
+                    Duration
+                  </span>
+                  <span className="mt-1 block text-xl font-black text-fuchsia-300">
+                    48H
+                  </span>
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs leading-relaxed text-gray-300">
+                Mine <strong className="text-white">10,000 APXN POINTS</strong> progressively during 48 hours.
+                Free mining and ad mining remain active.
+              </p>
+
+              {isStarsBoostActive ? (
+                <div className="mt-5 rounded-2xl border border-emerald-400/40 bg-emerald-400/10 p-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                    Boost Active
+                  </div>
+                  <div className="mt-1 text-3xl font-black tabular-nums text-white">
+                    {formatTime(starsBoostRemaining)}
+                  </div>
+                  <div className="mt-1 text-[10px] font-bold text-emerald-300">
+                    10,000 APXN POINTS • 48H
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleBuyStarsBoost}
+                  disabled={
+                    !isDataLoaded ||
+                    isBuyingStarsBoost
+                  }
+                  className={`mt-5 w-full rounded-2xl py-4 text-base font-black transition-all ${
+                    !isDataLoaded ||
+                    isBuyingStarsBoost
+                      ? 'cursor-wait bg-slate-700 text-gray-300'
+                      : 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-amber-500 text-white shadow-[0_0_28px_rgba(217,70,239,0.35)] active:scale-95'
+                  }`}
+                >
+                  {isBuyingStarsBoost
+                    ? 'OPENING TELEGRAM PAYMENT...'
+                    : 'BUY FOR 10 ⭐'}
+                </button>
+              )}
+
+              <div className="mt-3 text-[9px] text-gray-500">
+                Payment is processed officially by Telegram Stars.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
@@ -4021,8 +4462,20 @@ export default function Home() {
                      ⏸ x3 saved time is frozen
                    </span>
                  )}
+                 {isStarsBoostActive && (
+                   <span className="text-[9px] text-fuchsia-300 font-bold">
+                     ⛏️⚡ +{STARS_BOOST_RATE_PER_SECOND.toFixed(5)} APXN POINTS/sec paid boost
+                   </span>
+                 )}
                </div>
-               <span className="font-semibold text-yellow-400 text-xs">+{totalMiningRate.toFixed(5)} APXN/sec</span>
+               <span className="font-semibold text-yellow-400 text-xs">
+                 +{(
+                   totalMiningRate +
+                   (isStarsBoostActive
+                     ? STARS_BOOST_RATE_PER_SECOND
+                     : 0)
+                 ).toFixed(5)} APXN/sec
+               </span>
             </div>
 
             <div className={`rounded-2xl p-4 flex items-center justify-between border ${
@@ -4088,14 +4541,23 @@ export default function Home() {
                +{miningDelta.toFixed(4)}
              </h3>
              <div className={`mt-2 text-[11px] font-bold ${
-               isMiningPaused
+               isMiningPaused && !isStarsBoostActive
                  ? 'text-red-400'
                  : 'text-emerald-400'
              }`}>
                {isMiningPaused
-                 ? '⏸ Mining Paused • Restart to claim points'
+                 ? (
+                     isStarsBoostActive
+                       ? `⚡ 48H Stars Boost Active • ${formatTime(starsBoostRemaining)} left`
+                       : '⏸ Mining Paused • Restart to claim points'
+                   )
                  : `● Mining Active • ${formatTime(miningSessionRemaining)} left`}
              </div>
+             {isStarsBoostActive && !isMiningPaused && (
+               <div className="mt-1 text-[10px] font-black text-fuchsia-300">
+                 ⛏️⚡ 10,000 APXN POINTS Boost • {formatTime(starsBoostRemaining)}
+               </div>
+             )}
           </div>
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
@@ -4107,6 +4569,37 @@ export default function Home() {
                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent rounded-full pointer-events-none"></div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowStarsBoostModal(true)
+              }
+              className="absolute left-2 bottom-0 translate-y-4 z-20 flex flex-col items-center justify-center gap-1 group"
+              aria-label="APXN 48H Mining Boost"
+            >
+              <div className={`relative flex h-12 w-12 items-center justify-center rounded-full border transition-all duration-300 group-hover:scale-110 ${
+                isStarsBoostActive
+                  ? 'border-emerald-300/80 bg-gradient-to-br from-emerald-600 via-fuchsia-600 to-amber-400 shadow-[0_0_24px_rgba(52,211,153,0.55)]'
+                  : 'border-fuchsia-300/70 bg-gradient-to-br from-violet-700 via-fuchsia-600 to-amber-400 shadow-[0_0_24px_rgba(217,70,239,0.55)]'
+              }`}>
+                <span className="text-2xl drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">
+                  ⛏️
+                </span>
+                <span className="absolute -right-1 -top-2 text-lg drop-shadow-[0_0_8px_rgba(250,204,21,0.95)]">
+                  ⚡
+                </span>
+              </div>
+              <span className={`text-[10px] font-black transition-colors ${
+                isStarsBoostActive
+                  ? 'text-emerald-300'
+                  : 'text-fuchsia-300 group-hover:text-white'
+              }`}>
+                {isStarsBoostActive
+                  ? 'ACTIVE'
+                  : '10 ⭐'}
+              </span>
+            </button>
 
             <a
               href="https://x.com/ApexNetworkApp"
