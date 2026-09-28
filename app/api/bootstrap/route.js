@@ -240,7 +240,10 @@ export async function POST(request) {
         ad_reward_count,
         mining_boost_started_at,
         mining_boost_until,
-        mining_boost_count
+        mining_boost_count,
+        stars_boost_started_at,
+        stars_boost_until,
+        stars_boost_count
       `)
       .eq(
         'telegram_id',
@@ -483,6 +486,22 @@ export async function POST(request) {
             user.mining_boost_count ||
               0
           ),
+
+        starsBoostStartedAt:
+          user
+            .stars_boost_started_at ||
+          null,
+
+        starsBoostUntil:
+          user
+            .stars_boost_until ||
+          null,
+
+        starsBoostCount:
+          Number(
+            user.stars_boost_count ||
+              0
+          ),
       },
 
       telegram: {
@@ -547,5 +566,4 @@ export async function POST(request) {
     );
   }
 }
-
 
