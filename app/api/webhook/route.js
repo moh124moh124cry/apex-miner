@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { NextResponse } from 'next/server';
+import { registerStarsBoostPaymentHandlers } from '../../../lib/stars-boost-webhook';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,16 @@ telegramApiPrototype.callApi = async function callApiWithNativeFetch(
 
   return data.result;
 };
+
+// ======================================================
+// Telegram Stars payment handlers
+// ======================================================
+// Register before the generic message moderation handler.
+// This adds:
+// - pre_checkout_query verification
+// - successful_payment handling
+// - 10 Stars -> 48H boost -> 10,000 APXN POINTS
+registerStarsBoostPaymentHandlers(bot);
 
 // ======================================================
 // Moderation configuration
