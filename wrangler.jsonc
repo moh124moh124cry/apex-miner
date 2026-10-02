@@ -5,7 +5,12 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "main": "vinext/server/fetch-handler",
+  "main": "worker/index.js",
+  "triggers": {
+    "crons": [
+      "0 */2 * * *"
+    ]
+  },
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",
