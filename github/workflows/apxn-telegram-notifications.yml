@@ -1,0 +1,30 @@
+name: APXN Telegram notifications
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch-notifications:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Run protected APXN notification dispatcher
+        env:
+          APP_URL: ${{ secrets.APXN_APP_URL }}
+          RUN_SECRET: ${{ secrets.APXN_NOTIFICATION_RUN_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$RUN_SECRET" ]; then
+            echo "Notification secrets are not configured yet. Skipping safely."
+            exit 0
+          fi
+
+          APP_URL="${APP_URL%/}"
+
+          curl             --fail             --silent             --show-error             --max-time 60             -X POST             "$APP_URL/api/notifications/run"             -H "Authorization: Bearer $RUN_SECRET"             -H "Content-Type: application/json"
+
