@@ -833,6 +833,37 @@ export default function Home() {
 
   const [manualWalletInput, setManualWalletInput] = useState(false);
   const [tempAddress, setTempAddress] = useState('');
+  // Open the correct Mini App section from Telegram notification buttons.
+  // Navigation only: this does not change balances, mining, or payment state.
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const tab = params.get('tab');
+
+    if (
+      [
+        'mine',
+        'tasks',
+        'friends',
+        'boosts',
+        'discover',
+      ].includes(tab)
+    ) {
+      setActiveTab(tab);
+    }
+
+    if (params.get('offer') === 'stars48') {
+      setActiveTab('mine');
+      setShowStarsBoostModal(true);
+    }
+  }, []);
+
 
   const isMiningEventActive =
     miningEventStatusLoaded &&
