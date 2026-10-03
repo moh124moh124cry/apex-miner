@@ -4958,10 +4958,10 @@ export default function Home() {
               <span className="text-xl">⚠️</span>
               <div>
                 <h3 className="text-red-400 font-bold text-sm tracking-wide uppercase mb-1">
-                  Mandatory KYC Requirement
+                  KYC — APXN Membership & Loyalty
                 </h3>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  To protect our ecosystem from fraud and prove you are a human entitled to an account, based on our Whitepaper, you must unlock at least <strong className="text-white bg-red-500/20 px-1 rounded">2 stages in EVERY level</strong>. This is a strict condition to pass <strong className="text-red-400">KYC</strong> verification and qualify for the <span className="text-white font-bold">$APXN Airdrop</span> withdrawal.
+                  To participate in the APXN Membership & Loyalty program, users must unlock at least <strong className="text-white bg-red-500/20 px-1 rounded">2 stages in EVERY level</strong>. Completing the required stages will unlock your <strong className="text-yellow-400">Verified APXN Points</strong> and allow you to progress toward higher APXN levels. <span className="text-red-300 font-bold">🔒 This feature is currently Coming Soon.</span>
                 </p>
               </div>
             </div>
@@ -4989,13 +4989,13 @@ export default function Home() {
               ]
             },
             {
-              title: "Level 3: TON Elite",
-              currency: "💎 TON",
+              title: "Level 3: APXN Elite",
+              currency: "⭐️ Stars",
               items: [
-                { name: "Apex Quantum", price: "0.1", boost: "+0.03/sec" },
-                { name: "Titan Node", price: "0.2", boost: "+0.04/sec" },
-                { name: "Cyber Miner", price: "0.3", boost: "+0.05/sec" },
-                { name: "Genesis Rig", price: "0.4", boost: "+0.06/sec" }
+                { name: "Apex Quantum", price: "50", boost: "+0.03/sec" },
+                { name: "Titan Node", price: "60", boost: "+0.04/sec" },
+                { name: "Cyber Miner", price: "70", boost: "+0.05/sec" },
+                { name: "Genesis Rig", price: "80", boost: "+0.06/sec" }
               ]
             }
           ].map((level, index) => (
@@ -5443,6 +5443,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
