@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { TonConnectButton } from '@tonconnect/ui-react';
+import { supabase } from '../lib/supabase';
 
 const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
@@ -746,6 +746,12 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('mine');
   const [miningCountry, setMiningCountry] = useState('');
 
+  // APXN Profile is isolated from mining, tasks, ads and payment state.
+  const [showProfile, setShowProfile] = useState(false);
+  const [hasEarlyAccessBadge, setHasEarlyAccessBadge] = useState(false);
+  const [profileBadgeChecked, setProfileBadgeChecked] = useState(false);
+  const [profileBadgeLoading, setProfileBadgeLoading] = useState(false);
+
   const [discoverView, setDiscoverView] = useState('about');
 
   const [taskCompleted, setTaskCompleted] = useState(false);
@@ -1034,6 +1040,44 @@ export default function Home() {
     setShowWalletModal(false);
     setManualWalletInput(false);
     setTempAddress('');
+  };
+
+  const handleOpenProfile = async () => {
+    setShowProfile(true);
+
+    // One lightweight badge check per app session only.
+    // It does not touch mining, rewards, Stars, tasks or wallet state.
+    if (
+      profileBadgeChecked ||
+      profileBadgeLoading ||
+      !userId ||
+      userId === 'test_user'
+    ) {
+      return;
+    }
+
+    setProfileBadgeLoading(true);
+
+    try {
+      const { data, error } = await supabase.rpc(
+        'apex_has_early_access_badge',
+        {
+          p_telegram_id: String(userId),
+        }
+      );
+
+      if (error) {
+        console.error('APXN profile badge check failed');
+        return;
+      }
+
+      setHasEarlyAccessBadge(Boolean(data));
+      setProfileBadgeChecked(true);
+    } catch {
+      // Keep the profile usable if the badge check is temporarily unavailable.
+    } finally {
+      setProfileBadgeLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -4334,6 +4378,116 @@ export default function Home() {
         </div>
       )}
 
+      {showProfile && (
+        <div className="fixed inset-0 z-[240] overflow-y-auto bg-slate-950 text-white">
+          <div className="mx-auto min-h-screen w-full max-w-md px-5 py-6">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowProfile(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-xl text-white active:scale-95"
+                aria-label="Close APXN Profile"
+              >
+                ←
+              </button>
+
+              <h2 className="text-lg font-black tracking-[0.18em] text-white">
+                APXN PROFILE
+              </h2>
+
+              <div className="h-10 w-10" />
+            </div>
+
+            <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-950 text-2xl">
+                    👤
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="truncate text-xl font-black text-white">
+                      {firstName && firstName !== 'Unknown'
+                        ? firstName
+                        : 'APXN Worker'}
+                    </div>
+                  </div>
+                </div>
+
+                {hasEarlyAccessBadge && (
+                  <div className="shrink-0 text-center">
+                    <img
+                      src="https://apxn.network/apxn-early-access-badge.png"
+                      alt="APXN Early Access Badge"
+                      title="Early Access"
+                      className="h-16 w-16 rounded-2xl object-cover shadow-[0_0_22px_rgba(34,197,94,0.22)]"
+                    />
+                    <div className="mt-1 text-[9px] font-black uppercase tracking-wider text-emerald-300">
+                      Early Access
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-7 border-t border-slate-800 pt-6">
+                <div className="text-xs font-black tracking-[0.16em] text-gray-400">
+                  MINING BALANCE
+                </div>
+
+                <div className="mt-2 break-words text-2xl font-black text-white">
+                  {Number(balance || 0).toLocaleString('en-US', {
+                    minimumFractionDigits: 4,
+                    maximumFractionDigits: 4,
+                  })}{' '}
+                  <span className="text-base text-yellow-400">
+                    APXN POINTS
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-7 border-t border-slate-800 pt-6">
+                <div className="text-xs font-black tracking-[0.16em] text-gray-400">
+                  VERIFIED APXN POINTS
+                </div>
+
+                <div className="mt-3 text-xl font-black text-gray-300">
+                  🔒 Locked
+                </div>
+
+                <div className="mt-2 text-sm font-bold text-violet-300">
+                  Membership & Loyalty
+                </div>
+              </div>
+
+              <div className="mt-7 border-t border-slate-800 pt-6">
+                <div className="text-xs font-black tracking-[0.16em] text-gray-400">
+                  APXN LEVEL
+                </div>
+
+                <div className="mt-3 text-xl font-black text-gray-300">
+                  🔒 Locked
+                </div>
+
+                <div className="mt-5 grid grid-cols-7 gap-1.5">
+                  {['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'].map(level => (
+                    <div
+                      key={level}
+                      className="rounded-lg border border-slate-700 bg-slate-950 py-2 text-center text-xs font-black text-gray-500"
+                    >
+                      {level}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 text-sm leading-relaxed text-gray-500">
+                  Levels based on verified APXN Points
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
            <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
@@ -4446,9 +4600,14 @@ export default function Home() {
         </div>
 
         <div className="w-full flex justify-end items-center gap-2 mt-2">
-          <div className="origin-right scale-[0.85]">
-            <TonConnectButton />
-          </div>
+          <button
+            type="button"
+            onClick={handleOpenProfile}
+            className="flex items-center gap-2 rounded-xl border border-violet-400/40 bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-black text-white shadow-[0_0_18px_rgba(124,58,237,0.28)] active:scale-95 transition-all"
+          >
+            <span className="text-base">👤</span>
+            <span>APXN Profile</span>
+          </button>
         </div>
       </div>
 
@@ -5461,6 +5620,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
