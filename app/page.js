@@ -4966,7 +4966,25 @@ export default function Home() {
               </div>
             </div>
           </div>
+<div className="mb-6 w-full rounded-2xl border border-yellow-400/40 bg-yellow-400/10 p-4 shadow-lg">
+  <div className="flex items-center gap-3">
+    <span className="text-2xl">🎁</span>
 
+    <div>
+      <h3 className="text-yellow-300 font-bold text-sm tracking-wide uppercase">
+        Completion Bonus
+      </h3>
+
+      <p className="text-white font-bold text-lg mt-1">
+        +20,000 APXN Points
+      </p>
+
+      <p className="text-gray-300 text-[11px] mt-1 leading-relaxed">
+        Complete all levels to receive this bonus.
+      </p>
+    </div>
+  </div>
+</div>
           {[
             {
               title: "Level 1: APXN Miners",
