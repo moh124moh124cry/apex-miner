@@ -14,45 +14,19 @@ const STARS_BOOST_RATE_PER_SECOND =
 const USER_CACHE_VERSION = 5;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Limit a stuck ad to a single mining restart attempt. Other rewarded
-// ad tasks are deliberately unchanged.
+// Mining restart ad availability is checked for every country for at most 5 seconds.
+// If no ad can be loaded in that window, mining continues through ad_unavailable mode.
+// The 5-second timeout applies only to loading the ad, not to the time the user watches it.
 const MINING_RESTART_AD_TIMEOUT_MS = 90 * 1000;
-const PH_RESTART_AD_WAIT_MS = 3 * 1000;
+const MINING_RESTART_AD_WAIT_MS = 5 * 1000;
 
-async function showMiningRestartAdSafely() {
-  let timeoutId;
-
-  try {
-    // Only a successfully finished rewarded interstitial may restart mining.
-    // Monetag can otherwise silently resolve when there is no ad feed.
-    await Promise.race([
-      Promise.resolve().then(() =>
-        window.show_11803132({
-          type: 'end',
-          catchIfNoFeed: true,
-        })
-      ),
-      new Promise((_, reject) => {
-        timeoutId = window.setTimeout(() => {
-          reject(new Error('MINING_RESTART_AD_TIMEOUT'));
-        }, MINING_RESTART_AD_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timeoutId !== undefined) {
-      window.clearTimeout(timeoutId);
-    }
-  }
-}
-
-// Wait at most three seconds for a Philippine account to find an ad.
-// Preloading never shows an ad. Do not limit the visible ad to 3 seconds.
-async function showPhilippinesMiningRestartAd() {
+async function showMiningRestartAdWithFiveSecondFallback() {
   const startedAt = Date.now();
 
+  // Give the Monetag SDK part of the same 5-second window to become ready.
   while (
     typeof window.show_11803132 !== 'function' &&
-    Date.now() - startedAt < PH_RESTART_AD_WAIT_MS
+    Date.now() - startedAt < MINING_RESTART_AD_WAIT_MS
   ) {
     await new Promise(resolve => window.setTimeout(resolve, 100));
   }
@@ -61,51 +35,62 @@ async function showPhilippinesMiningRestartAd() {
     return false;
   }
 
-  let timeoutId;
+  const remainingMs = Math.max(
+    0,
+    MINING_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
+  );
+
+  if (remainingMs <= 0) {
+    return false;
+  }
+
+  const telegramId =
+    window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'apxn';
+
+  const ymid =
+    `${telegramId}-mining-restart-${Date.now()}`;
+
+  let safetyTimeoutId;
 
   try {
-    const remainingMs = Math.max(
-      1,
-      PH_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
-    );
-
-    // Monetag's preload operation cannot open a visible ad.
+    // Monetag documents that timeout on type:'end' limits only the ad-loading
+    // step. Once the ad is visible, the user can watch it normally.
     await Promise.race([
       Promise.resolve().then(() =>
         window.show_11803132({
-          type: 'preload',
-          timeout: Math.max(1, Math.ceil(remainingMs / 1000)),
+          type: 'end',
+          timeout: remainingMs / 1000,
           catchIfNoFeed: true,
+          ymid,
+          requestVar: 'mining_restart',
         })
       ),
       new Promise((_, reject) => {
-        timeoutId = window.setTimeout(() => {
-          reject(new Error('PH_RESTART_AD_UNAVAILABLE'));
-        }, remainingMs);
+        // This is only a final protection against a completely stuck SDK/ad
+        // lifecycle after the ad call has started.
+        safetyTimeoutId = window.setTimeout(() => {
+          reject(new Error('MINING_RESTART_AD_TIMEOUT'));
+        }, MINING_RESTART_AD_TIMEOUT_MS);
       }),
     ]);
-  } catch {
-    const remainingMs = Math.max(
-      0,
-      PH_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
-    );
 
-    if (remainingMs > 0) {
-      await new Promise(resolve =>
-        window.setTimeout(resolve, remainingMs)
-      );
+    return true;
+  } catch (error) {
+    if (error?.message === 'MINING_RESTART_AD_TIMEOUT') {
+      throw error;
     }
+
+    console.warn(
+      'Mining restart ad unavailable:',
+      error?.message || error
+    );
 
     return false;
   } finally {
-    if (timeoutId !== undefined) {
-      window.clearTimeout(timeoutId);
+    if (safetyTimeoutId !== undefined) {
+      window.clearTimeout(safetyTimeoutId);
     }
   }
-
-  // A started ad must complete normally; do not bypass a skipped ad.
-  await showMiningRestartAdSafely();
-  return true;
 }
 
 function getRemainingAdRewardCooldown(lastAdRewardAt) {
@@ -3237,22 +3222,18 @@ export default function Home() {
     try {
       setIsWatchingRestartAd(true);
 
-      if (miningCountry === 'PH') {
-        restartAdCompleted = await showPhilippinesMiningRestartAd();
+      restartAdCompleted =
+        await showMiningRestartAdWithFiveSecondFallback();
 
-        if (!restartAdCompleted) {
-          restartMode = 'ph_ad_unavailable';
-        }
-      } else {
-        if (typeof window.show_11803132 !== 'function') {
-          alert(
-            '⚠️ Restart ad is not ready yet. Please try again in a moment.'
-          );
-          return;
-        }
+      if (!restartAdCompleted) {
+        // Universal fallback for every country when no ad is available
+        // within five seconds.
+        restartMode = 'ad_unavailable';
 
-        await showMiningRestartAdSafely();
-        restartAdCompleted = true;
+        console.warn(
+          'Mining restart continuing without ad after 5-second availability check:',
+          miningCountry || 'unknown'
+        );
       }
 
       setIsSaving(true);
@@ -3465,7 +3446,8 @@ export default function Home() {
 
       if (
         requiresRestartAd &&
-        !restartAdCompleted
+        !restartAdCompleted &&
+        restartMode !== 'ad_unavailable'
       ) {
         alert(
           '❌ Restart ad was not completed. Mining was not restarted.'
@@ -5620,6 +5602,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
