@@ -15,12 +15,12 @@ const USER_CACHE_VERSION = 5;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Mining restart ad availability is checked for every country for at most 5 seconds.
-// If no ad can be loaded in that window, mining continues through ad_unavailable mode.
-// The 5-second timeout applies only to loading the ad, not to the time the user watches it.
+// If no ad can be prepared in that window, mining continues through ad_unavailable mode.
+// Once an ad is available and starts, skipping/rejecting it must NOT trigger the fallback.
 const MINING_RESTART_AD_TIMEOUT_MS = 90 * 1000;
 const MINING_RESTART_AD_WAIT_MS = 5 * 1000;
 
-async function showMiningRestartAdWithFiveSecondFallback() {
+async function prepareMiningRestartAd() {
   const startedAt = Date.now();
 
   // Give the Monetag SDK part of the same 5-second window to become ready.
@@ -35,51 +35,37 @@ async function showMiningRestartAdWithFiveSecondFallback() {
     return false;
   }
 
-  const remainingMs = Math.max(
-    0,
-    MINING_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
-  );
-
-  if (remainingMs <= 0) {
-    return false;
-  }
-
-  const telegramId =
-    window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'apxn';
-
-  const ymid =
-    `${telegramId}-mining-restart-${Date.now()}`;
-
-  let safetyTimeoutId;
+  let timeoutId;
 
   try {
-    // Monetag documents that timeout on type:'end' limits only the ad-loading
-    // step. Once the ad is visible, the user can watch it normally.
+    const remainingMs = Math.max(
+      1,
+      MINING_RESTART_AD_WAIT_MS - (Date.now() - startedAt)
+    );
+
+    // Preload checks ad availability without opening the visible ad.
     await Promise.race([
       Promise.resolve().then(() =>
         window.show_11803132({
-          type: 'end',
-          timeout: remainingMs / 1000,
+          type: 'preload',
+          timeout: Math.max(
+            1,
+            Math.ceil(remainingMs / 1000)
+          ),
           catchIfNoFeed: true,
-          ymid,
-          requestVar: 'mining_restart',
         })
       ),
       new Promise((_, reject) => {
-        // This is only a final protection against a completely stuck SDK/ad
-        // lifecycle after the ad call has started.
-        safetyTimeoutId = window.setTimeout(() => {
-          reject(new Error('MINING_RESTART_AD_TIMEOUT'));
-        }, MINING_RESTART_AD_TIMEOUT_MS);
+        timeoutId = window.setTimeout(() => {
+          reject(
+            new Error('MINING_RESTART_AD_UNAVAILABLE')
+          );
+        }, remainingMs);
       }),
     ]);
 
     return true;
   } catch (error) {
-    if (error?.message === 'MINING_RESTART_AD_TIMEOUT') {
-      throw error;
-    }
-
     console.warn(
       'Mining restart ad unavailable:',
       error?.message || error
@@ -87,8 +73,37 @@ async function showMiningRestartAdWithFiveSecondFallback() {
 
     return false;
   } finally {
-    if (safetyTimeoutId !== undefined) {
-      window.clearTimeout(safetyTimeoutId);
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function showMiningRestartAdSafely() {
+  let timeoutId;
+
+  try {
+    // At this point preload has succeeded.
+    // A visible ad must complete normally. A skip/rejection is propagated
+    // to handleClaim and must never become ad_unavailable.
+    await Promise.race([
+      Promise.resolve().then(() =>
+        window.show_11803132({
+          type: 'end',
+          catchIfNoFeed: true,
+        })
+      ),
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(
+            new Error('MINING_RESTART_AD_TIMEOUT')
+          );
+        }, MINING_RESTART_AD_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
     }
   }
 }
@@ -3222,12 +3237,15 @@ export default function Home() {
     try {
       setIsWatchingRestartAd(true);
 
-      restartAdCompleted =
-        await showMiningRestartAdWithFiveSecondFallback();
+      const restartAdAvailable =
+        await prepareMiningRestartAd();
 
-      if (!restartAdCompleted) {
-        // Universal fallback for every country when no ad is available
-        // within five seconds.
+      if (restartAdAvailable) {
+        await showMiningRestartAdSafely();
+        restartAdCompleted = true;
+      } else {
+        // Universal fallback for every country only when no ad
+        // can be prepared within five seconds.
         restartMode = 'ad_unavailable';
 
         console.warn(
