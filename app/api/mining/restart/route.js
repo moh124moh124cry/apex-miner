@@ -72,14 +72,18 @@ export async function POST(
       );
 
     // Preserve compatibility with existing Mini App releases.
-    // The ad-free mode is deliberately limited to Philippine
-    // accounts whose saved country is PH in the database.
+    //
+    // Supported modes:
+    // - ad_completed: the restart ad was shown and completed.
+    // - ad_unavailable: no ad was available within the 5-second window.
+    // - ph_ad_unavailable: legacy mode kept for older Philippine clients.
     const restartMode =
       body?.restartMode ||
       'ad_completed';
 
     if (
       restartMode !== 'ad_completed' &&
+      restartMode !== 'ad_unavailable' &&
       restartMode !== 'ph_ad_unavailable'
     ) {
       return response(
@@ -90,6 +94,10 @@ export async function POST(
       );
     }
 
+    // Legacy compatibility only:
+    // Old app versions may still send ph_ad_unavailable.
+    // Keep the old Philippine country verification for those cached clients.
+    // The new ad_unavailable mode is global and does not enter this block.
     if (restartMode === 'ph_ad_unavailable') {
       const {
         data: countryUser,
@@ -127,16 +135,16 @@ export async function POST(
       ) {
         return response(
           {
-            error: 'Ad-free mining restart is limited to Philippine accounts',
+            error: 'Legacy Philippine ad-free mining restart is limited to Philippine accounts',
           },
           403
         );
       }
     }
 
-    // In the normal mode, the frontend calls after an
-    // ad completes. In PH no-feed mode, the server checks
-    // the persisted country before reaching Supabase.
+    // The frontend calls this API after either:
+    // - the restart ad completes, or
+    // - no ad is available within the 5-second availability window.
     //
     // Supabase remains the final authority:
     // - the old 24-hour session must already be expired
@@ -144,6 +152,9 @@ export async function POST(
     // - a new fixed 24-hour session is created
     // - last_claim is moved to the restart time
     // - event / referral / x3 accounting remains intact
+    //
+    // The fallback mode only skips the ad requirement when no ad
+    // was available. It does not bypass the 24-hour session rules.
     const {
       data,
       error,
@@ -357,5 +368,4 @@ export async function POST(
     );
   }
 }
-
 
