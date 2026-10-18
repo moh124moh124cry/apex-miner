@@ -4823,7 +4823,7 @@ export default function Home() {
                   : (isWatchingAd || isWatchingBoostAd)
                     ? 'WAIT...'
                     : isMiningPaused
-                      ? 'WATCH AD • RESTART MINING'
+                      ? 'RESTART MINING'
                       : `MINING ACTIVE • ${formatTime(miningSessionRemaining)}`
             }
           </button>
