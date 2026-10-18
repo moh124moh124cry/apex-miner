@@ -3240,10 +3240,25 @@ export default function Home() {
       const restartAdAvailable =
         await prepareMiningRestartAd();
 
-      if (restartAdAvailable) {
-        await showMiningRestartAdSafely();
-        restartAdCompleted = true;
-      } else {
+if (restartAdAvailable) {
+  try {
+    await showMiningRestartAdSafely();
+    restartAdCompleted = true;
+  } catch (adError) {
+    const reason = adError?.message;
+
+    if (
+      reason === 'Empty feed' ||
+      reason === 'Ad is not ready'
+    ) {
+      restartMode = 'ad_unavailable';
+    } else {
+      throw adError;
+    }
+  }
+}
+  
+       else {
         // Universal fallback for every country only when no ad
         // can be prepared within five seconds.
         restartMode = 'ad_unavailable';
