@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { supabase } from '../lib/supabase';
 import StakingWidget from './components/StakingWidget';
@@ -8,10 +8,9 @@ const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
 const DAILY_TASK_COOLDOWN_SECONDS = 24 * 60 * 60;
 const MINING_BOOST_DURATION_SECONDS = 24 * 60 * 60;
-const STARS_BOOST_DURATION_SECONDS = 48 * 60 * 60;
-const STARS_BOOST_REWARD_POINTS = 10000;
-const STARS_BOOST_RATE_PER_SECOND =
-  STARS_BOOST_REWARD_POINTS / STARS_BOOST_DURATION_SECONDS;
+// Only new Telegram Stars invoices earn 5,000 POINTS.
+// Previously purchased 10,000 POINTS boosts use their own recorded events.
+const STARS_BOOST_REWARD_POINTS = 5000;
 const USER_CACHE_VERSION = 5;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -413,6 +412,56 @@ function getOverlapSeconds(
   ) / 1000;
 }
 
+// Paid boost events come from the authenticated /api/stars/boost/status endpoint.
+// Each interval has its own reward_total, so existing 10k purchases retain
+// their full rate even after the new 5k offer goes live.
+function getActiveStarsBoostRate(events, nowTime = Date.now()) {
+  if (!Array.isArray(events)) return 0;
+  return events.reduce((rate, event) => {
+    const start = Date.parse(event.startedAt);
+    const end = Date.parse(event.endsAt);
+    const amount = Number(event.rewardTotal);
+    if (!Number.isFinite(start) || !Number.isFinite(end) ||
+        !Number.isFinite(amount) || end <= start || amount <= 0 ||
+        nowTime < start || nowTime >= end) return rate;
+    return rate + amount / ((end - start) / 1000);
+  }, 0);
+}
+
+function getActiveStarsBoostReward(events, nowTime = Date.now()) {
+  if (!Array.isArray(events)) return 0;
+  return events.reduce((total, event) => {
+    const start = Date.parse(event.startedAt);
+    const end = Date.parse(event.endsAt);
+    const amount = Number(event.rewardTotal);
+    return Number.isFinite(start) && Number.isFinite(end) &&
+      nowTime >= start && nowTime < end && Number.isFinite(amount)
+      ? total + amount : total;
+  }, 0);
+}
+
+async function fetchStarsBoostEvents() {
+  const initData = window.Telegram?.WebApp?.initData;
+  if (!initData) throw new Error('Telegram authentication unavailable');
+  const response = await fetch('/api/stars/boost/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData }),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Paid boost status unavailable');
+  const data = await response.json();
+  if (!data?.success || !Array.isArray(data.events)) {
+    throw new Error('Invalid paid boost response');
+  }
+  return data.events.filter((event) => {
+    const start = Date.parse(event.startedAt);
+    const end = Date.parse(event.endsAt);
+    return Number.isFinite(start) && Number.isFinite(end) && end > start &&
+      [5000, 10000].includes(Number(event.rewardTotal));
+  });
+}
+
 function calculateEstimatedMiningDelta({
   lastClaim,
   miningSessionEndsAt = null,
@@ -425,6 +474,7 @@ function calculateEstimatedMiningDelta({
   eventBaseRate = 0.02,
   starsBoostStartedAt = null,
   starsBoostUntil = null,
+  starsBoostEvents = [],
   nowTime = Date.now(),
 }) {
   if (!lastClaim) return 0;
@@ -619,31 +669,24 @@ function calculateEstimatedMiningDelta({
       boostedSeconds
   );
 
-  const starsBoostStartTime =
-    starsBoostStartedAt
-      ? new Date(
-          starsBoostStartedAt
-        ).getTime()
-      : NaN;
-
-  const starsBoostUntilTime =
-    starsBoostUntil
-      ? new Date(
-          starsBoostUntil
-        ).getTime()
-      : NaN;
-
-  const starsBoostSeconds =
-    getOverlapSeconds(
-      lastClaimTime,
-      safeNowTime,
-      starsBoostStartTime,
-      starsBoostUntilTime
-    );
-
-  const starsBoostDelta =
-    starsBoostSeconds *
-    STARS_BOOST_RATE_PER_SECOND;
+  // Server-calculated mining claims already use each paid boost event's
+  // reward_total. Mirror that logic in the visible balance estimate.
+  // Never infer all historical purchases from the NEW 5k rate.
+  const starsBoostDelta = Array.isArray(starsBoostEvents)
+    ? starsBoostEvents.reduce((sum, event) => {
+        const start = Date.parse(event.startedAt);
+        const end = Date.parse(event.endsAt);
+        const amount = Number(event.rewardTotal);
+        if (!Number.isFinite(start) || !Number.isFinite(end) ||
+            !Number.isFinite(amount) || amount <= 0 || end <= start) {
+          return sum;
+        }
+        const overlap = getOverlapSeconds(
+          lastClaimTime, safeNowTime, start, end
+        );
+        return sum + overlap * (amount / ((end - start) / 1000));
+      }, 0)
+    : 0;
 
   return (
     normalSeconds * normalRate +
@@ -795,6 +838,9 @@ export default function Home() {
   const [starsBoostStartedAt, setStarsBoostStartedAt] = useState(null);
   const [starsBoostUntil, setStarsBoostUntil] = useState(null);
   const [starsBoostRemaining, setStarsBoostRemaining] = useState(0);
+  const [starsBoostEvents, setStarsBoostEvents] = useState([]);
+  const starsBoostEventsRef = useRef([]);
+  const [starsBoostStatusLoaded, setStarsBoostStatusLoaded] = useState(false);
   const [showStarsBoostModal, setShowStarsBoostModal] = useState(false);
   const [isBuyingStarsBoost, setIsBuyingStarsBoost] = useState(false);
 
@@ -891,6 +937,18 @@ export default function Home() {
 
   const isStarsBoostActive =
     starsBoostRemaining > 0;
+
+  const activeStarsBoostRate = starsBoostStatusLoaded
+    ? getActiveStarsBoostRate(starsBoostEvents)
+    : 0;
+  const activeStarsBoostReward = starsBoostStatusLoaded
+    ? getActiveStarsBoostReward(starsBoostEvents)
+    : 0;
+  const visibleStarsBoostReward = isStarsBoostActive
+    ? (activeStarsBoostReward > 0
+        ? `${activeStarsBoostReward.toLocaleString('en-US')} APXN POINTS`
+        : 'APXN POINTS BOOST')
+    : `${STARS_BOOST_REWARD_POINTS.toLocaleString('en-US')} APXN POINTS`;
 
   const isMiningPaused =
     isDataLoaded &&
@@ -1520,6 +1578,7 @@ export default function Home() {
                 currentStarsBoostStartedAt,
               starsBoostUntil:
                 currentStarsBoostUntil,
+              starsBoostEvents: starsBoostEventsRef.current,
               nowTime: safeNowTime,
             })
           );
@@ -1885,6 +1944,7 @@ export default function Home() {
                         freshStarsBoostStartedAt,
                       starsBoostUntil:
                         freshStarsBoostUntil,
+                      starsBoostEvents: starsBoostEventsRef.current,
                       nowTime:
                         authoritativeNowTime,
                     })
@@ -2210,6 +2270,50 @@ export default function Home() {
       if (timer) clearTimeout(timer);
     };
   }, []);
+
+  // Fetch the precise 5k/10k paid intervals independently of app startup.
+  // Any temporary failure here must never block mining, wallet or Staking.
+  useEffect(() => {
+    if (!isDataLoaded || !userId || userId === 'test_user') return;
+    let cancelled = false;
+    setStarsBoostStatusLoaded(false);
+    starsBoostEventsRef.current = [];
+    setStarsBoostEvents([]);
+    fetchStarsBoostEvents()
+      .then((events) => {
+        if (cancelled) return;
+        starsBoostEventsRef.current = events;
+        setStarsBoostEvents(events);
+        setStarsBoostStatusLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // If the status request fails, do not invent a paid reward rate.
+        setStarsBoostStatusLoaded(false);
+      });
+    return () => { cancelled = true; };
+  }, [isDataLoaded, userId]);
+
+  // Reconcile the visible pending balance after authoritative paid events
+  // arrive. Base mining and ad/referral calculations remain unchanged.
+  useEffect(() => {
+    if (!isDataLoaded || !userId || !starsBoostStatusLoaded) return;
+    const cached = readUserCache(userId);
+    if (!cached?.lastClaim) return;
+    setMiningDelta(calculateEstimatedMiningDelta({
+      lastClaim: cached.lastClaim,
+      miningSessionEndsAt: cached.miningSessionEndsAt || null,
+      baseRate: Number(cached.miningRate ?? 0.00025),
+      activeFriends: Number(cached.activeFriendsCount || 0),
+      boostStartedAt: cached.miningBoostStartedAt || null,
+      boostUntil: cached.miningBoostUntil || null,
+      eventStartsAt: miningEventStartsAt,
+      eventEndsAt: miningEventEndsAt,
+      eventBaseRate: miningEventBaseRate,
+      starsBoostEvents,
+      nowTime: Date.now(),
+    }));
+  }, [isDataLoaded, userId, starsBoostStatusLoaded, starsBoostEvents]);
 
   const refreshMiningEventState = async () => {
     const initData =
@@ -2601,6 +2705,7 @@ export default function Home() {
                 starsBoostUntil ||
                 cachedUser?.starsBoostUntil ||
                 null,
+              starsBoostEvents,
               nowTime:
                 getAuthoritativeNowTime(),
             })
@@ -2634,6 +2739,7 @@ export default function Home() {
     miningEventBaseRate,
     starsBoostStartedAt,
     starsBoostUntil,
+    starsBoostEvents,
   ]);
 
   // Friends are fetched only when the Friends tab is actually opened.
@@ -2796,10 +2902,12 @@ export default function Home() {
           return 0;
         }
 
-        setMiningDelta(delta =>
-          delta +
-          STARS_BOOST_RATE_PER_SECOND
-        );
+        // Only show a paid rate confirmed by its actual 5k/10k event.
+        if (starsBoostStatusLoaded) {
+          setMiningDelta(delta =>
+            delta + getActiveStarsBoostRate(starsBoostEvents)
+          );
+        }
 
         return prev - 1;
       });
@@ -2809,6 +2917,8 @@ export default function Home() {
   }, [
     isDataLoaded,
     starsBoostUntil,
+    starsBoostEvents,
+    starsBoostStatusLoaded,
   ]);
 
   useEffect(() => {
@@ -2925,8 +3035,19 @@ export default function Home() {
               await refreshMiningEventState();
             }
 
+            try {
+              const events = await fetchStarsBoostEvents();
+              starsBoostEventsRef.current = events;
+              setStarsBoostEvents(events);
+              setStarsBoostStatusLoaded(true);
+            } catch {
+              // The paid boost is recorded by the Telegram webhook;
+              // its rate will sync when the app is reopened.
+              setStarsBoostStatusLoaded(false);
+            }
+
             alert(
-              '✅ 48H Mining Boost activated!\n\n⛏️ 10,000 APXN POINTS\n⭐ 10 Telegram Stars\n⏱ 48 hours'
+              '✅ Telegram Stars payment received!\n\n⛏️ 5,000 APXN POINTS\n⭐ 10 Telegram Stars\n⏱ 48 hours'
             );
             return;
           }
@@ -4295,7 +4416,7 @@ export default function Home() {
               </div>
 
               <h3 className="mt-2 text-3xl font-black text-white">
-                10,000 APXN POINTS
+                {visibleStarsBoostReward}
               </h3>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
@@ -4319,7 +4440,7 @@ export default function Home() {
               </div>
 
               <p className="mt-4 text-xs leading-relaxed text-gray-300">
-                Mine <strong className="text-white">10,000 APXN POINTS</strong> progressively during 48 hours.
+                Mine <strong className="text-white">5,000 APXN POINTS</strong> progressively during 48 hours with each new purchase.
                 Free mining and ad mining remain active.
               </p>
 
@@ -4332,7 +4453,7 @@ export default function Home() {
                     {formatTime(starsBoostRemaining)}
                   </div>
                   <div className="mt-1 text-[10px] font-bold text-emerald-300">
-                    10,000 APXN POINTS • 48H
+                    {visibleStarsBoostReward} • 48H
                   </div>
                 </div>
               ) : (
@@ -4639,7 +4760,9 @@ export default function Home() {
                  )}
                  {isStarsBoostActive && (
                    <span className="text-[9px] text-fuchsia-300 font-bold">
-                     ⛏️⚡ +{STARS_BOOST_RATE_PER_SECOND.toFixed(5)} APXN POINTS/sec paid boost
+                     ⛏️⚡ {starsBoostStatusLoaded
+                       ? `+${activeStarsBoostRate.toFixed(5)} APXN POINTS/sec paid boost`
+                       : 'Checking paid boost rate...'}
                    </span>
                  )}
                </div>
@@ -4647,7 +4770,7 @@ export default function Home() {
                  +{(
                    totalMiningRate +
                    (isStarsBoostActive
-                     ? STARS_BOOST_RATE_PER_SECOND
+                     ? activeStarsBoostRate
                      : 0)
                  ).toFixed(5)} APXN/sec
                </span>
@@ -4730,7 +4853,7 @@ export default function Home() {
              </div>
              {isStarsBoostActive && !isMiningPaused && (
                <div className="mt-1 text-[10px] font-black text-fuchsia-300">
-                 ⛏️⚡ 10,000 APXN POINTS Boost • {formatTime(starsBoostRemaining)}
+                 ⛏️⚡ {visibleStarsBoostReward} Boost • {formatTime(starsBoostRemaining)}
                </div>
              )}
           </div>
@@ -5614,6 +5737,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
