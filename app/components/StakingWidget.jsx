@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 const MINIMUM_BALANCE = 20000;
 const FIXED_AMOUNT = 10000;
@@ -211,7 +212,7 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
     ? (remainingSeconds === 0 ? 'claim' : null)
     : (eligible ? 'activate' : null);
   const actionLabel = hasActiveCycle
-    ? 'CLAIM +1,000 APXN • WATCH AD'
+    ? 'CLAIM +1,000 APXN POINTS • WATCH AD'
     : info?.status === 'claimed' ? 'STAKE AGAIN • WATCH AD' : 'CONFIRM STAKING • WATCH AD';
 
   return (
@@ -221,7 +222,7 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
         onClick={openStaking}
         disabled={!isDataLoaded}
         className="absolute right-1 top-1 -translate-y-12 z-20 flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-emerald-300/80 bg-gradient-to-br from-emerald-500 via-teal-600 to-violet-700 text-white shadow-[0_0_24px_rgba(16,185,129,0.6)] transition-transform active:scale-95 disabled:opacity-60"
-        aria-label="Open APXN Staking"
+        aria-label="Open APXN POINTS Staking"
       >
         <span className="text-xl leading-5">🔒</span>
         <span className="text-[10px] font-black tracking-tight">Staking</span>
@@ -240,14 +241,20 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
               ✕
             </button>
 
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-emerald-300/70 bg-emerald-500/15 text-3xl">
-              {notEligible ? '🔐' : '💎'}
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-emerald-300/70 bg-emerald-500/15 p-1">
+              <Image
+                src="/logo2.png"
+                alt="APXN POINTS coin logo"
+                width={56}
+                height={56}
+                className="h-14 w-14 rounded-full object-cover"
+              />
             </div>
-            <h2 className="text-xl font-black">APXN STAKING</h2>
+            <h2 className="text-xl font-black">APXN POINTS STAKING</h2>
 
             {!info && (
               <div className="mt-5">
-                <p className="text-sm text-slate-300">{busy ? 'Checking your APXN balance...' : errorMessage || 'Unable to load staking.'}</p>
+                <p className="text-sm text-slate-300">{busy ? 'Checking your APXN POINTS balance...' : errorMessage || 'Unable to load staking.'}</p>
                 {!busy && <button type="button" onClick={openStaking} className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-bold">TRY AGAIN</button>}
               </div>
             )}
@@ -259,7 +266,7 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
                     <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
                       <div className="text-lg font-black text-amber-300">NOT ELIGIBLE</div>
                       <p className="mt-2 text-xs text-slate-300">You need at least 20,000 APXN POINTS to unlock Staking.</p>
-                      <p className="mt-3 text-2xl font-black text-amber-300">20,000 APXN</p>
+                      <p className="mt-3 text-2xl font-black text-amber-300">20,000 APXN POINTS</p>
                       <p className="mt-1 text-[11px] text-slate-400">Your balance: {Number(info.balance || 0).toLocaleString()}</p>
                     </div>
                     <button
@@ -316,7 +323,7 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
                         {busy ? 'CHECKING / WATCHING AD...' : actionLabel}
                       </button>
                     ) : (
-                      <p className="text-sm font-bold text-emerald-300">Come back when the 24-hour timer ends to claim +1,000 APXN.</p>
+                      <p className="text-sm font-bold text-emerald-300">Come back when the 24-hour timer ends to claim +1,000 APXN POINTS.</p>
                     )}
                   </>
                 )}
