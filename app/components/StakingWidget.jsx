@@ -220,7 +220,7 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
         type="button"
         onClick={openStaking}
         disabled={!isDataLoaded}
-        className="absolute right-1 top-1 z-20 flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-emerald-300/80 bg-gradient-to-br from-emerald-500 via-teal-600 to-violet-700 text-white shadow-[0_0_24px_rgba(16,185,129,0.6)] transition-transform active:scale-95 disabled:opacity-60"
+        className="absolute right-1 top-1 -translate-y-12 z-20 flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-emerald-300/80 bg-gradient-to-br from-emerald-500 via-teal-600 to-violet-700 text-white shadow-[0_0_24px_rgba(16,185,129,0.6)] transition-transform active:scale-95 disabled:opacity-60"
         aria-label="Open APXN Staking"
       >
         <span className="text-xl leading-5">🔒</span>
