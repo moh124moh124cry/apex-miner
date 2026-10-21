@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { supabase } from '../lib/supabase';
+import StakingWidget from './components/StakingWidget';
 
 const MINING_SESSION_DURATION_SECONDS = 24 * 60 * 60;
 const AD_REWARD_COOLDOWN_SECONDS = 24 * 60 * 60;
@@ -4736,6 +4737,15 @@ export default function Home() {
 
           <div className="flex-1 flex items-center justify-center my-8 relative w-full">
             <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-20 rounded-full"></div>
+            <StakingWidget
+              userId={userId}
+              isDataLoaded={isDataLoaded}
+              onBalanceUpdate={(nextBalance) => {
+                setBalance(nextBalance);
+                patchUserCache(userId, { balance: nextBalance });
+              }}
+              openStarsBoost={() => setShowStarsBoostModal(true)}
+            />
 
             <div className="w-56 h-56 rounded-full p-[4px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-800 shadow-[0_0_50px_rgba(234,179,8,0.4),inset_0_0_20px_rgba(255,255,255,0.5)] z-10 flex items-center justify-center relative">
               <div className="w-full h-full rounded-full border-[6px] border-slate-950 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] relative">
@@ -5604,6 +5614,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
