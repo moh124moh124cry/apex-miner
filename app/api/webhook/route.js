@@ -560,9 +560,10 @@ async function isAdmin(ctx) {
   } catch (error) {
     console.error('Admin check error:', error);
 
-    // Fail open for moderation actions to avoid punishing
-    // a real administrator during a Telegram API outage.
-    return true;
+    
+    // Do not exempt suspicious messages when admin verification fails.
+    return false;
+    
   }
 }
 
