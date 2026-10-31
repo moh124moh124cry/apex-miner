@@ -760,8 +760,22 @@ bot.on('message', async (ctx) => {
 
     if (!message || !ctx.from) {
       return;
+    
+    }
+    
+    // Delete images and GIFs from non-admin members.
+    const hasImage = Boolean(
+      message.photo?.length ||
+      message.animation ||
+      (message.document?.mime_type || '').startsWith('image/')
+    );
+
+    if (hasImage && !(await isAdmin(ctx))) {
+      await safeDelete(ctx);
+      return;
     }
 
+    
     if (blockOtherBots && ctx.from.is_bot) {
       await moderateViolation(ctx, 'OTHER_BOT', true);
       return;
