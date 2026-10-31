@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
-const MINIMUM_BALANCE = 20000;
-const FIXED_AMOUNT = 10000;
 const DAILY_REWARD = 1000;
 const AD_WAIT_MS = 5000;
 const AD_DISPLAY_TIMEOUT_MS = 90000;
@@ -25,16 +23,22 @@ async function withTimeout(promise, milliseconds, reason) {
   }
 }
 
-// Time limit applies to ad AVAILABILITY only. Once a real ad opens,
-// closing or skipping it cannot be treated as an unavailable-ad fallback.
+// The five-second limit applies only to ad availability.
+// A shown ad must be completed; skipping it does not count.
 async function showStakingAd() {
   const started = Date.now();
-  while (typeof window.show_11803132 !== 'function' && Date.now() - started < AD_WAIT_MS) {
+
+  while (
+    typeof window.show_11803132 !== 'function' &&
+    Date.now() - started < AD_WAIT_MS
+  ) {
     await sleep(100);
   }
+
   if (typeof window.show_11803132 !== 'function') return 'unavailable';
 
   const remaining = Math.max(1, AD_WAIT_MS - (Date.now() - started));
+
   try {
     await withTimeout(
       window.show_11803132({
@@ -57,8 +61,6 @@ async function showStakingAd() {
     );
     return 'completed';
   } catch (error) {
-    // An explicitly empty ad feed may fall back; a skipped/closed
-    // available ad must be retried rather than rewarded.
     if (/no.feed|no.fill|no.ads?|unavailable|no.inventory/i.test(String(error?.message || ''))) {
       return 'unavailable';
     }
@@ -88,14 +90,21 @@ async function stakingRequest(action) {
     body: JSON.stringify({ action, initData }),
     cache: 'no-store',
   });
+
   const data = await response.json();
+
   if (!response.ok && !data.errorCode) {
     throw new Error(data.error || 'Staking request failed. Please try again.');
   }
+
   return { ...data, httpOk: response.ok };
 }
 
-export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, openStarsBoost }) {
+export default function StakingWidget({
+  userId,
+  isDataLoaded,
+  onBalanceUpdate,
+}) {
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -110,7 +119,9 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
     setOpen(false);
     setInfo(null);
     setPendingAction(null);
+    setAdOutcome(null);
     setErrorMessage('');
+    setSuccessMessage('');
   }, [userId]);
 
   useEffect(() => {
@@ -120,13 +131,21 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
   }, [open]);
 
   const remainingSeconds = info?.endsAt
-    ? Math.max(0, Math.ceil((Date.parse(info.endsAt) - (Date.now() + serverOffsetMs)) / 1000))
+    ? Math.max(
+        0,
+        Math.ceil(
+          (Date.parse(info.endsAt) - (Date.now() + serverOffsetMs)) / 1000
+        )
+      )
     : 0;
-  void tick; // The once-per-second state update keeps the countdown fresh.
+
+  void tick; // Updates the countdown once per second.
 
   function syncInfo(data) {
     setInfo(data);
-    if (data.serverNow) setServerOffsetMs(Date.parse(data.serverNow) - Date.now());
+    if (data.serverNow) {
+      setServerOffsetMs(Date.parse(data.serverNow) - Date.now());
+    }
     if (Number.isFinite(Number(data.balance))) {
       onBalanceUpdate(Number(data.balance));
     }
@@ -134,12 +153,15 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
 
   async function openStaking() {
     if (!isDataLoaded || busy) return;
+
     setOpen(true);
     setBusy(true);
     setInfo(null);
     setPendingAction(null);
+    setAdOutcome(null);
     setErrorMessage('');
     setSuccessMessage('');
+
     try {
       const result = await stakingRequest('status');
       syncInfo(result);
@@ -152,9 +174,11 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
 
   async function watchAdFor(action) {
     if (busy || pendingAction) return;
+
     setBusy(true);
     setErrorMessage('');
     setSuccessMessage('');
+
     try {
       const result = await showStakingAd();
       setAdOutcome(result);
@@ -168,22 +192,29 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
 
   async function confirmStakingAction() {
     if (busy || !pendingAction) return;
+
     const action = pendingAction;
     setBusy(true);
     setErrorMessage('');
+
     try {
       const result = await stakingRequest(action);
       syncInfo(result);
+
       if (!result.httpOk || !result.success) {
-        if (result.errorCode === 'NOT_ELIGIBLE') {
-          setErrorMessage('Not eligible. You need at least 20,000 APXN POINTS.');
-        } else if (result.errorCode === 'TOO_EARLY') {
+        if (result.errorCode === 'TOO_EARLY') {
           setErrorMessage('Your 24-hour staking cycle has not finished yet.');
+        } else if (result.errorCode === 'NOT_ELIGIBLE') {
+          setErrorMessage('Staking is not available yet. Please try again later.');
         } else {
-          setErrorMessage('Your staking status changed. Please review it and try again.');
+          setErrorMessage(
+            'Your staking status changed. Please review it and try again.'
+          );
         }
       } else if (action === 'claim') {
-        setSuccessMessage('+1,000 APXN POINTS added to your balance! Start a new cycle when ready.');
+        setSuccessMessage(
+          '+1,000 APXN POINTS added to your balance! Start a new cycle when ready.'
+        );
       } else {
         setSuccessMessage('Staking activated! Your 24-hour countdown has started.');
       }
@@ -206,14 +237,17 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
   }
 
   const hasActiveCycle = info?.status === 'active';
-  const eligible = Number(info?.balance || 0) >= MINIMUM_BALANCE;
-  const notEligible = Boolean(info && !hasActiveCycle && !eligible);
   const action = hasActiveCycle
-    ? (remainingSeconds === 0 ? 'claim' : null)
-    : (eligible ? 'activate' : null);
+    ? remainingSeconds === 0
+      ? 'claim'
+      : null
+    : 'activate';
+
   const actionLabel = hasActiveCycle
     ? 'CLAIM +1,000 APXN POINTS • WATCH AD'
-    : info?.status === 'claimed' ? 'STAKE AGAIN • WATCH AD' : 'CONFIRM STAKING • WATCH AD';
+    : info?.status === 'claimed'
+      ? 'STAKE AGAIN • WATCH AD'
+      : 'CONFIRM STAKING • WATCH AD';
 
   return (
     <>
@@ -250,86 +284,122 @@ export default function StakingWidget({ userId, isDataLoaded, onBalanceUpdate, o
                 className="h-14 w-14 rounded-full object-cover"
               />
             </div>
+
             <h2 className="text-xl font-black">APXN POINTS STAKING</h2>
 
             {!info && (
               <div className="mt-5">
-                <p className="text-sm text-slate-300">{busy ? 'Checking your APXN POINTS balance...' : errorMessage || 'Unable to load staking.'}</p>
-                {!busy && <button type="button" onClick={openStaking} className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-bold">TRY AGAIN</button>}
+                <p className="text-sm text-slate-300">
+                  {busy
+                    ? 'Checking your staking status...'
+                    : errorMessage || 'Unable to load staking.'}
+                </p>
+                {!busy && (
+                  <button
+                    type="button"
+                    onClick={openStaking}
+                    className="mt-4 w-full rounded-xl bg-emerald-600 py-3 font-bold"
+                  >
+                    TRY AGAIN
+                  </button>
+                )}
               </div>
             )}
 
             {info && (
               <div className="mt-4 space-y-4">
-                {notEligible ? (
-                  <>
-                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-                      <div className="text-lg font-black text-amber-300">NOT ELIGIBLE</div>
-                      <p className="mt-2 text-xs text-slate-300">You need at least 20,000 APXN POINTS to unlock Staking.</p>
-                      <p className="mt-3 text-2xl font-black text-amber-300">20,000 APXN POINTS</p>
-                      <p className="mt-1 text-[11px] text-slate-400">Your balance: {Number(info.balance || 0).toLocaleString()}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3">
+                    <div className="text-[10px] text-slate-400">
+                      STAKING CYCLE
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => { closeStaking(); openStarsBoost(); }}
-                      className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-3 font-black"
-                    >
-                      ⭐ OPEN 10 ⭐ MINING BOOST
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3">
-                        <div className="text-[10px] text-slate-400">FIXED STAKING</div>
-                        <div className="mt-1 text-xl font-black">{FIXED_AMOUNT.toLocaleString()}</div>
-                        <div className="text-[10px] text-emerald-300">APXN POINTS</div>
-                      </div>
-                      <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3">
-                        <div className="text-[10px] text-slate-400">24H REWARD</div>
-                        <div className="mt-1 text-xl font-black text-emerald-300">+{DAILY_REWARD.toLocaleString()}</div>
-                        <div className="text-[10px] text-emerald-300">APXN POINTS</div>
-                      </div>
+                    <div className="mt-1 text-xl font-black">24 HOURS</div>
+                    <div className="text-[10px] text-emerald-300">
+                      OPEN TO EVERYONE
                     </div>
-                    <p className="text-xs leading-5 text-slate-300">Your 10,000 APXN POINTS remain in your balance. No points are deducted or locked.</p>
+                  </div>
 
-                    {hasActiveCycle && (
-                      <div className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-3 py-4">
-                        <p className="text-xs font-black text-cyan-300">
-                          {remainingSeconds > 0 ? 'STAKING ACTIVE • TIME REMAINING' : 'YOUR REWARD IS READY'}
-                        </p>
-                        <p className="mt-1 text-3xl font-black tabular-nums">{countdown(remainingSeconds)}</p>
-                        <p className="mt-2 text-xs text-slate-300">Cycle #{info.cycleNumber}</p>
-                      </div>
-                    )}
+                  <div className="rounded-xl border border-emerald-500/30 bg-slate-900 p-3">
+                    <div className="text-[10px] text-slate-400">24H REWARD</div>
+                    <div className="mt-1 text-xl font-black text-emerald-300">
+                      +{DAILY_REWARD.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-emerald-300">
+                      APXN POINTS
+                    </div>
+                  </div>
+                </div>
 
-                    {info.status === 'claimed' && (
-                      <p className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-300">Your previous cycle was claimed. You can start a new 24-hour cycle.</p>
-                    )}
+                <p className="text-xs leading-5 text-slate-300">
+                  Staking is available to everyone, regardless of your points
+                  balance. No points are deducted or locked.
+                </p>
 
-                    {pendingAction ? (
-                      <>
-                        <p className="text-xs text-emerald-300">
-                          {adOutcome === 'unavailable'
-                            ? 'Ad unavailable after 5 seconds. You can continue.'
-                            : 'Ad completed. Confirm to continue.'}
-                        </p>
-                        <button type="button" onClick={confirmStakingAction} disabled={busy} className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3 text-lg font-black disabled:opacity-60">
-                          {busy ? 'PLEASE WAIT...' : 'OK'}
-                        </button>
-                      </>
-                    ) : action ? (
-                      <button type="button" onClick={() => watchAdFor(action)} disabled={busy} className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-violet-600 py-3 text-sm font-black disabled:opacity-60">
-                        {busy ? 'CHECKING / WATCHING AD...' : actionLabel}
-                      </button>
-                    ) : (
-                      <p className="text-sm font-bold text-emerald-300">Come back when the 24-hour timer ends to claim +1,000 APXN POINTS.</p>
-                    )}
-                  </>
+                {hasActiveCycle && (
+                  <div className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-3 py-4">
+                    <p className="text-xs font-black text-cyan-300">
+                      {remainingSeconds > 0
+                        ? 'STAKING ACTIVE • TIME REMAINING'
+                        : 'YOUR REWARD IS READY'}
+                    </p>
+                    <p className="mt-1 text-3xl font-black tabular-nums">
+                      {countdown(remainingSeconds)}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-300">
+                      Cycle #{info.cycleNumber}
+                    </p>
+                  </div>
                 )}
 
-                {successMessage && <p role="status" className="text-xs font-bold text-emerald-300">✅ {successMessage}</p>}
-                {errorMessage && <p role="alert" className="text-xs font-bold text-red-300">⚠️ {errorMessage}</p>}
+                {info.status === 'claimed' && (
+                  <p className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-300">
+                    Your previous cycle was claimed. You can start a new 24-hour
+                    cycle.
+                  </p>
+                )}
+
+                {pendingAction ? (
+                  <>
+                    <p className="text-xs text-emerald-300">
+                      {adOutcome === 'unavailable'
+                        ? 'Ad unavailable after 5 seconds. You can continue.'
+                        : 'Ad completed. Confirm to continue.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={confirmStakingAction}
+                      disabled={busy}
+                      className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3 text-lg font-black disabled:opacity-60"
+                    >
+                      {busy ? 'PLEASE WAIT...' : 'OK'}
+                    </button>
+                  </>
+                ) : action ? (
+                  <button
+                    type="button"
+                    onClick={() => watchAdFor(action)}
+                    disabled={busy}
+                    className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-violet-600 py-3 text-sm font-black disabled:opacity-60"
+                  >
+                    {busy ? 'CHECKING / WATCHING AD...' : actionLabel}
+                  </button>
+                ) : (
+                  <p className="text-sm font-bold text-emerald-300">
+                    Come back when the 24-hour timer ends to claim +1,000 APXN POINTS.
+                  </p>
+                )}
+
+                {successMessage && (
+                  <p role="status" className="text-xs font-bold text-emerald-300">
+                    ✅ {successMessage}
+                  </p>
+                )}
+
+                {errorMessage && (
+                  <p role="alert" className="text-xs font-bold text-red-300">
+                    ⚠️ {errorMessage}
+                  </p>
+                )}
               </div>
             )}
           </div>
