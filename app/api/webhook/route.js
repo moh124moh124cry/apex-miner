@@ -780,10 +780,25 @@ bot.on('message', async (ctx) => {
       return;
     }
 
-    if (looksLikeSpam(message)) {
-      await moderateViolation(ctx, 'SPAM_CONTENT');
+    
+    const isForwarded = Boolean(
+      message.forward_origin ||
+      message.forward_from ||
+      message.forward_from_chat ||
+      message.forward_sender_name ||
+      message.is_automatic_forward
+    );
+
+    const isAdultAd =
+      /free\s+(hot\s+)?girls?\s+videos?|18\+\s*only|live\s*cam|no\s*blur|watch\s+all\s+videos|onlyfans|porn|sex\s*videos?|buy\s*followers|crypto\s*signals?|vip\s*signals?/i.test(
+        getMessageText(message)
+      );
+
+    if (isForwarded || isAdultAd || looksLikeSpam(message)) {
+      await moderateViolation(ctx, 'SPAM_OR_FORWARDED');
       return;
-    }
+}
+    
 
     if (isRepeatedMessage(ctx)) {
       await moderateViolation(ctx, 'REPEATED_MESSAGE', true);
