@@ -5,7 +5,8 @@ import { validateTelegramInitData } from '../../../lib/telegram-auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MINIMUM_BALANCE = 20000;
+// Every registered Telegram user can start a staking cycle, regardless of balance.
+const MINIMUM_BALANCE = 0;
 const FIXED_AMOUNT = 10000;
 const DAILY_REWARD = 1000;
 
@@ -17,7 +18,7 @@ function json(data, status = 200) {
 }
 
 function toClientStatus(cycle, balance, serverNow) {
-  const eligible = balance >= MINIMUM_BALANCE;
+  const eligible = true;
   const status = cycle?.status === 'active'
     ? 'active'
     : cycle?.status === 'claimed' ? 'claimed' : 'idle';
@@ -70,7 +71,7 @@ export async function POST(request) {
       return json(toClientStatus(cycle, Number(user.balance || 0), new Date().toISOString()));
     }
 
-    // SQL locks the user row, verifies eligibility/cooldown, prevents
+    // SQL locks the user row, verifies the 24-hour cooldown, prevents
     // concurrent claims, and writes the +1,000 points atomically.
     const { data, error } = await supabaseAdmin.rpc('apxn_staking_action', {
       p_telegram_id: telegramId,
@@ -95,7 +96,7 @@ export async function POST(request) {
 
     if (!result.success) {
       const statuses = {
-        NOT_ELIGIBLE: 403,
+        NOT_ELIGIBLE: 403, // Compatibility until the Supabase RPC is updated.
         USER_NOT_FOUND: 404,
         TOO_EARLY: 409,
         CYCLE_ACTIVE: 409,
