@@ -4484,115 +4484,202 @@ export default function Home() {
         </div>
       )}
 
-      {showProfile && (
-        <div className="fixed inset-0 z-[240] overflow-y-auto bg-slate-950 text-white">
-          <div className="mx-auto min-h-screen w-full max-w-md px-5 py-6">
-            <div className="flex items-center justify-between">
+            {showProfile && (
+        <div
+          className="fixed inset-0 z-[240] overflow-y-auto text-white"
+          style={{
+            background:
+              'radial-gradient(ellipse at 90% 8%, rgba(67,45,184,0.32), transparent 39%), radial-gradient(ellipse at 7% 68%, rgba(1,99,223,0.16), transparent 48%), #030917',
+          }}
+        >
+          <div className="pointer-events-none fixed right-[-30%] top-[-16%] h-72 w-72 rounded-full bg-violet-700/15 blur-3xl" />
+          <div className="pointer-events-none fixed bottom-[-15%] left-[-30%] h-72 w-72 rounded-full bg-blue-600/15 blur-3xl" />
+
+          <div className="relative mx-auto min-h-screen w-full max-w-[560px] px-4 pb-12 pt-6 sm:px-6">
+            {/* Keep the existing Close Profile behavior. */}
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setShowProfile(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-xl text-white active:scale-95"
                 aria-label="Close APXN Profile"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-300/35 bg-blue-950/30 text-2xl text-white shadow-[0_0_14px_rgba(37,99,235,0.15)] transition-transform active:scale-95"
               >
                 ←
               </button>
-
-              <h2 className="text-lg font-black tracking-[0.18em] text-white">
+              <h2 className="min-w-0 text-center text-[17px] font-black tracking-[0.16em] text-white drop-shadow-[0_0_14px_rgba(129,140,248,0.3)] sm:text-xl">
                 APXN PROFILE
               </h2>
-
-              <div className="h-10 w-10" />
+              <div className="h-11 w-11 shrink-0" aria-hidden="true" />
             </div>
 
-            <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-950 text-2xl">
-                    👤
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="truncate text-xl font-black text-white">
-                      {firstName && firstName !== 'Unknown'
-                        ? firstName
-                        : 'APXN Worker'}
-                    </div>
-                  </div>
-                </div>
-
-                {hasEarlyAccessBadge && (
-                  <div className="shrink-0 text-center">
-                    <img
-                      src="https://apxn.network/apxn-early-access-badge.png"
-                      alt="APXN Early Access Badge"
-                      title="Early Access"
-                      className="h-16 w-16 rounded-2xl object-cover shadow-[0_0_22px_rgba(34,197,94,0.22)]"
+            {/* 3D APXN membership card – visual card, not a bank/payment card. */}
+            <div className="mt-9 [perspective:1100px]">
+              <div
+                className="relative mx-auto w-full max-w-[490px]"
+                style={{ transform: 'rotateX(2deg) rotateY(-3deg)', transformStyle: 'preserve-3d' }}
+              >
+                {/* Offset lower-right rim creates real depth without any extra image. */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 translate-x-[7px] translate-y-[8px] rounded-[29px]"
+                  style={{
+                    background: 'linear-gradient(115deg, #0754ad 15%, #4145c0 55%, #9b31ff 100%)',
+                    boxShadow: '6px 10px 24px rgba(0,0,0,0.55), 0 0 28px rgba(97,60,242,0.20)',
+                  }}
+                />
+                <div
+                  className="relative rounded-[29px] p-[2px]"
+                  style={{
+                    background:
+                      'linear-gradient(128deg, #7af2ff 0%, #136efa 24%, #6550ff 58%, #f49cff 87%, #7f29ff 100%)',
+                    boxShadow:
+                      '0 0 18px rgba(13,158,255,0.40), 0 0 24px rgba(148,56,255,0.28), 0 18px 36px rgba(0,0,0,0.62)',
+                  }}
+                >
+                  <div
+                    className="relative flex min-h-[225px] aspect-[1.58/1] flex-col justify-between overflow-hidden rounded-[27px] px-4 py-5 sm:px-6 sm:py-6"
+                    style={{
+                      background:
+                        'radial-gradient(ellipse at 7% 5%, rgba(14,172,255,0.95), transparent 43%), radial-gradient(ellipse at 98% 99%, rgba(210,35,255,0.75), transparent 47%), linear-gradient(135deg, #07358d 3%, #080d37 48%, #2c0874 100%)',
+                    }}
+                  >
+                    <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-32 h-60 w-60 rounded-full bg-cyan-300/15 blur-3xl" />
+                    <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-[-15%] h-64 w-64 rounded-full bg-fuchsia-500/25 blur-3xl" />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-[-13%] top-[20%] h-[130%] w-[65%] -rotate-[34deg] rounded-full border-[20px] border-indigo-200/10"
                     />
-                    <div className="mt-1 text-[9px] font-black uppercase tracking-wider text-emerald-300">
-                      Early Access
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-cyan-100/90 via-blue-400 to-fuchsia-300" />
+
+                    {/* Logo + real Telegram first name + actual early access badge. */}
+                    <div className="relative z-10 flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
+                        <img
+                          src="/logo2.png"
+                          alt="APXN official logo"
+                          className="h-12 w-12 shrink-0 rounded-2xl border border-cyan-200/40 object-cover shadow-[0_0_20px_rgba(25,149,255,0.45)] sm:h-16 sm:w-16"
+                        />
+                        <div className="min-w-0">
+                          <p className="max-w-[135px] truncate text-lg font-black leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] sm:max-w-[205px] sm:text-2xl">
+                            {firstName && firstName !== 'Unknown' ? firstName : 'APXN Worker'}
+                          </p>
+                          <p className="mt-1 text-[9px] font-bold tracking-[0.22em] text-blue-100/75 sm:text-[11px]">
+                            APXN MEMBER
+                          </p>
+                        </div>
+                      </div>
+                      {hasEarlyAccessBadge ? (
+                        <div className="relative z-10 -mt-1 flex w-[77px] shrink-0 flex-col items-center sm:w-[98px]">
+                          <img
+                            src="https://apxn.network/apxn-early-access-badge.png"
+                            alt="Early Access badge"
+                            title="APXN Early Access"
+                            className="h-[70px] w-[70px] object-contain drop-shadow-[0_0_14px_rgba(27,255,110,0.55)] sm:h-[94px] sm:w-[94px]"
+                          />
+                          <span className="mt-0.5 rounded-full border border-green-400/60 bg-emerald-950/75 px-2 py-0.5 text-center text-[8px] font-black tracking-wide text-green-200 sm:text-[10px]">
+                            EARLY ACCESS
+                          </span>
+                        </div>
+                      ) : profileBadgeLoading ? (
+                        <span className="text-[9px] text-slate-200/60">Checking badge…</span>
+                      ) : null}
+                    </div>
+
+                    {/* Actual existing mining balance; no fictional APXN tokens. */}
+                    <div className="relative z-10 mt-5 min-w-0">
+                      <p className="text-[10px] font-black tracking-[0.18em] text-blue-100/90 sm:text-xs">
+                        MINING BALANCE
+                      </p>
+                      <p className="mt-1 max-w-full break-words text-[clamp(1.5rem,5.9vw,2.75rem)] font-black leading-tight tracking-tight text-white [font-variant-numeric:tabular-nums] drop-shadow-[0_2px_9px_rgba(0,0,0,0.45)]">
+                        {Number(balance || 0).toLocaleString('en-US', {
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 4,
+                        })}
+                      </p>
+                      <div className="mt-2 flex items-end justify-between gap-2">
+                        <span className="text-[13px] font-black tracking-wider text-yellow-300 drop-shadow-[0_0_10px_rgba(250,204,21,0.36)] sm:text-base">
+                          APXN POINTS
+                        </span>
+                        <div className="flex items-center gap-1 text-xl font-black italic tracking-[0.01em] text-white sm:text-[25px]">
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            className="h-5 w-5"
+                          >
+                            <path d="M5 9a4 4 0 0 1 0 6" />
+                            <path d="M9 6a8 8 0 0 1 0 12" />
+                            <path d="M13 3a12 12 0 0 1 0 18" />
+                          </svg>
+                          APXN
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-
-              <div className="mt-7 border-t border-slate-800 pt-6">
-                <div className="text-xs font-black tracking-[0.16em] text-gray-400">
-                  MINING BALANCE
-                </div>
-
-                <div className="mt-2 break-words text-2xl font-black text-white">
-                  {Number(balance || 0).toLocaleString('en-US', {
-                    minimumFractionDigits: 4,
-                    maximumFractionDigits: 4,
-                  })}{' '}
-                  <span className="text-base text-yellow-400">
-                    APXN POINTS
-                  </span>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-7 border-t border-slate-800 pt-6">
-                <div className="text-xs font-black tracking-[0.16em] text-gray-400">
-                  VERIFIED APXN POINTS
+            {/* Future verified points remain locked until official unlock. */}
+            <div className="mt-8 space-y-4">
+              <section
+                className="relative overflow-hidden rounded-[25px] border border-indigo-400/45 bg-gradient-to-br from-[#10234c] via-[#0a1636] to-[#171039] p-4 shadow-[0_0_18px_rgba(75,91,255,0.14)] sm:p-5"
+                aria-label="Verified APXN Points"
+              >
+                <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-violet-600/15 blur-3xl" aria-hidden="true" />
+                <div className="relative flex items-center gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-violet-400/70 bg-violet-950/40 text-3xl shadow-[0_0_18px_rgba(155,90,255,0.22)]">
+                    🔒
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-[11px] font-black tracking-[0.13em] text-slate-300 sm:text-sm">
+                      VERIFIED APXN POINTS
+                    </h3>
+                    <p className="mt-1 text-2xl font-black text-white">Locked</p>
+                    <p className="mt-1 text-sm font-bold text-violet-300">Membership &amp; Loyalty</p>
+                  </div>
                 </div>
+              </section>
 
-                <div className="mt-3 text-xl font-black text-gray-300">
-                  🔒 Locked
+              {/* Levels continue to depend on verified points and stay locked. */}
+              <section
+                className="relative overflow-hidden rounded-[25px] border border-indigo-400/45 bg-gradient-to-br from-[#10234c] via-[#0a1533] to-[#1b103f] p-4 shadow-[0_0_18px_rgba(92,78,226,0.14)] sm:p-5"
+                aria-label="APXN Level"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-violet-400/70 bg-violet-950/40 text-3xl shadow-[0_0_18px_rgba(155,90,255,0.22)]">
+                    🔒
+                  </div>
+                  <div>
+                    <h3 className="text-[11px] font-black tracking-[0.13em] text-slate-300 sm:text-sm">
+                      APXN LEVEL
+                    </h3>
+                    <p className="mt-1 text-2xl font-black text-white">Locked</p>
+                  </div>
                 </div>
-
-                <div className="mt-2 text-sm font-bold text-violet-300">
-                  Membership & Loyalty
-                </div>
-              </div>
-
-              <div className="mt-7 border-t border-slate-800 pt-6">
-                <div className="text-xs font-black tracking-[0.16em] text-gray-400">
-                  APXN LEVEL
-                </div>
-
-                <div className="mt-3 text-xl font-black text-gray-300">
-                  🔒 Locked
-                </div>
-
-                <div className="mt-5 grid grid-cols-7 gap-1.5">
-                  {['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'].map(level => (
+                <div className="mt-5 grid grid-cols-7 gap-1.5 sm:gap-2.5">
+                  {['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'].map((level) => (
                     <div
                       key={level}
-                      className="rounded-lg border border-slate-700 bg-slate-950 py-2 text-center text-xs font-black text-gray-500"
+                      className="rounded-xl border border-slate-500/65 bg-[#050b1e]/75 py-2.5 text-center text-xs font-black text-slate-400 sm:text-sm"
                     >
                       {level}
                     </div>
                   ))}
                 </div>
-
-                <div className="mt-4 text-sm leading-relaxed text-gray-500">
+                <p className="mt-4 text-center text-xs leading-relaxed text-slate-400 sm:text-sm">
                   Levels based on verified APXN Points
-                </div>
-              </div>
+                </p>
+              </section>
             </div>
           </div>
         </div>
       )}
+
+
 
       {showWalletModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
