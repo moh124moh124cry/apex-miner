@@ -4512,116 +4512,100 @@ export default function Home() {
               <div className="h-11 w-11 shrink-0" aria-hidden="true" />
             </div>
 
-            {/* 3D APXN membership card – visual card, not a bank/payment card. */}
-            <div className="mt-9 [perspective:1100px]">
+                        {/* APXN compact premium 3D digital membership card. */}
+            <div className="mt-6 px-1 [perspective:1100px]">
               <div
-                className="relative mx-auto w-full max-w-[490px]"
-                style={{ transform: 'rotateX(2deg) rotateY(-3deg)', transformStyle: 'preserve-3d' }}
+                className="relative mx-auto w-full max-w-[355px]"
+                style={{ transform: 'rotateX(1deg) rotateY(-2deg)', transformStyle: 'preserve-3d' }}
               >
-                {/* Offset lower-right rim creates real depth without any extra image. */}
+                {/* Thin side edge gives the card a subtle three-dimensional look. */}
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 translate-x-[7px] translate-y-[8px] rounded-[29px]"
+                  className="pointer-events-none absolute inset-0 translate-x-[3px] translate-y-[5px] rounded-[22px]"
                   style={{
-                    background: 'linear-gradient(115deg, #0754ad 15%, #4145c0 55%, #9b31ff 100%)',
-                    boxShadow: '6px 10px 24px rgba(0,0,0,0.55), 0 0 28px rgba(97,60,242,0.20)',
+                    background: 'linear-gradient(145deg, #1873b9 0%, #172f74 52%, #7a3bd0 100%)',
+                    boxShadow: '3px 8px 20px rgba(0,0,0,0.42)',
                   }}
                 />
+
+                {/* A fine metallic rim, not a large neon border. */}
                 <div
-                  className="relative rounded-[29px] p-[2px]"
+                  className="relative rounded-[22px] p-[1.5px]"
                   style={{
-                    background:
-                      'linear-gradient(128deg, #7af2ff 0%, #136efa 24%, #6550ff 58%, #f49cff 87%, #7f29ff 100%)',
-                    boxShadow:
-                      '0 0 18px rgba(13,158,255,0.40), 0 0 24px rgba(148,56,255,0.28), 0 18px 36px rgba(0,0,0,0.62)',
+                    background: 'linear-gradient(125deg, #9ae5ff 0%, #4a98f7 31%, #8083e4 67%, #ba87e8 100%)',
+                    boxShadow: '0 0 12px rgba(61,126,248,0.24), 0 12px 22px rgba(0,0,0,0.46)',
                   }}
                 >
                   <div
-                    className="relative flex min-h-[225px] aspect-[1.58/1] flex-col justify-between overflow-hidden rounded-[27px] px-4 py-5 sm:px-6 sm:py-6"
+                    className="relative flex min-h-[188px] aspect-[1.72/1] flex-col justify-between overflow-hidden rounded-[20px] px-4 py-4"
                     style={{
-                      background:
-                        'radial-gradient(ellipse at 7% 5%, rgba(14,172,255,0.95), transparent 43%), radial-gradient(ellipse at 98% 99%, rgba(210,35,255,0.75), transparent 47%), linear-gradient(135deg, #07358d 3%, #080d37 48%, #2c0874 100%)',
+                      background: 'radial-gradient(ellipse at -5% -12%, rgba(43,126,228,0.53), transparent 51%), radial-gradient(ellipse at 108% 114%, rgba(105,50,155,0.48), transparent 56%), linear-gradient(138deg, #102b60 0%, #080f2b 54%, #1d1643 100%)',
                     }}
                   >
-                    <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-32 h-60 w-60 rounded-full bg-cyan-300/15 blur-3xl" />
-                    <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-[-15%] h-64 w-64 rounded-full bg-fuchsia-500/25 blur-3xl" />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute right-[-13%] top-[20%] h-[130%] w-[65%] -rotate-[34deg] rounded-full border-[20px] border-indigo-200/10"
-                    />
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-cyan-100/90 via-blue-400 to-fuchsia-300" />
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/55 via-sky-300/25 to-violet-300/30" />
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-12 top-5 h-44 w-44 rotate-[35deg] rounded-full border-[11px] border-white/[0.045]" />
+                    <div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-cyan-300/35 via-transparent to-violet-300/35" />
 
-                    {/* Logo + real Telegram first name + actual early access badge. */}
+                    {/* APXN logo, actual Telegram first name, and real badge only. */}
                     <div className="relative z-10 flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
+                      <div className="flex min-w-0 items-center gap-2.5">
                         <img
                           src="/logo2.png"
-                          alt="APXN official logo"
-                          className="h-12 w-12 shrink-0 rounded-2xl border border-cyan-200/40 object-cover shadow-[0_0_20px_rgba(25,149,255,0.45)] sm:h-16 sm:w-16"
+                          alt="APXN logo"
+                          className="h-10 w-10 shrink-0 rounded-xl border border-white/25 object-cover shadow-[0_0_10px_rgba(75,151,247,0.22)]"
                         />
                         <div className="min-w-0">
-                          <p className="max-w-[135px] truncate text-lg font-black leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] sm:max-w-[205px] sm:text-2xl">
+                          <p className="max-w-[170px] truncate text-[17px] font-extrabold leading-tight text-white sm:text-lg">
                             {firstName && firstName !== 'Unknown' ? firstName : 'APXN Worker'}
                           </p>
-                          <p className="mt-1 text-[9px] font-bold tracking-[0.22em] text-blue-100/75 sm:text-[11px]">
+                          <p className="mt-1 text-[8px] font-bold tracking-[0.18em] text-sky-200/75">
                             APXN MEMBER
                           </p>
                         </div>
                       </div>
                       {hasEarlyAccessBadge ? (
-                        <div className="relative z-10 -mt-1 flex w-[77px] shrink-0 flex-col items-center sm:w-[98px]">
+                        <div className="flex w-[62px] shrink-0 flex-col items-center gap-0.5">
                           <img
                             src="https://apxn.network/apxn-early-access-badge.png"
                             alt="Early Access badge"
                             title="APXN Early Access"
-                            className="h-[70px] w-[70px] object-contain drop-shadow-[0_0_14px_rgba(27,255,110,0.55)] sm:h-[94px] sm:w-[94px]"
+                            className="h-[49px] w-[49px] object-contain drop-shadow-[0_0_6px_rgba(27,255,110,0.22)]"
                           />
-                          <span className="mt-0.5 rounded-full border border-green-400/60 bg-emerald-950/75 px-2 py-0.5 text-center text-[8px] font-black tracking-wide text-green-200 sm:text-[10px]">
+                          <span className="whitespace-nowrap rounded-full border border-emerald-400/40 bg-emerald-950/70 px-1.5 py-0.5 text-[7px] font-extrabold text-emerald-200">
                             EARLY ACCESS
                           </span>
                         </div>
                       ) : profileBadgeLoading ? (
-                        <span className="text-[9px] text-slate-200/60">Checking badge…</span>
+                        <span className="text-[9px] text-slate-300/70">Checking…</span>
                       ) : null}
                     </div>
 
-                    {/* Actual existing mining balance; no fictional APXN tokens. */}
-                    <div className="relative z-10 mt-5 min-w-0">
-                      <p className="text-[10px] font-black tracking-[0.18em] text-blue-100/90 sm:text-xs">
+                    {/* Same live APXN Points balance used throughout the application. */}
+                    <div className="relative z-10 mt-2 min-w-0">
+                      <p className="text-[9px] font-extrabold tracking-[0.18em] text-blue-100/75">
                         MINING BALANCE
                       </p>
-                      <p className="mt-1 max-w-full break-words text-[clamp(1.5rem,5.9vw,2.75rem)] font-black leading-tight tracking-tight text-white [font-variant-numeric:tabular-nums] drop-shadow-[0_2px_9px_rgba(0,0,0,0.45)]">
+                      <p className="mt-1 break-all text-[clamp(1.25rem,5.5vw,1.9rem)] font-black leading-tight tracking-tight text-white [font-variant-numeric:tabular-nums]">
                         {Number(balance || 0).toLocaleString('en-US', {
                           minimumFractionDigits: 4,
                           maximumFractionDigits: 4,
                         })}
                       </p>
                       <div className="mt-2 flex items-end justify-between gap-2">
-                        <span className="text-[13px] font-black tracking-wider text-yellow-300 drop-shadow-[0_0_10px_rgba(250,204,21,0.36)] sm:text-base">
+                        <span className="text-[11px] font-extrabold tracking-wider text-amber-300">
                           APXN POINTS
                         </span>
-                        <div className="flex items-center gap-1 text-xl font-black italic tracking-[0.01em] text-white sm:text-[25px]">
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.4"
-                            strokeLinecap="round"
-                            className="h-5 w-5"
-                          >
-                            <path d="M5 9a4 4 0 0 1 0 6" />
-                            <path d="M9 6a8 8 0 0 1 0 12" />
-                            <path d="M13 3a12 12 0 0 1 0 18" />
-                          </svg>
+                        <span className="text-[16px] font-black italic tracking-[0.08em] text-white/90">
                           APXN
-                        </div>
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+
+
 
             {/* Future verified points remain locked until official unlock. */}
             <div className="mt-8 space-y-4">
