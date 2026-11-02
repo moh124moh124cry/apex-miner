@@ -4512,70 +4512,49 @@ export default function Home() {
               <div className="h-11 w-11 shrink-0" aria-hidden="true" />
             </div>
 
-                                {/* APXN tilted premium 3D membership card — display only. */}
-            <div className="relative mb-10 mt-10 px-5 [perspective:1300px] sm:px-6">
-              <div
-                className="relative mx-auto w-full max-w-[350px] transform-gpu"
-                style={{
-                  transform: 'rotateZ(-3.8deg) rotateY(-6deg) rotateX(2deg)',
-                  transformOrigin: 'center center',
-                  transformStyle: 'preserve-3d',
-                }}
-              >
-                {/* Visible lower-right metallic side gives the angled card real depth. */}
+                                      {/* APXN compact premium card — straight, no rotation. */}
+            <div className="mt-6 px-1">
+              <div className="relative mx-auto w-full max-w-[355px]">
+                {/* Thin side edge creates depth without tilting the card. */}
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 translate-x-[8px] translate-y-[9px] rounded-[23px]"
+                  className="pointer-events-none absolute inset-0 translate-x-[3px] translate-y-[5px] rounded-[22px]"
                   style={{
-                    background: 'linear-gradient(135deg, #0755a3 0%, #213882 47%, #9c33d5 100%)',
-                    boxShadow: '8px 14px 24px rgba(0,0,0,0.55), 2px 7px 15px rgba(140,51,246,0.28)',
-                    transform: 'translateZ(-7px)',
+                    background: 'linear-gradient(145deg, #1873b9 0%, #172f74 52%, #7a3bd0 100%)',
+                    boxShadow: '3px 8px 20px rgba(0,0,0,0.42)',
                   }}
                 />
 
-                {/* Metallic blue/violet edge and a restrained neon glow. */}
                 <div
-                  className="relative rounded-[23px] p-[2px]"
+                  className="relative rounded-[22px] p-[1.5px]"
                   style={{
-                    background: 'linear-gradient(126deg, #7cecff 0%, #087cf3 28%, #5454f4 62%, #f06aff 100%)',
-                    boxShadow: '0 0 15px rgba(9,157,255,0.42), 0 0 19px rgba(168,85,247,0.24), 0 17px 28px rgba(0,0,0,0.55)',
+                    background: 'linear-gradient(125deg, #9ae5ff 0%, #4a98f7 31%, #8083e4 67%, #ba87e8 100%)',
+                    boxShadow: '0 0 12px rgba(61,126,248,0.24), 0 12px 22px rgba(0,0,0,0.46)',
                   }}
                 >
                   <div
-                    className="relative flex aspect-[1.68/1] min-h-[190px] flex-col justify-between overflow-hidden rounded-[21px] px-4 py-4 sm:px-5"
+                    className="relative flex min-h-[188px] aspect-[1.72/1] flex-col justify-between overflow-hidden rounded-[20px] px-4 py-4"
                     style={{
-                      background: 'radial-gradient(ellipse at 0% 0%, rgba(12,142,241,0.80), transparent 49%), radial-gradient(ellipse at 100% 95%, rgba(144,35,211,0.60), transparent 52%), linear-gradient(135deg, #073477 0%, #090e38 54%, #270c60 100%)',
+                      background: 'radial-gradient(ellipse at -5% -12%, rgba(43,126,228,0.53), transparent 51%), radial-gradient(ellipse at 108% 114%, rgba(105,50,155,0.48), transparent 56%), linear-gradient(138deg, #102b60 0%, #080f2b 54%, #1d1643 100%)',
                     }}
                   >
-                    {/* Glossy light, curved 3D accent, and highlights are decorative only. */}
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-cyan-100 via-sky-300/75 to-violet-200" />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -right-16 top-5 h-56 w-56 rotate-[32deg] rounded-full border-[16px] border-indigo-200/10"
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -left-10 -top-32 h-52 w-64 rotate-[24deg] rounded-full"
-                      style={{ background: 'linear-gradient(165deg, rgba(255,255,255,0.16), transparent 75%)' }}
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute bottom-0 right-0 h-px w-4/5 bg-gradient-to-r from-transparent via-violet-300/60 to-fuchsia-200"
-                    />
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-white/55 via-sky-300/25 to-violet-300/30" />
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-12 top-5 h-44 w-44 rotate-[35deg] rounded-full border-[11px] border-white/[0.045]" />
+                    <div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-cyan-300/35 via-transparent to-violet-300/35" />
 
-                    {/* Existing real profile name, APXN logo and optional Early Access badge. */}
+                    {/* Real Telegram first name, logo and existing optional badge. */}
                     <div className="relative z-10 flex items-start justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <img
                           src="/logo2.png"
                           alt="APXN logo"
-                          className="h-10 w-10 shrink-0 rounded-xl border border-cyan-200/40 object-cover shadow-[0_0_13px_rgba(35,185,255,0.36)]"
+                          className="h-10 w-10 shrink-0 rounded-xl border border-white/25 object-cover shadow-[0_0_10px_rgba(75,151,247,0.22)]"
                         />
                         <div className="min-w-0">
-                          <p className="max-w-[155px] truncate text-[17px] font-extrabold leading-tight text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.4)] sm:text-lg">
+                          <p className="max-w-[170px] truncate text-[17px] font-extrabold leading-tight text-white sm:text-lg">
                             {firstName && firstName !== 'Unknown' ? firstName : 'APXN Worker'}
                           </p>
-                          <p className="mt-1 text-[8px] font-bold tracking-[0.18em] text-sky-100/80">
+                          <p className="mt-1 text-[8px] font-bold tracking-[0.18em] text-sky-200/75">
                             APXN MEMBER
                           </p>
                         </div>
@@ -4586,9 +4565,9 @@ export default function Home() {
                             src="https://apxn.network/apxn-early-access-badge.png"
                             alt="Early Access badge"
                             title="APXN Early Access"
-                            className="h-[49px] w-[49px] object-contain drop-shadow-[0_0_8px_rgba(27,255,110,0.35)]"
+                            className="h-[49px] w-[49px] object-contain drop-shadow-[0_0_6px_rgba(27,255,110,0.22)]"
                           />
-                          <span className="whitespace-nowrap rounded-full border border-emerald-400/50 bg-emerald-950/65 px-1.5 py-0.5 text-[7px] font-extrabold text-emerald-200">
+                          <span className="whitespace-nowrap rounded-full border border-emerald-400/40 bg-emerald-950/70 px-1.5 py-0.5 text-[7px] font-extrabold text-emerald-200">
                             EARLY ACCESS
                           </span>
                         </div>
@@ -4597,12 +4576,12 @@ export default function Home() {
                       ) : null}
                     </div>
 
-                    {/* Live mining balance; does not change any points or account data. */}
+                    {/* Actual mining balance. */}
                     <div className="relative z-10 mt-2 min-w-0">
-                      <p className="text-[9px] font-extrabold tracking-[0.18em] text-blue-100/85">
+                      <p className="text-[9px] font-extrabold tracking-[0.18em] text-blue-100/75">
                         MINING BALANCE
                       </p>
-                      <p className="mt-1 break-all text-[clamp(1.2rem,5.3vw,1.9rem)] font-black leading-tight tracking-tight text-white [font-variant-numeric:tabular-nums] drop-shadow-[0_2px_7px_rgba(0,0,0,0.42)]">
+                      <p className="mt-1 break-all text-[clamp(1.25rem,5.5vw,1.9rem)] font-black leading-tight tracking-tight text-white [font-variant-numeric:tabular-nums]">
                         {Number(balance || 0).toLocaleString('en-US', {
                           minimumFractionDigits: 4,
                           maximumFractionDigits: 4,
@@ -4612,7 +4591,7 @@ export default function Home() {
                         <span className="text-[11px] font-extrabold tracking-wider text-amber-300">
                           APXN POINTS
                         </span>
-                        <span className="text-[16px] font-black italic tracking-[0.08em] text-white drop-shadow-[0_0_8px_rgba(203,213,225,0.32)]">
+                        <span className="text-[16px] font-black italic tracking-[0.08em] text-white/90">
                           APXN
                         </span>
                       </div>
@@ -4621,6 +4600,8 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+
 
 
 
