@@ -5402,7 +5402,7 @@ export default function Home() {
           <div className="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 flex justify-around p-2">
              <button onClick={() => setDiscoverView('about')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'about' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>About</button>
              <button onClick={() => setDiscoverView('roadmap')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'roadmap' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Apex Roadmap</button>
-             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Tokenomics</button>
+             <button onClick={() => setDiscoverView('whitepaper')} className={`py-2 px-4 rounded-lg text-xs font-bold transition-colors ${discoverView === 'whitepaper' ? 'bg-yellow-600 text-slate-900' : 'text-gray-400 hover:text-white'}`}>Whitepaper</button>
           </div>
 
           {discoverView === 'about' && (
@@ -5415,17 +5415,17 @@ export default function Home() {
                    <h1 className="text-4xl font-black text-white mb-2 z-10">Apex Network</h1>
                    <div className="flex gap-2 mt-2 z-10">
                       <span className="flex items-center gap-1 text-yellow-500 font-bold text-[10px] border border-yellow-500/30 px-3 py-1 rounded-full bg-yellow-900/30">
-                        <img src="/binance-logo-1.png" alt="Binance" className="w-3 h-3 object-contain" /> BINANCE ECOSYSTEM
+                        <img src="/binance-logo-1.png" alt="Binance" className="w-3 h-3 object-contain" /> BSC BEP-20
                       </span>
                       <span className="flex items-center gap-1 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 px-3 py-1 rounded-full bg-cyan-900/30">
-                        <span>🥞</span> PANCAKESWAP
+                        <span>🧭</span> APXN ROADMAP
                       </span>
                    </div>
                 </div>
 
                 <div className="px-6 w-full mt-8">
                    <p className="text-gray-300 text-sm leading-relaxed mb-8 font-medium text-center">
-                     Welcome to the next generation of cloud infrastructure. Built natively on the <strong className="text-yellow-500">Binance Smart Chain (BSC)</strong> for extreme scalability and ultra-low fees, Apex Network offers a seamless Web3 mining ecosystem directly inside Telegram.
+                     Apex Network is a Telegram-based Web3 ecosystem for mining APXN Points, daily participation and referrals, with a planned DEX, testnet and mainnet.
                    </p>
 
                    <h2 className="text-2xl font-bold text-white mb-4 border-b border-slate-800 pb-2">Core Features</h2>
@@ -5437,13 +5437,13 @@ export default function Home() {
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
                          <span className="text-3xl block mb-2">🛡️</span>
-                         <h3 className="font-bold text-white text-sm">BEP-20 Security</h3>
-                         <p className="text-gray-400 text-[10px] mt-1">Audited smart contract & liquidity.</p>
+                         <h3 className="font-bold text-white text-sm">BEP-20 Token</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">BSC token contract information is publicly accessible.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
                          <span className="text-3xl block mb-2">🚀</span>
-                         <h3 className="font-bold text-white text-sm">PancakeSwap LP</h3>
-                         <p className="text-gray-400 text-[10px] mt-1">Guaranteed decentralized trading.</p>
+                         <h3 className="font-bold text-white text-sm">APXN DEX</h3>
+                         <p className="text-gray-400 text-[10px] mt-1">APXN DEX launch planned for Q3 2027.</p>
                       </div>
                       <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
                          <span className="text-3xl block mb-2">👥</span>
@@ -5486,7 +5486,7 @@ export default function Home() {
                        <strong className="text-gray-200">NOT FINANCIAL ADVICE:</strong> The information provided within the Apex Network application, whitepaper, and roadmap does not constitute investment, financial, or trading advice.
                      </p>
                      <p className="text-gray-500 text-[10px] leading-relaxed">
-                       The blockchain industry is highly volatile. The Core Team reserves the absolute right to amend, delay, or restructure the Whitepaper, Tokenomics, and Roadmap phases at any time due to unforeseen force majeure events, global regulatory changes, or shifting market dynamics to protect the ecosystem's integrity.
+                       APXN reserves the full right to revise the roadmap, milestones and dates according to events, changing global financial market conditions and force majeure circumstances. Dates are targets, not guarantees.
                      </p>
                    </div>
                 </div>
@@ -5495,293 +5495,195 @@ export default function Home() {
 
           {discoverView === 'roadmap' && (
              <div className="px-6 pt-8 w-full">
-                <h2 className="text-2xl font-black text-white mb-8 text-center uppercase tracking-widest">Apex Roadmap</h2>
+                <h2 className="text-2xl font-black text-white mb-2 text-center uppercase tracking-widest">APXN Roadmap</h2>
+                <p className="text-gray-400 text-xs text-center mb-8">Q4 2026 — Q2 2028</p>
                 <div className="relative border-l-2 border-slate-700 ml-3 pl-6 space-y-10 pb-8">
-                  {/* Q4 2026 */}
                   <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></span>
-                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2026: Genesis Launch</h3>
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-yellow-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-yellow-400 text-lg mb-1">Q4 2026: Mining, Tasks & Referrals</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Official Launch of Apex Network Telegram app</li>
-                      <li>Start mining and accumulating APXN points</li>
-                      <li>Daily Check-In & Social Tasks system</li>
-                      <li>Invite Friends & Referral rewards</li>
-                      <li>Wallet linking integration</li>
+                      <li>APXN Points mining and daily participation</li>
+                      <li>Referrals, social and daily tasks, upgrades and staking</li>
+                      <li>Continued Telegram Mini App improvements</li>
                     </ul>
                   </div>
-
-                  {/* Q1 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: Mining & Engagement</h3>
+                    <h3 className="font-black text-blue-400 text-lg mb-1">Q1 2027: APXN Membership & Loyalty KYC</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Enhancing the point mining system & Mining Speed</li>
-                      <li>Daily Streak system improvements</li>
-                      <li>Additional tasks and rewards</li>
-                      <li>Referral system & activity tiers upgrades</li>
-                      <li>UI/UX improvements inside Telegram</li>
+                      <li>Launch APXN Membership & Loyalty KYC</li>
+                      <li>Display 100 APXN in the accounts of 10,000 Badge holders who complete the APXN Membership & Loyalty KYC tasks</li>
+                      <li>The first airdrop can be claimed in Q2 2027 according to the official claim rules</li>
                     </ul>
                   </div>
-
-                  {/* Q2 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Rig Upgrades & Presale</h3>
+                    <h3 className="font-black text-purple-400 text-lg mb-1">Q2 2027: Development, Partnerships & Airdrops</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Launch of Rig Upgrades (GPU Overclock, Cloud Server, Quantum ASIC)</li>
-                      <li>Burning points for internal upgrades</li>
-                      <li><strong className="text-white">Initiation of the Phased Presale (Runs continuously until Listing)</strong></li>
+                      <li>Continue APXN development, partnerships and marketing</li>
+                      <li>Launch the second airdrop using approximately 2,000,000 APXN from the partnerships, marketing, development and airdrop fund</li>
+                      <li>Open claims for the first and second airdrops</li>
                     </ul>
                   </div>
-
-                  {/* Q3 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-green-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: Community & Growth</h3>
+                    <h3 className="font-black text-green-400 text-lg mb-1">Q3 2027: APXN DEX & CEX Launchpad</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Expansion of the referral system & global community</li>
-                      <li>Advanced user tiers & continuous activity rewards</li>
-                      <li>Additional community campaigns</li>
-                      <li><strong className="text-white">Phased Presale ongoing</strong></li>
+                      <li>Launch APXN DEX</li>
+                      <li>Launch a Launchpad on centralized exchanges (CEX)</li>
                     </ul>
                   </div>
-
-                  {/* Q4 2027 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-orange-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-orange-400 text-lg mb-1">Q4 2027: Ecosystem Expansion</h3>
+                    <h3 className="font-black text-orange-400 text-lg mb-1">Q4 2027: Testnet & Exchange Listings</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Telegram Mini App optimization</li>
-                      <li>Mining & upgrades enhancements</li>
-                      <li>Security infrastructure development</li>
-                      <li>Technical preparation for upcoming phases</li>
+                      <li>Launch the APXN testnet</li>
+                      <li>Target APXN listings on CEX and DEX platforms</li>
                     </ul>
                   </div>
-
-                  {/* Q1 2028 */}
                   <div className="relative">
                     <span className="absolute -left-[31px] top-1 w-4 h-4 bg-cyan-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-cyan-400 text-lg mb-1">Q1 2028: Platform Optimization</h3>
+                    <h3 className="font-black text-cyan-400 text-lg mb-1">Q1 2028: Mainnet Preparation & New Products</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Enhancing app speed, stability, and point economy</li>
-                      <li>Security stress tests for current infrastructure</li>
-                      <li>Preparing the system for the token transition phase</li>
-                      <li><strong className="text-white">Phased Presale ongoing</strong></li>
+                      <li>Prepare the APXN mainnet</li>
+                      <li>Launch new products within the APXN ecosystem</li>
                     </ul>
                   </div>
-
-                  {/* Q2 2028 */}
                   <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-red-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-red-400 text-lg mb-1">Q2 2028: Token Preparation</h3>
+                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-emerald-500 rounded-full ring-4 ring-slate-950"></span>
+                    <h3 className="font-black text-emerald-400 text-lg mb-1">Q2 2028: APXN Mainnet Launch</h3>
                     <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Preparation for APXN Tokenomics</li>
-                      <li>Security systems final review</li>
-                      <li>Global community expansion</li>
-                      <li>Preparation for the major announcement</li>
-                    </ul>
-                  </div>
-
-                  {/* Q3 2028 */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-pink-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-pink-400 text-lg mb-1">Q3 2028: Listing Announcement</h3>
-                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li><strong className="text-white">Conclusion of the Phased Presale</strong></li>
-                      <li>Official APXN Listing Announcement</li>
-                      <li>Announcement of supported trading platforms (DEX/CEX)</li>
-                      <li>Transition from Points phase to Token phase</li>
-                      <li>Announcement of Apex Testnet</li>
-                    </ul>
-                  </div>
-
-                  {/* Q4 2028 */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-indigo-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-indigo-400 text-lg mb-1">Q4 2028: Apex Testnet</h3>
-                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Apex Network Testnet Launch</li>
-                      <li>Network, transaction, and security testing</li>
-                      <li>Opening the network for developers</li>
-                      <li>Testnet Explorer launch</li>
-                    </ul>
-                  </div>
-
-                  {/* Q1 2029 */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-teal-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-teal-400 text-lg mb-1">Q1 2029: Testnet Expansion</h3>
-                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Testnet performance optimization</li>
-                      <li>Fixing bugs & scaling the network</li>
-                      <li>Developer support and stability metrics</li>
-                      <li>Preparation for Staking system</li>
-                    </ul>
-                  </div>
-
-                  {/* Q2 2029 */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-lime-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-lime-400 text-lg mb-1">Q2 2029: Staking Implementation</h3>
-                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Launch of Apex Staking</li>
-                      <li>APXN staking rewards system</li>
-                      <li>Validators / Nodes testing</li>
-                      <li>Staking security audits</li>
-                    </ul>
-                  </div>
-
-                  {/* Q3 2029 */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-amber-500 rounded-full ring-4 ring-slate-950"></span>
-                    <h3 className="font-black text-amber-400 text-lg mb-1">Q3 2029: Mainnet Preparation</h3>
-                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li>Final security audits</li>
-                      <li>Preparing Apex Mainnet & Mainnet Explorer</li>
-                      <li>Validators setup & final documentation</li>
-                      <li>Official readiness announcement</li>
-                    </ul>
-                  </div>
-
-                  {/* Q4 2029 */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-1 w-4 h-4 bg-emerald-500 rounded-full ring-4 ring-slate-950 animate-pulse"></span>
-                    <h3 className="font-black text-emerald-400 text-lg mb-1">Q4 2029: Apex Mainnet Launch</h3>
-                    <ul className="text-gray-400 text-xs leading-relaxed list-disc ml-4 space-y-1">
-                      <li><strong className="text-white">Apex Network Mainnet Official Launch</strong></li>
-                      <li>APXN running natively on Mainnet</li>
-                      <li>Activating Staking on Mainnet</li>
-                      <li>Mainnet Explorer launch</li>
-                      <li>Ecosystem and global partnerships expansion</li>
+                      <li>Launch the APXN mainnet</li>
                     </ul>
                   </div>
                 </div>
-
-                <div className="mt-12 mb-4">
+                <div className="mt-10 mb-8">
                   <h3 className="text-center text-gray-400 font-black tracking-widest text-[10px] uppercase mb-6">Core Project Flow</h3>
                   <div className="flex flex-col gap-2 items-center">
-                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Telegram App</div>
+                    <div className="bg-slate-900 border border-slate-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold text-center">Mining, Tasks & Referrals (Q4 2026)</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Daily Activity & Mining Points</div>
+                    <div className="bg-slate-900 border border-slate-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold text-center">APXN Membership & Loyalty KYC (Q1 2027)</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Tasks & Referrals</div>
+                    <div className="bg-slate-900 border border-slate-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold text-center">First & Second Airdrop Claims (Q2 2027)</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    <div className="bg-slate-900 border border-yellow-600/50 px-4 py-2 rounded-lg text-xs font-bold text-yellow-500 shadow-md">Rig Upgrades & Phased Presale</div>
+                    <div className="bg-slate-900 border border-slate-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold text-center">APXN DEX & CEX Launchpad (Q3 2027)</div>
                     <div className="h-4 w-[2px] bg-yellow-500"></div>
-                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-gray-300 shadow-md">Community Growth</div>
-                    <div className="h-4 w-[2px] bg-purple-500"></div>
-                    <div className="bg-gradient-to-r from-purple-900 to-indigo-900 border border-purple-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-[0_0_10px_rgba(168,85,247,0.4)]">Listing Announcement (Q3 2028)</div>
-                    <div className="h-4 w-[2px] bg-blue-500"></div>
-                    <div className="bg-gradient-to-r from-blue-900 to-cyan-900 border border-blue-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]">Apex Testnet (Q4 2028)</div>
-                    <div className="h-4 w-[2px] bg-green-500"></div>
-                    <div className="bg-slate-900 border border-green-500 px-4 py-2 rounded-lg text-xs font-bold text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.2)]">Staking (2029)</div>
-                    <div className="h-4 w-[2px] bg-emerald-500"></div>
-                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-400 px-6 py-3 rounded-xl text-sm font-black text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]">APEX MAINNET (Q4 2029)</div>
+                    <div className="bg-slate-900 border border-slate-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold text-center">APXN Testnet & CEX / DEX Listings (Q4 2027)</div>
+                    <div className="h-4 w-[2px] bg-yellow-500"></div>
+                    <div className="bg-slate-900 border border-slate-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold text-center">Mainnet Preparation & Products (Q1 2028)</div>
+                    <div className="h-4 w-[2px] bg-yellow-500"></div>
+                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-400 text-white px-4 py-2 rounded-lg text-xs font-bold text-center">APXN Mainnet (Q2 2028)</div>
                   </div>
+                </div>
+                <div className="bg-slate-900/80 border border-yellow-600/30 rounded-xl p-4 mb-8">
+                  <h3 className="font-bold text-yellow-400 text-sm mb-2">Roadmap Amendment Notice</h3>
+                  <p className="text-gray-400 text-[11px] leading-relaxed">APXN reserves the full right to revise the roadmap, milestones and dates according to events, changing global financial market conditions and force majeure circumstances. Dates are targets, not guarantees.</p>
                 </div>
              </div>
           )}
 
           {discoverView === 'whitepaper' && (
              <div className="px-6 pt-6 w-full">
-                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-6">Tokenomics & Security</h1>
+                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 text-center uppercase tracking-widest mb-2">APXN Whitepaper</h1>
+                <p className="text-gray-400 text-[11px] text-center mb-7">Overview • Tokenomics • Community Rewards</p>
 
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Smart Contract & Transparency</h2>
-                <div className="bg-slate-900/80 p-4 rounded-xl border border-emerald-500/50 mb-6 flex flex-col gap-3 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                  <div className="flex items-center gap-2">
-                     <span className="text-xl">🛡️</span>
-                     <h3 className="font-bold text-emerald-400 text-sm">Verified & Audited Contract</h3>
-                  </div>
-                  <p className="text-[11px] text-gray-300 leading-relaxed">
-                    Apex Network ($APXN) is built using standard, audited smart contracts via <strong className="text-white">Thirdweb</strong>. The code contains NO mint functions, NO hidden taxes, and the total supply is strictly fixed.
-                  </p>
-                  <div className="bg-black/50 p-2 rounded-lg border border-slate-700 mt-1">
-                    <span className="block text-[9px] text-gray-500 uppercase mb-1">Contract Address (BSC BEP-20)</span>
-                    <span className="block text-[11px] font-mono text-yellow-400 break-all">0x88074bA197BBB0a3AFF891E52d05764F98509956</span>
-                  </div>
-                  <a href="https://bscscan.com/token/0x88074bA197BBB0a3AFF891E52d05764F98509956#transactions" target="_blank" rel="noopener noreferrer" className="mt-2 w-full bg-emerald-600/20 border border-emerald-500/50 text-emerald-400 py-2 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-2 hover:bg-emerald-600/40 transition-colors">
-                    <span>🔍</span> Verify on BscScan
-                  </a>
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Apex Network Ecosystem</h2>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 mb-7">
+                  <p className="text-gray-300 text-xs leading-relaxed">APXN begins as a Telegram Mini App featuring APXN Points mining, daily tasks, referrals, boosts and staking. The roadmap extends toward APXN DEX, an APXN testnet and an APXN mainnet.</p>
+                  <p className="text-gray-400 text-[11px] leading-relaxed mt-3">APXN Points are in-app participation points, distinct from transferable on-chain APXN tokens. Token allocation follows official eligibility rules.</p>
                 </div>
 
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Initial Coin Offering (ICO)</h2>
-                <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 p-4 rounded-xl border border-yellow-500/50 mb-8 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[9px] font-black px-2 py-1 rounded-bl-lg uppercase">Active Phase</div>
-                  <h3 className="font-bold text-white text-sm mb-2 flex items-center gap-2">🎟️ Ticket-Based Presale</h3>
-                  <p className="text-[11px] text-gray-300 leading-relaxed mb-3">
-                    Before our official listing and liquidity injection on PancakeSwap, $APXN is exclusively available through our early-access Ticket System inside this app.
-                  </p>
-                  <div className="flex items-center justify-between bg-black/40 p-3 rounded-lg border border-yellow-700/50">
-                     <span className="text-xs text-gray-400 font-bold">ICO Ticket Price:</span>
-                     <span className="text-lg font-black text-green-400">0.10 $ <span className="text-[10px] text-gray-500 font-normal">/ APXN</span></span>
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">APXN Membership & Loyalty KYC & Airdrops</h2>
+                <div className="bg-slate-900/80 border border-blue-500/40 rounded-xl p-4 mb-7 space-y-3">
+                  <p className="text-gray-300 text-xs leading-relaxed"><strong className="text-white">Q1 2027:</strong> Launch APXN Membership & Loyalty KYC. Display 100 APXN in the accounts of 10,000 Badge holders who complete the required APXN Membership & Loyalty KYC tasks.</p>
+                  <p className="text-gray-300 text-xs leading-relaxed">The displayed first-airdrop reward is not an immediate on-chain transfer. Its claim is scheduled for Q2 2027.</p>
+                  <p className="text-gray-300 text-xs leading-relaxed"><strong className="text-white">Q2 2027:</strong> Launch the second airdrop, allocating approximately <strong className="text-yellow-400">2,000,000 APXN</strong> from the partnerships, marketing, development and airdrop fund. Open claims for the first and second airdrops.</p>
+                  <p className="text-gray-400 text-[11px] leading-relaxed">The 63,000,000 APXN community allocation spans seven levels based on verified APXN Points. Final distribution rules will be published officially.</p>
+                </div>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Seven Levels & Community Distribution</h2>
+                <div className="bg-slate-900/80 border border-yellow-600/40 rounded-xl p-4 mb-7 space-y-3">
+                  <p className="text-gray-300 text-xs leading-relaxed"><strong className="text-white">63,000,000 APXN</strong> are allocated to the community across seven levels. Each level will have its own dedicated APXN allocation, and each user's level depends on verified APXN Points.</p>
+                  <p className="text-gray-300 text-xs leading-relaxed">Within each level, tokens are distributed proportionally to each eligible user's verified APXN Points compared with the total verified APXN Points of eligible users in the same level. Users within the same level do not automatically receive equal amounts.</p>
+                  <p className="text-gray-300 text-xs leading-relaxed">A user's level and APXN allocation will appear on the Dashboard only after successfully completing <strong className="text-white">all stages of APXN Membership & Loyalty KYC</strong>.</p>
+                  <p className="text-gray-400 text-[11px] leading-relaxed">Final allocations for all seven levels will be determined and officially announced before the distribution and listing planned in this Whitepaper.</p>
+                </div>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Early Access Badge Guidelines</h2>
+                <div className="bg-slate-900/80 border border-blue-500/40 rounded-xl p-4 mb-7">
+                  <p className="text-gray-300 text-xs leading-relaxed">APXN will publish special official instructions for the Badge, including eligibility, activity requirements, benefits and the conditions for keeping the Badge. The final rules will be announced through official APXN channels.</p>
+                </div>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Tokenomics — 100 Million APXN</h2>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 mb-4">
+                  <div className="flex justify-between gap-2 items-center mb-3"><span className="text-gray-400 text-xs">Total Supply</span><strong className="text-yellow-400 text-sm">100,000,000 APXN</strong></div>
+                  <div className="flex h-4 overflow-hidden rounded-full w-full gap-[2px]">
+                    <div className="h-full bg-blue-500" style={{ width: '63%' }}></div>
+                    <div className="h-full bg-purple-500" style={{ width: '15%' }}></div>
+                    <div className="h-full bg-amber-500" style={{ width: '15%' }}></div>
+                    <div className="h-full bg-orange-500" style={{ width: '5%' }}></div>
+                    <div className="h-full bg-pink-500" style={{ width: '2%' }}></div>
                   </div>
                 </div>
-
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Airdrop Conversion Criteria</h2>
-                <div className="bg-slate-900/50 p-4 rounded-xl border border-yellow-700/50 mb-8">
-                  <p className="text-gray-300 text-xs leading-relaxed mb-3">
-                    APXN Points collected in-app will be converted to real $APXN tokens during TGE. The conversion ratio is strictly dependent on:
-                  </p>
-                  <ul className="text-xs text-gray-400 space-y-2 ml-4 list-disc">
-                    <li><strong className="text-white">Activity Evaluation:</strong> Consistency in daily check-ins (streaks) and active friend referrals.</li>
-                    <li><strong className="text-white">In-App Upgrades:</strong> Purchasing hardware boosts utilizing your mined points proves ecosystem loyalty.</li>
-                    <li><strong className="text-white">Early Access:</strong> Genesis pioneer accounts will receive favorable multipliers.</li>
-                  </ul>
-                </div>
-
-                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Distribution Details (100M Total)</h2>
-
-                <div className="space-y-4 mb-8">
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-sm">Community & Airdrop</span>
+                <div className="space-y-3 mb-8">
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-white font-bold text-sm">Community</h3>
                       <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black">63%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      Allocated entirely to our true supporters. Distributed via the conversion criteria above to ensure a fair and decentralized ecosystem.
-                    </p>
+                    <p className="text-yellow-400 text-xs font-black mt-2">63,000,000 APXN</p>
+                    <p className="text-gray-400 text-[11px] leading-relaxed mt-2">Community allocation across seven levels based on verified APXN Points and officially announced distribution conditions.</p>
                   </div>
-
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-sm">DEX & CEX Liquidity</span>
-                      <span className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-black">20%</span>
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-white font-bold text-sm">Listings & Exchanges</h3>
+                      <span className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-black">15%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      Locked liquidity specifically reserved for PancakeSwap (DEX) and top-tier Centralized Exchanges (CEXs) to ensure smooth trading, deep order books, and price stability.
-                    </p>
+                    <p className="text-yellow-400 text-xs font-black mt-2">15,000,000 APXN</p>
+                    <p className="text-gray-400 text-[11px] leading-relaxed mt-2">Reserved for exchange listings and platform requirements.</p>
                   </div>
-
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-sm">Marketing & Partners</span>
-                      <span className="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-black">10%</span>
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-white font-bold text-sm">Partnerships, Marketing, Development & Airdrops</h3>
+                      <span className="bg-amber-600 text-white px-2 py-1 rounded text-[10px] font-black">15%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      Strategic fund for global influencer campaigns, KOL onboarding, and future Web3 brand partnerships to drive mass adoption.
-                    </p>
+                    <p className="text-yellow-400 text-xs font-black mt-2">15,000,000 APXN</p>
+                    <p className="text-gray-400 text-[11px] leading-relaxed mt-2">Includes approximately 2,000,000 APXN for the second airdrop. This is included in the 15 million allocation, not additional supply.</p>
                   </div>
-
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-sm">Core Team</span>
-                      <span className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black">6%</span>
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-white font-bold text-sm">Project Team</h3>
+                      <span className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black">5%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      Development allocation. Strictly locked via smart contracts with a prolonged vesting period to align founder incentives with long-term project success.
-                    </p>
+                    <p className="text-yellow-400 text-xs font-black mt-2">5,000,000 APXN</p>
+                    <p className="text-gray-400 text-[11px] leading-relaxed mt-2">Reserved for the APXN project team.</p>
                   </div>
-
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-yellow-700/50 flex flex-col gap-2 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-1 h-full bg-yellow-500"></div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-sm">Phased Presale / ICO</span>
-                      <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black">1%</span>
+                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-white font-bold text-sm">CEX Launchpad</h3>
+                      <span className="bg-pink-600 text-white px-2 py-1 rounded text-[10px] font-black">2%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      Exclusive early-bird allocation. This phased presale will commence in Q2 2027 and run continuously throughout the project's lifespan until the official TGE announcement.
-                    </p>
+                    <p className="text-yellow-400 text-xs font-black mt-2">2,000,000 APXN</p>
+                    <p className="text-gray-400 text-[11px] leading-relaxed mt-2">A separate allocation for the planned CEX Launchpad in Q3 2027.</p>
                   </div>
+                </div>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Launchpad, DEX & Mainnet</h2>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 mb-7">
+                  <p className="text-gray-300 text-xs leading-relaxed">Q3 2027 targets APXN DEX and CEX Launchpad. Q4 2027 targets APXN testnet and CEX/DEX listings. Q1 2028 covers mainnet preparation and new products, followed by the planned APXN mainnet launch in Q2 2028.</p>
+                  <p className="text-gray-400 text-[11px] leading-relaxed mt-3">Launchpad pricing, eligible exchanges and participation conditions will be announced when confirmed. No active token sale is implied.</p>
+                </div>
+
+                <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-4">Smart Contract & Transparency</h2>
+                <div className="bg-slate-900/80 border border-emerald-500/40 rounded-xl p-4 mb-7">
+                  <p className="text-gray-300 text-[11px] leading-relaxed mb-3">APXN's BSC BEP-20 contract details are available below. BscScan verification is not the same as an independent security audit.</p>
+                  <div className="bg-black/50 p-2 rounded-lg border border-slate-700"><span className="block text-[9px] text-gray-500 uppercase mb-1">Contract Address (BSC BEP-20)</span><span className="block text-[11px] font-mono text-yellow-400 break-all">0x88074bA197BBB0a3AFF891E52d05764F98509956</span></div>
+                  <a href="https://bscscan.com/token/0x88074bA197BBB0a3AFF891E52d05764F98509956#transactions" target="_blank" rel="noopener noreferrer" className="mt-3 w-full bg-emerald-600/20 border border-emerald-500/50 text-emerald-400 py-2 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-2 hover:bg-emerald-600/40 transition-colors">🔍 View on BscScan</a>
+                </div>
+
+                <div className="bg-gradient-to-br from-red-950/40 to-black border border-red-900/40 rounded-xl p-4 mb-8">
+                  <h3 className="font-bold text-red-400 text-sm mb-2">Important Notice</h3>
+                  <p className="text-gray-400 text-[11px] leading-relaxed">This whitepaper is informational, not financial advice or a guarantee of returns, prices or listing. APXN reserves the full right to revise the roadmap, milestones and dates according to events, changing global financial market conditions and force majeure circumstances. Dates are targets, not guarantees.</p>
                 </div>
              </div>
           )}
@@ -5808,6 +5710,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
