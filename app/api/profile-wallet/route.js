@@ -79,6 +79,20 @@ export async function POST(request) {
       return reply({ error: 'Could not load wallet' }, 500);
     }
 
+    // Any saved wallet associated with an authenticated Telegram numeric ID
+    // is verified under APXN policy, even when @username is absent.
+    if (saved && !saved.wallet_verified) {
+      const { error: verifyError } = await supabaseAdmin
+        .from('user_wallets')
+        .update({ wallet_verified: true, verified_at: new Date().toISOString() })
+        .eq('telegram_id', telegramId);
+      if (verifyError) {
+        console.error('BSC wallet verification failed:', verifyError.code);
+        return reply({ error: 'Could not update wallet verification' }, 500);
+      }
+      saved.wallet_verified = true;
+    }
+
     if (action === 'load') return reply(walletResult(saved));
 
     const address = String(body?.address || '').trim();
@@ -105,15 +119,15 @@ export async function POST(request) {
 
     // Database trigger independently enforces one CHANGE per calendar month.
     // First-time saves do not consume the edit for that month.
-    // A changed address must be verified again before airdrop claims.
+    // APXN policy: saved address + authenticated Telegram numeric ID = verified in-app.
     const { error: saveError } = await supabaseAdmin
       .from('user_wallets')
       .upsert({
         telegram_id: telegramId,
         wallet_address: address,
         chain_id: 56,
-        wallet_verified: false,
-        verified_at: null,
+        wallet_verified: true,
+        verified_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'telegram_id' });
 
