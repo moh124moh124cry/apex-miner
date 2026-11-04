@@ -14,6 +14,19 @@ const STARS_BOOST_REWARD_POINTS = 5000;
 const USER_CACHE_VERSION = 5;
 const USER_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Render a country flag using the saved two-letter country code.
+// Unknown countries get a globe; no Telegram username is displayed.
+function top20CountryFlag(code) {
+  const country = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(country) || ['XX', 'EU', 'T1'].includes(country)) {
+    return '🌍';
+  }
+  return String.fromCodePoint(
+    ...Array.from(country, (letter) => 127397 + letter.charCodeAt(0))
+  );
+}
+
+
 // Mining restart ad availability is checked for every country for at most 5 seconds.
 // If no ad can be prepared in that window, mining continues through ad_unavailable mode.
 // Once an ad is available and starts, skipping/rejecting it must NOT trigger the fallback.
@@ -879,13 +892,16 @@ export default function Home() {
   const [welcomeAmount, setWelcomeAmount] = useState(0);
   const [referralBonusAmount, setReferralBonusAmount] = useState(0);
 
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [walletAddress, setWalletAddress] = useState(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [selectedWallet, setSelectedWallet] = useState('');
-
-  const [manualWalletInput, setManualWalletInput] = useState(false);
-  const [tempAddress, setTempAddress] = useState('');
+  const [showTop20, setShowTop20] = useState(false);
+  const [top20Users, setTop20Users] = useState([]);
+  const [top20Month, setTop20Month] = useState('');
+  const [top20Loading, setTop20Loading] = useState(false);
+  const [top20Error, setTop20Error] = useState('');
+  const [bscWalletInput, setBscWalletInput] = useState('');
+  const [savedBscWallet, setSavedBscWallet] = useState('');
+  const [walletVerified, setWalletVerified] = useState(false);
+  const [bscWalletLoading, setBscWalletLoading] = useState(false);
+  const [bscWalletMessage, setBscWalletMessage] = useState('');
   // Open the correct Mini App section from Telegram notification buttons.
   // Navigation only: this does not change balances, mining, or payment state.
   useEffect(() => {
@@ -1044,65 +1060,86 @@ export default function Home() {
     );
   };
 
-  const handleConnectWallet = async (walletName) => {
-    setSelectedWallet(walletName);
-    setIsConnecting(true);
-
+  const loadTop20 = async () => {
+    setTop20Loading(true);
+    setTop20Error('');
     try {
-      let provider = null;
-      if (typeof window !== 'undefined') {
-        if (walletName === 'MetaMask' && window.ethereum) {
-          provider = window.ethereum;
-        } else if (walletName === 'Trust Wallet' && window.trustwallet) {
-          provider = window.trustwallet;
-        } else if (walletName === 'OKX Web3' && window.okxwallet) {
-          provider = window.okxwallet;
-        } else if (walletName === 'Binance Web3' && window.BinanceChain) {
-          provider = window.BinanceChain;
-        } else if (window.ethereum) {
-          provider = window.ethereum;
-        }
-      }
-      if (!provider) {
-        setManualWalletInput(true);
-        setIsConnecting(false);
-        return;
-      }
-      const accounts = await provider.request({ method: 'eth_requestAccounts' });
-
-      if (accounts && accounts.length > 0) {
-        const address = accounts[0];
-        setWalletAddress(`0x${address.substring(2, 6)}...${address.substring(address.length - 4)}`);
-        setShowWalletModal(false);
-      }
+      const initData = window.Telegram?.WebApp?.initData;
+      if (!initData) throw new Error('Please open APXN inside Telegram.');
+      const response = await fetch('/api/top20', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData }),
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Leaderboard unavailable');
+      setTop20Users(Array.isArray(data.users) ? data.users : []);
+      setTop20Month(data.month || '');
     } catch (error) {
-      console.error("Connection error:", error);
-      alert("❌ Connection cancelled or failed.");
+      setTop20Error(error.message || 'Cannot load Top 20');
     } finally {
-      setIsConnecting(false);
+      setTop20Loading(false);
     }
   };
 
-  const handleManualBind = () => {
-    if (tempAddress.length === 42 && tempAddress.startsWith('0x')) {
-      setWalletAddress(`${tempAddress.substring(0, 6)}...${tempAddress.substring(tempAddress.length - 4)}`);
-      setShowWalletModal(false);
-      setManualWalletInput(false);
-      setTempAddress('');
-      alert("✅ Wallet Successfully Linked for TGE!");
-    } else {
-      alert("❌ Please enter a valid BSC (BEP-20) address starting with '0x'!");
+  const loadBscWallet = async () => {
+    setBscWalletLoading(true);
+    setBscWalletMessage('');
+    try {
+      const initData = window.Telegram?.WebApp?.initData;
+      if (!initData) throw new Error('Open APXN inside Telegram.');
+      const response = await fetch('/api/profile-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, action: 'load' }),
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Wallet unavailable');
+      setSavedBscWallet(data.address || '');
+      setBscWalletInput(data.address || '');
+      setWalletVerified(Boolean(data.verified));
+    } catch (error) {
+      setBscWalletMessage(error.message || 'Wallet unavailable');
+    } finally {
+      setBscWalletLoading(false);
     }
   };
 
-  const closeModal = () => {
-    setShowWalletModal(false);
-    setManualWalletInput(false);
-    setTempAddress('');
+  const saveBscWallet = async () => {
+    const address = bscWalletInput.trim();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address) || /^0x0{40}$/i.test(address)) {
+      setBscWalletMessage('Please enter a valid BSC address (0x + 40 hex characters).');
+      return;
+    }
+    setBscWalletLoading(true);
+    setBscWalletMessage('');
+    try {
+      const initData = window.Telegram?.WebApp?.initData;
+      if (!initData) throw new Error('Open APXN inside Telegram.');
+      const response = await fetch('/api/profile-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, action: 'save', address }),
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Save failed');
+      setSavedBscWallet(data.address);
+      setBscWalletInput(data.address);
+      setWalletVerified(Boolean(data.verified));
+      setBscWalletMessage('BSC address saved successfully.');
+    } catch (error) {
+      setBscWalletMessage(error.message || 'Save failed');
+    } finally {
+      setBscWalletLoading(false);
+    }
   };
 
   const handleOpenProfile = async () => {
     setShowProfile(true);
+    void loadBscWallet();
 
     // One lightweight badge check per app session only.
     // It does not touch mining, rewards, Stars, tasks or wallet state.
@@ -4658,6 +4695,29 @@ export default function Home() {
                   Levels based on verified APXN Points
                 </p>
               </section>
+              <section className="mt-4 rounded-[25px] border border-indigo-400/45 bg-gradient-to-br from-[#10234c] to-[#171039] p-4 sm:p-5"
+                aria-label="BSC Wallet Address">
+                <h3 className="text-sm font-black tracking-wider text-white">🔗 BSC WALLET ADDRESS</h3>
+                <p className="mt-2 text-xs leading-relaxed text-slate-300">
+                  Add your personal BNB Smart Chain (BEP-20) wallet for future APXN airdrop claims.
+                  Do not use an exchange deposit address. Never share your recovery phrase.
+                </p>
+                <input aria-label="Your BSC wallet address" type="text" value={bscWalletInput}
+                  disabled={bscWalletLoading || walletVerified}
+                  onChange={(event) => setBscWalletInput(event.target.value)}
+                  placeholder="0x..." autoComplete="off" spellCheck={false}
+                  className="mt-4 w-full rounded-xl border border-indigo-400/40 bg-[#050b1e] px-3 py-3 font-mono text-xs text-white outline-none focus:border-yellow-400" />
+                <button type="button" disabled={bscWalletLoading || walletVerified}
+                  onClick={saveBscWallet}
+                  className="mt-3 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-black text-white disabled:opacity-50">
+                  {bscWalletLoading ? 'Loading...' : walletVerified ? 'Verified Wallet Locked' : 'SAVE WALLET'}
+                </button>
+                {savedBscWallet ? <p className="mt-3 break-all text-xs text-emerald-300">Saved: {savedBscWallet}</p> : null}
+                {bscWalletMessage ? <p className="mt-2 text-xs text-amber-300">{bscWalletMessage}</p> : null}
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+                  Saving an address does not verify wallet ownership or guarantee airdrop eligibility.
+                </p>
+              </section>
             </div>
           </div>
         </div>
@@ -4665,67 +4725,37 @@ export default function Home() {
 
 
 
-      {showWalletModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-           <div className="bg-slate-900 border border-yellow-500/50 rounded-2xl w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(234,179,8,0.2)]">
-              <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✖</button>
-
-              {!manualWalletInput ? (
-                <>
-                  <h3 className="text-xl font-black text-white mb-6 text-center flex items-center justify-center gap-2">
-                     <img src="/binance-logo-1.png" alt="Binance" className="w-6 h-6 object-contain" /> Connect BSC Wallet
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                     <button onClick={() => handleConnectWallet('Binance Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Binance Web3' ? 'border-yellow-400 bg-slate-800/80' : 'border-slate-700 hover:border-yellow-400'} transition-all`}>
-                        <img src="/binance-logo-1.png" alt="Binance" className="w-7 h-7 object-contain drop-shadow-md" />
-                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Binance Web3' ? 'Connecting...' : 'Binance Web3'}</span>
-                     </button>
-                     <button onClick={() => handleConnectWallet('MetaMask')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'MetaMask' ? 'border-orange-500 bg-slate-800/80' : 'border-slate-700 hover:border-orange-500'} transition-all`}>
-                        <span className="text-2xl w-7 text-center">🦊</span>
-                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'MetaMask' ? 'Connecting...' : 'MetaMask'}</span>
-                     </button>
-                     <button onClick={() => handleConnectWallet('Trust Wallet')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'Trust Wallet' ? 'border-blue-500 bg-slate-800/80' : 'border-slate-700 hover:border-blue-500'} transition-all`}>
-                        <span className="text-2xl w-7 text-center">🛡️</span>
-                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'Trust Wallet' ? 'Connecting...' : 'Trust Wallet'}</span>
-                     </button>
-                     <button onClick={() => handleConnectWallet('OKX Web3')} disabled={isConnecting} className={`w-full flex items-center gap-3 bg-slate-800 p-4 rounded-xl border ${isConnecting && selectedWallet === 'OKX Web3' ? 'border-white bg-slate-800/80' : 'border-slate-700 hover:border-white'} transition-all`}>
-                        <span className="text-xl font-black text-white w-7 text-center">OKX</span>
-                        <span className="text-white font-bold text-lg">{isConnecting && selectedWallet === 'OKX Web3' ? 'Connecting...' : 'OKX Web3'}</span>
-                     </button>
+      {showTop20 && (
+        <div className="fixed inset-0 z-[260] overflow-y-auto bg-[#030917]/95 text-white">
+          <div className="mx-auto min-h-screen max-w-[560px] px-4 pb-12 pt-6">
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" onClick={() => setShowTop20(false)}
+                className="rounded-xl border border-blue-400/40 bg-blue-950/40 px-4 py-2 font-bold">←</button>
+              <h2 className="text-lg font-black tracking-wider text-yellow-300">🏆 TOP 20</h2>
+              <span className="text-xs text-slate-400">{top20Month}</span>
+            </div>
+            <p className="mt-5 text-center text-xs text-slate-400">
+              Monthly leaderboard • Total APXN Points • Updated once per month
+            </p>
+            {top20Loading ? <p className="mt-8 text-center text-slate-300">Loading Top 20...</p> : null}
+            {top20Error ? <p className="mt-8 text-center text-rose-300">{top20Error}</p> : null}
+            {!top20Loading && !top20Error && (
+              <div className="mt-6 space-y-2">
+                {top20Users.map((user, index) => (
+                  <div key={index} className="flex items-center gap-3 rounded-2xl border border-indigo-400/30 bg-slate-900/70 px-4 py-3">
+                    <span className="w-8 shrink-0 text-center font-black text-yellow-300">#{user.rank}</span>
+                    <span className="shrink-0 text-xl" aria-label={user.country ? `Country: ${user.country}` : 'Country unknown'}>
+                      {top20CountryFlag(user.country)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">{user.name}</span>
+                    <span className="shrink-0 text-right text-xs font-bold text-blue-200">
+                      {Number(user.points || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                    </span>
                   </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center animate-in fade-in duration-300">
-                   <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 border border-yellow-500/50">
-                     <span className="text-2xl">🔗</span>
-                   </div>
-                   <h3 className="text-lg font-black text-white mb-2 text-center">Link Wallet Address</h3>
-                   <p className="text-xs text-gray-400 text-center mb-6 leading-relaxed">
-                     Telegram browser does not support direct connections. Please paste your <strong className="text-yellow-400">BSC (BEP-20)</strong> address below to link it to your account for future Airdrops.
-                   </p>
-
-                   <div className="w-full mb-4">
-                     <label className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1 block">Your BEP-20 Address</label>
-                     <input
-                       type="text"
-                       value={tempAddress}
-                       onChange={(e) => setTempAddress(e.target.value)}
-                       placeholder="0x..."
-                       className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-all font-mono"
-                     />
-                   </div>
-
-                   <button onClick={handleManualBind} className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] active:scale-95 transition-all">
-                     Bind Address
-                   </button>
-
-                   <button onClick={() => setManualWalletInput(false)} className="w-full mt-3 py-2 text-gray-500 text-xs font-bold hover:text-white transition-colors">
-                     Cancel
-                   </button>
-                </div>
-              )}
-              {!manualWalletInput && <p className="text-[10px] font-bold text-yellow-500 text-center mt-6 uppercase tracking-wider">Supports Binance Smart Chain (BEP-20)</p>}
-           </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -4766,13 +4796,9 @@ export default function Home() {
             <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">Apex Network</span>
           </div>
 
-          <button onClick={() => setShowWalletModal(true)} className={`border font-bold px-4 py-2 rounded-xl text-xs transition-colors flex items-center gap-2 ${walletAddress ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-700 text-white hover:border-yellow-500'}`}>
-            {walletAddress ? (
-               <span>✅</span>
-            ) : (
-               <img src="/binance-logo-1.png" alt="Binance" className="w-4 h-4 object-contain" />
-            )}
-            <span>{walletAddress ? walletAddress : 'Connect Wallet'}</span>
+          <button type="button" onClick={() => { setShowTop20(true); void loadTop20(); }}
+            className="flex items-center gap-2 rounded-xl border border-yellow-400/50 bg-gradient-to-r from-amber-950/65 to-slate-800 px-3 py-2 text-xs font-black text-yellow-300 shadow-[0_0_16px_rgba(234,179,8,0.15)] active:scale-95">
+            <span>🏆</span><span>TOP 20</span>
           </button>
         </div>
 
