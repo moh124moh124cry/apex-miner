@@ -900,6 +900,9 @@ export default function Home() {
   const [bscWalletInput, setBscWalletInput] = useState('');
   const [savedBscWallet, setSavedBscWallet] = useState('');
   const [walletVerified, setWalletVerified] = useState(false);
+  const [bscWalletCanEdit, setBscWalletCanEdit] = useState(true);
+  const [bscWalletNextEditDate, setBscWalletNextEditDate] = useState(null);
+  const [bscWalletLoaded, setBscWalletLoaded] = useState(false);
   const [bscWalletLoading, setBscWalletLoading] = useState(false);
   const [bscWalletMessage, setBscWalletMessage] = useState('');
   // Open the correct Mini App section from Telegram notification buttons.
@@ -1085,6 +1088,7 @@ export default function Home() {
 
   const loadBscWallet = async () => {
     setBscWalletLoading(true);
+    setBscWalletLoaded(false);
     setBscWalletMessage('');
     try {
       const initData = window.Telegram?.WebApp?.initData;
@@ -1098,8 +1102,11 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'Wallet unavailable');
       setSavedBscWallet(data.address || '');
-      setBscWalletInput(data.address || '');
+      setBscWalletInput(''); // Always show an empty field, even for old wallets.
       setWalletVerified(Boolean(data.verified));
+      setBscWalletCanEdit(data.canEdit !== false);
+      setBscWalletNextEditDate(data.nextEditDate || null);
+      setBscWalletLoaded(true);
     } catch (error) {
       setBscWalletMessage(error.message || 'Wallet unavailable');
     } finally {
@@ -1107,12 +1114,25 @@ export default function Home() {
     }
   };
 
-  const saveBscWallet = async () => {
+  const saveBscWallet = async (action) => {
+    if (!bscWalletLoaded || bscWalletLoading) return;
+    const isEdit = action === 'edit';
+    if (isEdit ? !savedBscWallet : Boolean(savedBscWallet)) {
+      setBscWalletMessage('Use the appropriate wallet button.');
+      return;
+    }
+    if (isEdit && !bscWalletCanEdit) return;
+
     const address = bscWalletInput.trim();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address) || /^0x0{40}$/i.test(address)) {
       setBscWalletMessage('Please enter a valid BSC address (0x + 40 hex characters).');
       return;
     }
+    if (savedBscWallet && savedBscWallet.toLowerCase() === address.toLowerCase()) {
+      setBscWalletMessage('This address is already saved.');
+      return;
+    }
+
     setBscWalletLoading(true);
     setBscWalletMessage('');
     try {
@@ -1121,17 +1141,27 @@ export default function Home() {
       const response = await fetch('/api/profile-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, action: 'save', address }),
+        body: JSON.stringify({ initData, action, address }),
         cache: 'no-store',
       });
       const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.error || 'Save failed');
-      setSavedBscWallet(data.address);
-      setBscWalletInput(data.address);
+      if (!response.ok || !data.success) {
+        if (data.code === 'WALLET_MONTHLY_LIMIT') {
+          setBscWalletCanEdit(false);
+          setBscWalletNextEditDate(data.nextEditDate || null);
+        }
+        throw new Error(data.error || 'Wallet save failed');
+      }
+      setSavedBscWallet(data.address || address);
+      setBscWalletInput('');
       setWalletVerified(Boolean(data.verified));
-      setBscWalletMessage('BSC address saved successfully.');
+      setBscWalletCanEdit(data.canEdit !== false);
+      setBscWalletNextEditDate(data.nextEditDate || null);
+      setBscWalletMessage(isEdit
+        ? (data.verified ? 'Wallet updated and verified by APXN.' : 'Wallet updated.')
+        : (data.verified ? 'BSC wallet saved and verified by APXN.' : 'BSC wallet saved.'));
     } catch (error) {
-      setBscWalletMessage(error.message || 'Save failed');
+      setBscWalletMessage(error.message || 'Wallet save failed');
     } finally {
       setBscWalletLoading(false);
     }
@@ -4699,23 +4729,62 @@ export default function Home() {
                 aria-label="BSC Wallet Address">
                 <h3 className="text-sm font-black tracking-wider text-white">🔗 BSC WALLET ADDRESS</h3>
                 <p className="mt-2 text-xs leading-relaxed text-slate-300">
-                  Add your personal BNB Smart Chain (BEP-20) wallet for future APXN airdrop claims.
-                  Do not use an exchange deposit address. Never share your recovery phrase.
+                  Save your personal BNB Smart Chain (BEP-20) address for future APXN airdrop claims.
                 </p>
-                <input aria-label="Your BSC wallet address" type="text" value={bscWalletInput}
-                  disabled={bscWalletLoading || walletVerified}
+
+                <div className="mt-3 rounded-xl border border-amber-400/35 bg-amber-500/5 p-3 text-[11px] leading-relaxed text-slate-200">
+                  <p className="font-bold text-amber-300">⚠️ Important Wallet Notice</p>
+                  <p className="mt-1">✅ Use only a personal BSC (BEP-20) address from a self-custody wallet that you own and control.</p>
+                  <p className="mt-1">❌ Do not use deposit addresses from centralized exchanges or trading platforms.</p>
+                  <p className="mt-1">🔐 Never share your recovery phrase or private key.</p>
+                </div>
+
+                <label htmlFor="apxn-bsc-address" className="mt-4 block text-[11px] font-bold text-slate-200">
+                  Your BSC Wallet Address
+                </label>
+                <input id="apxn-bsc-address" aria-label="Your BSC wallet address"
+                  type="text" value={bscWalletInput}
+                  disabled={!bscWalletLoaded || bscWalletLoading || (Boolean(savedBscWallet) && !bscWalletCanEdit)}
                   onChange={(event) => setBscWalletInput(event.target.value)}
-                  placeholder="0x..." autoComplete="off" spellCheck={false}
-                  className="mt-4 w-full rounded-xl border border-indigo-400/40 bg-[#050b1e] px-3 py-3 font-mono text-xs text-white outline-none focus:border-yellow-400" />
-                <button type="button" disabled={bscWalletLoading || walletVerified}
-                  onClick={saveBscWallet}
-                  className="mt-3 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-black text-white disabled:opacity-50">
-                  {bscWalletLoading ? 'Loading...' : walletVerified ? 'Verified Wallet Locked' : 'SAVE WALLET'}
-                </button>
-                {savedBscWallet ? <p className="mt-3 break-all text-xs text-emerald-300">Saved: {savedBscWallet}</p> : null}
-                {bscWalletMessage ? <p className="mt-2 text-xs text-amber-300">{bscWalletMessage}</p> : null}
+                  placeholder="Paste your personal BSC address (0x...)"
+                  autoComplete="off" spellCheck={false}
+                  className="mt-2 w-full rounded-xl border border-indigo-400/40 bg-[#050b1e] px-3 py-3 font-mono text-xs text-white outline-none focus:border-yellow-400 disabled:opacity-50" />
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => saveBscWallet('save')}
+                    disabled={!bscWalletLoaded || bscWalletLoading || Boolean(savedBscWallet)}
+                    className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-xs font-black text-white disabled:opacity-40 sm:text-sm">
+                    {bscWalletLoading ? 'Please wait...' : 'SAVE WALLET'}
+                  </button>
+                  <button type="button" onClick={() => saveBscWallet('edit')}
+                    disabled={!bscWalletLoaded || bscWalletLoading || !savedBscWallet || !bscWalletCanEdit}
+                    className="rounded-xl border border-violet-400/50 bg-violet-800/60 py-3 text-xs font-black text-white disabled:opacity-40 sm:text-sm">
+                    ✏️ EDIT WALLET
+                  </button>
+                </div>
+
+                {savedBscWallet ? (
+                  <div className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-950/20 p-3">
+                    <p className="text-[11px] font-bold text-emerald-300">Saved BSC Wallet:</p>
+                    <p className="mt-1 break-all font-mono text-xs text-white">{savedBscWallet}</p>
+                    {walletVerified ? (
+                      <p className="mt-2 text-[11px] font-bold text-emerald-300">✓ Wallet Verified — BSC address registered to your Telegram account.</p>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-amber-300">Wallet registered to your Telegram account.</p>
+                    )}
+                  </div>
+                ) : null}
+                {savedBscWallet && !bscWalletCanEdit && bscWalletNextEditDate ? (
+                  <p className="mt-3 text-xs font-medium text-amber-300">
+                    Next available wallet edit: {bscWalletNextEditDate}
+                  </p>
+                ) : (
+                  <p className="mt-3 text-[11px] text-slate-300">
+                    You can change your saved wallet address once per calendar month.
+                  </p>
+                )}
+                {bscWalletMessage ? <p role="status" className="mt-2 text-xs text-amber-300">{bscWalletMessage}</p> : null}
                 <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-                  Saving an address does not verify wallet ownership or guarantee airdrop eligibility.
+                  APXN Wallet Verified confirms that your BSC address is registered to your Telegram account. It does not prove blockchain wallet ownership or guarantee airdrop eligibility.
                 </p>
               </section>
             </div>
@@ -5736,6 +5805,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
