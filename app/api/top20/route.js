@@ -41,7 +41,7 @@ export async function POST(request) {
 
     if (!snapshot) {
       const { data: users, error: usersError } = await supabaseAdmin
-        .from('users').select('first_name, username, balance')
+        .from('users').select('first_name, country, balance')
         .order('balance', { ascending: false })
         .order('telegram_id', { ascending: true }).limit(20);
       if (usersError) {
@@ -50,7 +50,10 @@ export async function POST(request) {
       }
       const top20 = (users || []).map((user, index) => ({
         rank: index + 1,
-        name: String(user.first_name || user.username || 'APXN Miner').slice(0, 50),
+        // Display first name only. Never include Telegram @username.
+        name: String(user.first_name || 'APXN Miner').trim().slice(0, 50) || 'APXN Miner',
+        country: /^[A-Z]{2}$/.test(String(user.country || '').toUpperCase())
+          ? String(user.country).toUpperCase() : '',
         points: Number(user.balance || 0),
       }));
       const { data: inserted, error: insertError } = await supabaseAdmin
