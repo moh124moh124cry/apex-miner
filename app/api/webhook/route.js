@@ -716,28 +716,76 @@ bot.command('rules', async (ctx) => {
 
 bot.on('new_chat_members', async (ctx) => {
   try {
+    const chatType = ctx.chat?.type;
+    if (chatType !== 'group' && chatType !== 'supergroup') return;
+
     const members = ctx.message?.new_chat_members || [];
     const humanMembers = members.filter((member) => !member.is_bot);
+    if (humanMembers.length === 0) return;
 
-    if (humanMembers.length === 0) {
-      return;
+    const names = [];
+    const offenders = [];
+    let hasUnsafeName = false;
+
+    for (const member of humanMembers) {
+      const rawName = [member.first_name, member.last_name]
+        .filter((part) => typeof part === 'string')
+        .join(' ')
+        .normalize('NFKC');
+
+      // Never copy links, referral codes or @handles from a user's name
+      // into an official welcome message.
+      const hasLink = extractUrls({ text: rawName }).length > 0;
+      const handles = rawName.match(/@[a-z0-9_]{5,}/gi) || [];
+      const unsafe = hasLink || handles.length > 0;
+
+      if (unsafe) {
+        hasUnsafeName = true;
+        // Auto-ban only obvious advertising, not a single harmless @handle.
+        if (hasLink || handles.length >= 2) offenders.push(member);
+        continue;
+      }
+
+      const cleanName = rawName
+        .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\ufeff]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 60);
+      names.push(cleanName || 'new member');
     }
 
-    const names = humanMembers.map((member) => {
-      const name = [member.first_name, member.last_name]
-        .filter(Boolean)
-        .join(' ');
+    // Remove the join notification if the name itself contains advertising.
+    if (hasUnsafeName) {
+      await safeDelete(ctx);
+    }
 
-      return name || 'New member';
-    });
+    // Always ban the joining account, never the member who invited them.
+    for (const member of offenders) {
+      try {
+        await ctx.telegram.callApi('banChatMember', {
+          chat_id: ctx.chat.id,
+          user_id: member.id,
+          revoke_messages: true,
+        });
+        console.log(
+          'Moderation: ADVERTISING_JOIN_NAME_BANNED; chat=' + ctx.chat.id +
+          '; user=' + member.id
+        );
+      } catch (error) {
+        console.error('Ban advertising new member error:', error);
+      }
+    }
+
+    if (names.length === 0) return;
 
     await ctx.reply(
-      `👋 Welcome ${names.join(' and ')}!\n\n` +
+      '👋 Welcome ' + names.join(' and ') + '!\n\n' +
         'Welcome to the Apex Network community 🚀\n' +
         'Please respect the community rules.\n\n' +
         '🔒 Never share your seed phrase or private key.\n' +
         '📌 Unauthorized links, advertising, and spam are automatically removed.\n\n' +
-        'Use /rules to view the community rules.'
+        'Use /rules to view the community rules.',
+      { link_preview_options: { is_disabled: true } }
     );
   } catch (error) {
     console.error('Welcome message error:', error);
@@ -942,4 +990,5 @@ export async function GET() {
     moderation: true,
   });
 }
+
 
