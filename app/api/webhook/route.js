@@ -806,6 +806,13 @@ bot.on('message', async (ctx) => {
 
     const message = ctx.message;
 
+    // Posts sent automatically from the linked channel must be preserved.
+    // Deleting the group's copy removes the Comments button in the channel.
+    // Manually forwarded messages, links and member spam stay moderated.
+    if (message?.is_automatic_forward === true) {
+      return;
+    }
+
     if (!message || !ctx.from) {
       return;
     
@@ -990,5 +997,6 @@ export async function GET() {
     moderation: true,
   });
 }
+
 
 
