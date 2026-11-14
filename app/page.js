@@ -791,6 +791,15 @@ function patchUserCache(telegramId, patch) {
   }
 }
 
+function YouTubeIcon() {
+  return (
+    <svg viewBox="0 0 24 18" aria-hidden="true" className="w-7 h-5 shrink-0">
+      <rect width="24" height="18" rx="5" fill="#FF0033" />
+      <path d="M10 4.5L17 9L10 13.5V4.5Z" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [balance, setBalance] = useState(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -815,6 +824,14 @@ export default function Home() {
   const [groupTaskCompleted, setGroupTaskCompleted] = useState(false);
   const [twitterTaskCompleted, setTwitterTaskCompleted] = useState(false);
 
+  // YouTube task state is always refreshed from Supabase when opening Tasks.
+  const [youtubeChannelUrl, setYoutubeChannelUrl] = useState('');
+  const [youtubeVideoUrl, setYoutubeVideoUrl] = useState('');
+  const [youtubeSubscribed, setYoutubeSubscribed] = useState(false);
+  const [youtubeVideoDone, setYoutubeVideoDone] = useState(false);
+  const [youtubeStatusLoading, setYoutubeStatusLoading] = useState(true);
+  const [youtubeClaimBusy, setYoutubeClaimBusy] = useState(false);
+
   // Links arrive with the existing /api/bootstrap response from
   // Cloudflare WORKER RUNTIME variables; never inline them at build time.
   const [dailyTwitterLink, setDailyTwitterLink] = useState('');
@@ -836,6 +853,8 @@ export default function Home() {
     channel: 0,
     group: 0,
     twitter: 0,
+    youtubeSubscribe: 0,
+    youtubeVideo: 0,
   });
 
   const [adRewardCooldown, setAdRewardCooldown] = useState(0);
@@ -905,6 +924,53 @@ export default function Home() {
   const [bscWalletLoaded, setBscWalletLoaded] = useState(false);
   const [bscWalletLoading, setBscWalletLoading] = useState(false);
   const [bscWalletMessage, setBscWalletMessage] = useState('');
+  // Refresh YouTube status every time the Tasks tab is opened.
+  // This bypasses the 7-day user cache so the video URL can change daily.
+  useEffect(() => {
+    if (activeTab !== 'tasks' || !isDataLoaded || !userId) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    const initData = typeof window !== 'undefined'
+      ? window.Telegram?.WebApp?.initData
+      : null;
+    if (!initData) {
+      setYoutubeStatusLoading(false);
+      return;
+    }
+
+    setYoutubeStatusLoading(true);
+    (async () => {
+      try {
+        const response = await fetch('/api/tasks/youtube', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData, action: 'status' }),
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'YouTube status unavailable');
+        if (cancelled) return;
+        setYoutubeChannelUrl(result.channelUrl || '');
+        setYoutubeVideoUrl(result.videoUrl || '');
+        setYoutubeSubscribed(Boolean(result.subscribed));
+        setYoutubeVideoDone(Boolean(result.videoDone));
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Unable to load YouTube tasks:', error.message);
+        setYoutubeChannelUrl('');
+        setYoutubeVideoUrl('');
+      } finally {
+        if (!cancelled) setYoutubeStatusLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [activeTab, isDataLoaded, userId]);
+
   // Open the correct Mini App section from Telegram notification buttons.
   // Navigation only: this does not change balances, mining, or payment state.
   useEffect(() => {
@@ -4417,6 +4483,71 @@ export default function Home() {
     });
   };
 
+  // Both YouTube rewards are credited on the server under a Postgres row lock.
+  const claimYouTubeTask = async (task) => {
+    if (!isDataLoaded || youtubeClaimBusy) return;
+    const initData = typeof window !== 'undefined'
+      ? window.Telegram?.WebApp?.initData
+      : null;
+    if (!initData) {
+      alert('❌ Please open Apex Miner inside Telegram.');
+      return;
+    }
+
+    setYoutubeClaimBusy(true);
+    try {
+      const response = await fetch('/api/tasks/youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, action: 'claim', task }),
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok && !(response.status === 409 && data.completed)) {
+        throw new Error(data.error || 'YouTube reward unavailable');
+      }
+
+      if (Number.isFinite(Number(data.balance))) {
+        const newBalance = Number(data.balance);
+        setBalance(newBalance);
+        patchUserCache(userId, { balance: newBalance });
+      }
+
+      if (task === 'subscribe') {
+        setYoutubeSubscribed(true);
+        updateTaskConfirmStage('youtubeSubscribe', 0);
+      } else {
+        setYoutubeVideoDone(true);
+        updateTaskConfirmStage('youtubeVideo', 0);
+      }
+    } catch (error) {
+      console.error('YouTube task failed:', error);
+      alert(`❌ ${error.message || 'Please try again.'}`);
+    } finally {
+      setYoutubeClaimBusy(false);
+    }
+  };
+
+  const handleYoutubeSubscribe = async () => {
+    await runTaskConfirmationFlow({
+      key: 'youtubeSubscribe',
+      link: youtubeChannelUrl,
+      completed: youtubeSubscribed,
+      busy: youtubeStatusLoading || youtubeClaimBusy,
+      onFinalConfirm: async () => claimYouTubeTask('subscribe'),
+    });
+  };
+
+  const handleYoutubeVideo = async () => {
+    await runTaskConfirmationFlow({
+      key: 'youtubeVideo',
+      link: youtubeVideoUrl,
+      completed: youtubeVideoDone,
+      busy: youtubeStatusLoading || youtubeClaimBusy,
+      onFinalConfirm: async () => claimYouTubeTask('video'),
+    });
+  };
+
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/ApxMinerBot/app?startapp=${userId}`;
     const shareText = "🚀 Join Apex Network on BSC and mine $APXN Points! Early pioneer welcome bonus active:";
@@ -5198,6 +5329,25 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-white mb-4">Daily Tasks</h2>
 
           <div className="flex flex-col gap-4 mb-6">
+            {/* APXN: today's YouTube video, 100 Points once per UTC day */}
+            <div className="bg-slate-900/80 border border-red-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                  <YouTubeIcon /> Watch Today's YouTube Video
+                </h3>
+                <p className="text-yellow-400 text-xs">+100 APXN Points</p>
+                {!youtubeVideoUrl && !youtubeStatusLoading && (
+                  <p className="text-gray-500 text-[10px] mt-1">New video coming soon</p>
+                )}
+              </div>
+              <button
+                onClick={handleYoutubeVideo}
+                disabled={!isDataLoaded || youtubeStatusLoading || youtubeClaimBusy || youtubeVideoDone || !youtubeVideoUrl}
+                className={`${youtubeVideoDone ? 'bg-green-600' : (!isDataLoaded || youtubeStatusLoading || youtubeClaimBusy || !youtubeVideoUrl) ? 'bg-slate-700' : 'bg-[#FF0033]'} px-3 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[90px]`}
+              >
+                {youtubeVideoDone ? 'Done ✓' : youtubeStatusLoading || youtubeClaimBusy ? 'Wait..' : !youtubeVideoUrl ? 'SOON' : (taskConfirmStages.youtubeVideo || 0) === 0 ? 'WATCH' : getTaskConfirmLabel({ key: 'youtubeVideo', completed: false })}
+              </button>
+            </div>
             <div className="bg-slate-900/80 border border-yellow-500/30 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Watch Rewarded Ad</h3>
@@ -5289,6 +5439,22 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-white mb-4">One-Time Social Tasks</h2>
 
           <div className="flex flex-col gap-4 mb-8">
+            {/* APXN: YouTube subscription task is the FIRST one-time task */}
+            <div className="bg-slate-900/80 border border-red-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                  <YouTubeIcon /> Subscribe to Our YouTube Channel
+                </h3>
+                <p className="text-yellow-400 text-xs">+500 APXN Points</p>
+              </div>
+              <button
+                onClick={handleYoutubeSubscribe}
+                disabled={!isDataLoaded || youtubeStatusLoading || youtubeClaimBusy || youtubeSubscribed || !youtubeChannelUrl}
+                className={`${youtubeSubscribed ? 'bg-green-600' : (!isDataLoaded || youtubeStatusLoading || youtubeClaimBusy || !youtubeChannelUrl) ? 'bg-slate-700' : 'bg-[#FF0033]'} px-3 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[96px]`}
+              >
+                {youtubeSubscribed ? 'Done ✓' : youtubeStatusLoading || youtubeClaimBusy ? 'Wait..' : !youtubeChannelUrl ? 'SOON' : (taskConfirmStages.youtubeSubscribe || 0) === 0 ? 'SUBSCRIBE' : getTaskConfirmLabel({ key: 'youtubeSubscribe', completed: false })}
+              </button>
+            </div>
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-white text-lg">Join Telegram Channel</h3>
@@ -5805,6 +5971,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
