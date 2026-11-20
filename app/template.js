@@ -1,24 +1,35 @@
 "use client";
 
 /**
- * APXN — native Telegram home-screen shortcut.
- * GitHub path: app/template.js
- * Branch: cloudflare-migration
+ * APEX NETWORK (APXN) — Home-screen shortcut + daily article task.
+ * GITHUB PATH: app/template.js
+ * BRANCH: cloudflare-migration
  *
- * Replaces the old Chrome/PWA workaround with Telegram WebApp's official
- * addToHomeScreen() API (Bot API 8.0+). The shortcut launches the Mini App
- * in Telegram, preserving Telegram authentication for mining.
+ * This complete replacement PRESERVES the original Telegram native home-screen
+ * button beside TOP 20, and adds the independent Article task beside the
+ * existing YouTube daily task without modifying the large app/page.js file.
  *
- * This App Router template wraps the existing page automatically.
- * It does NOT edit app/page.js, app/layout.js, mining, balances, or Supabase.
+ * REQUIRED SERVER SETUP (already completed separately):
+ *   POST /api/tasks/article/route.js
+ *   Supabase RPC apex_claim_article_task + users.article_last_claim_date
+ *   Cloudflare variable DAILY_APXN_ARTICLE_URL
+ *
+ * Once per UTC day, APXN grants 50 POINTS only when the server confirms the
+ * claim. Opening an article is not proof of reading it. The 3-step UI uses
+ * GO -> CONFIRM -> CONFIRM AGAIN, as with existing social tasks.
+ *
+ * IMPORTANT: Paste this complete source in GitHub as app/template.js.
+ * Do NOT name the GitHub file .txt and do NOT edit app/page.js.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-const HOST_ID = "apxn-native-install-button-host";
+const HOME_HOST_ID = "apxn-native-install-button-host";
+const ARTICLE_HOST_ID = "apxn-daily-article-task-host";
 const LOGO = "/logo2.png";
 const TELEGRAM_MINI_APP = "https://t.me/ApxMinerBot?startapp";
+const ARTICLE_ENDPOINT = "/api/tasks/article";
 
 const mainButton = {
   width: "100%",
@@ -55,10 +66,218 @@ function OldBrowserShortcutHelp() {
   );
 }
 
+// Validate even though the server already restricts links to apxn.network.
+// This prevents accidental opening of unexpected URLs from malformed data.
+function isOfficialArticleUrl(value) {
+  if (typeof value !== "string") return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" &&
+      (parsed.hostname === "apxn.network" || parsed.hostname === "www.apxn.network") &&
+      !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+function DailyArticleTask() {
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [url, setUrl] = useState("");
+  const [done, setDone] = useState(false);
+  const [stage, setStage] = useState(0);
+  const [notice, setNotice] = useState("");
+  const [balance, setBalance] = useState(null);
+  const [today, setToday] = useState("");
+  const claimLock = useRef(false);
+  const previousDay = useRef("");
+  const previousUrl = useRef("");
+
+  const loadArticleStatus = useCallback(async (signal) => {
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) {
+      setLoading(false);
+      setNotice("Open APXN inside Telegram to use this task.");
+      return;
+    }
+
+    try {
+      const response = await fetch(ARTICLE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData, action: "status" }),
+        cache: "no-store",
+        signal,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Article task unavailable");
+      if (signal?.aborted) return;
+      const validUrl = isOfficialArticleUrl(data.articleUrl) ? data.articleUrl : "";
+      setUrl(validUrl);
+      setDone(Boolean(data.articleDone));
+      setToday(data.today || "");
+      // Do not reset GO -> CONFIRM when returning from the article.
+      // Reset only on a new UTC day, a changed article, or a completed claim.
+      if ((previousDay.current && previousDay.current !== data.today) ||
+          (previousUrl.current && previousUrl.current !== validUrl) ||
+          data.articleDone) {
+        setStage(0);
+      }
+      previousDay.current = data.today || "";
+      previousUrl.current = validUrl;
+      setNotice(validUrl ? "" : "New article coming soon");
+    } catch (error) {
+      if (signal?.aborted) return;
+      setUrl("");
+      setNotice(error.message || "Unable to load the article task");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadArticleStatus(controller.signal);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !claimLock.current) {
+        void loadArticleStatus(controller.signal);
+      }
+    };
+    // After opening a link in the external browser, refresh the status when
+    // users return. This also catches changes made in Cloudflare.
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      controller.abort();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [loadArticleStatus]);
+
+  // Long-running Mini Apps should reset their daily status at UTC midnight.
+  useEffect(() => {
+    if (!today) return;
+    const timer = window.setInterval(() => {
+      const utcToday = new Date().toISOString().slice(0, 10);
+      if (utcToday !== today && !claimLock.current) void loadArticleStatus();
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [today, loadArticleStatus]);
+
+  function openArticle() {
+    if (!isOfficialArticleUrl(url)) {
+      setNotice("New article coming soon");
+      return;
+    }
+    try {
+      const tg = window.Telegram?.WebApp;
+      if (typeof tg?.openLink === "function") {
+        tg.openLink(url, { try_instant_view: false });
+      } else {
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          setNotice("Please enable opening links, then try again.");
+          return;
+        }
+      }
+      setStage(1);
+      setNotice("After visiting the article, return to APXN and confirm.");
+    } catch (error) {
+      console.error("APXN article opening failed:", error);
+      setNotice("Could not open the article. Please try again.");
+    }
+  }
+
+  async function claimArticle() {
+    if (claimLock.current || busy || done) return;
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) {
+      setNotice("Please open APXN inside Telegram.");
+      return;
+    }
+    claimLock.current = true;
+    setBusy(true);
+    setNotice("");
+    try {
+      const response = await fetch(ARTICLE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData, action: "claim" }),
+        cache: "no-store",
+      });
+      const data = await response.json();
+      if (response.status === 409 && data.completed) {
+        setDone(true);
+        setStage(0);
+        if (Number.isFinite(Number(data.balance))) setBalance(Number(data.balance));
+        setNotice("Today's 50 APXN Points were already claimed.");
+        return;
+      }
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Unable to claim article points");
+      }
+      setDone(true);
+      setStage(0);
+      if (Number.isFinite(Number(data.balance))) setBalance(Number(data.balance));
+      setNotice("✅ 50 APXN Points added to your balance! Refresh the app to update the main balance display.");
+    } catch (error) {
+      setNotice(error.message || "Please try again.");
+    } finally {
+      claimLock.current = false;
+      setBusy(false);
+    }
+  }
+
+  function handleTaskClick() {
+    if (loading || busy || done || !url) return;
+    if (stage === 0) {
+      openArticle();
+    } else if (stage === 1) {
+      setStage(2);
+      setNotice("Confirm again to claim your 50 APXN Points.");
+    } else {
+      void claimArticle();
+    }
+  }
+
+  const inactive = loading || busy || done || !url;
+  const label = done ? "Done ✓" : loading || busy ? "Wait..." : !url ? "SOON" :
+    stage === 0 ? "GO" : stage === 1 ? "CONFIRM" : "CONFIRM AGAIN";
+
+  return (
+    <div data-apxn-article-task="true" className="bg-slate-900/80 border border-cyan-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="font-bold text-white text-lg flex items-center gap-2">
+          <span aria-hidden="true" className="text-2xl">📰</span>
+          Visit Today's APXN Article
+        </h3>
+        <p className="text-yellow-400 text-xs">+50 APXN Points</p>
+        {notice && (
+          <p role="status" className="text-cyan-200 text-[11px] mt-2 leading-4">
+            {notice}
+          </p>
+        )}
+        {balance !== null && (
+          <p className="text-slate-400 text-[10px] mt-1">
+            Saved APXN Points balance: {balance.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+          </p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleTaskClick}
+        disabled={inactive}
+        className={`${done ? "bg-green-600" : inactive ? "bg-slate-700" : "bg-cyan-600"} px-3 py-2 rounded-xl text-white text-sm font-bold active:scale-95 transition-colors min-w-[90px] shrink-0`}
+      >
+        {label}
+      </button>
+    </div>
+  );
+}
+
 export default function APXNHomeScreenTemplate({ children }) {
   const [oldShortcut, setOldShortcut] = useState(false);
   const [ready, setReady] = useState(false);
-  const [host, setHost] = useState(null);
+  const [homeHost, setHomeHost] = useState(null);
+  const [articleHost, setArticleHost] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [status, setStatus] = useState("");
   const [homeStatus, setHomeStatus] = useState("unknown");
@@ -97,45 +316,85 @@ export default function APXNHomeScreenTemplate({ children }) {
     };
   }, [ready, oldShortcut]);
 
-  // Put the icon beside TOP 20 without modifying the 5,000+ line page.js.
+  // The existing TOP 20 button and YouTube daily task are in app/page.js.
+  // Add portal hosts only as needed, without modifying that large file.
   useEffect(() => {
     if (!ready || oldShortcut) return;
     let active = true;
-    let anchor = null;
+    let homeAnchor = null;
+    let articleAnchor = null;
+    let observedHome = null;
+    let observedArticle = null;
 
-    function placeInstallIcon() {
+    function placeButtons() {
       if (!active) return;
-      const existing = document.getElementById(HOST_ID);
-      if (existing?.isConnected) {
-        if (anchor !== existing) {
-          anchor = existing;
-          setHost(existing);
-        }
-        return;
-      }
-      const top20 = Array.from(document.querySelectorAll("button")).find(
-        (button) => /TOP\s*20/i.test(button.textContent || "") &&
-          !button.closest("[data-apxn-install-modal]")
-      );
-      if (!top20?.parentElement) return;
 
-      const newHost = document.createElement("span");
-      newHost.id = HOST_ID;
-      newHost.style.cssText = "display:inline-flex;align-items:center;flex-shrink:0;margin-left:auto;margin-right:5px";
-      top20.parentElement.insertBefore(newHost, top20);
-      anchor = newHost;
-      setHost(newHost);
+      // Preserve the original phone button next to TOP 20.
+      const oldHome = document.getElementById(HOME_HOST_ID);
+      if (oldHome?.isConnected) {
+        homeAnchor = oldHome;
+        if (observedHome !== oldHome) {
+          observedHome = oldHome;
+          setHomeHost(oldHome);
+        }
+      } else {
+        const top20 = Array.from(document.querySelectorAll("button")).find(
+          (button) => /TOP\s*20/i.test(button.textContent || "") &&
+            !button.closest("[data-apxn-install-modal]")
+        );
+        if (top20?.parentElement) {
+          const el = document.createElement("span");
+          el.id = HOME_HOST_ID;
+          el.style.cssText = "display:inline-flex;align-items:center;flex-shrink:0;margin-left:auto;margin-right:5px";
+          top20.parentElement.insertBefore(el, top20);
+          homeAnchor = el;
+          observedHome = el;
+          setHomeHost(el);
+        } else if (observedHome !== null) {
+          observedHome = null;
+          setHomeHost(null);
+        }
+      }
+
+      // Match the actual existing Daily Tasks heading, not our new card.
+      const oldArticle = document.getElementById(ARTICLE_HOST_ID);
+      if (oldArticle?.isConnected) {
+        articleAnchor = oldArticle;
+        if (observedArticle !== oldArticle) {
+          observedArticle = oldArticle;
+          setArticleHost(oldArticle);
+        }
+      } else {
+        const youtubeHeading = Array.from(document.querySelectorAll("h3")).find(
+          (heading) => /Watch Today's YouTube Video/i.test(heading.textContent || "") &&
+            !heading.closest("[data-apxn-article-task]")
+        );
+        const youtubeCard = youtubeHeading?.closest("div.rounded-2xl");
+        if (youtubeCard?.parentElement) {
+          const el = document.createElement("div");
+          el.id = ARTICLE_HOST_ID;
+          el.setAttribute("data-apxn-article-host", "true");
+          youtubeCard.insertAdjacentElement("afterend", el);
+          articleAnchor = el;
+          observedArticle = el;
+          setArticleHost(el);
+        } else if (observedArticle !== null) {
+          observedArticle = null;
+          setArticleHost(null);
+        }
+      }
     }
 
-    placeInstallIcon();
-    const observer = new MutationObserver(placeInstallIcon);
+    placeButtons();
+    const observer = new MutationObserver(placeButtons);
     observer.observe(document.body, { childList: true, subtree: true });
-
     return () => {
       active = false;
       observer.disconnect();
-      setHost(null);
-      if (anchor?.isConnected) anchor.remove();
+      setHomeHost(null);
+      setArticleHost(null);
+      if (homeAnchor?.isConnected) homeAnchor.remove();
+      if (articleAnchor?.isConnected) articleAnchor.remove();
     };
   }, [ready, oldShortcut]);
 
@@ -174,7 +433,6 @@ export default function APXNHomeScreenTemplate({ children }) {
     }
 
     try {
-      // MUST be called directly from a user click. No Chrome or PWA needed.
       tg.addToHomeScreen();
       setStatus("Follow Telegram's confirmation. The APXN shortcut will open the Mini App in Telegram.");
     } catch (error) {
@@ -188,7 +446,7 @@ export default function APXNHomeScreenTemplate({ children }) {
   return (
     <>
       {children}
-      {host && createPortal(
+      {homeHost && createPortal(
         <button
           type="button"
           aria-label="Add APXN Mini App to phone home screen"
@@ -203,9 +461,10 @@ export default function APXNHomeScreenTemplate({ children }) {
           }}
         >
           📲
-        </button>, host
+        </button>, homeHost
       )}
-      {host && modalOpen && createPortal(
+      {articleHost && createPortal(<DailyArticleTask />, articleHost)}
+      {homeHost && modalOpen && createPortal(
         <div
           data-apxn-install-modal="true"
           role="presentation"
