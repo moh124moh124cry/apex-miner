@@ -39,6 +39,13 @@ const TELEGRAM_TASK_CHATS = {
 
 const MAX_GATE_ENTRIES = 5000;
 
+// APXN SAFE OPTIMIZATION: Cache only verified, completed one-time tasks.
+// Completion markers expire after 10 minutes. No user balance,
+// mining state, membership checks, or uncompleted task is cached.
+// The real SQL RPC remains the only authority to award points.
+const COMPLETED_TASK_TTL_MS = 10 * 60 * 1000;
+
+
 const socialTaskGate =
   globalThis.__apexSocialTaskGate ||
   new Map();
@@ -98,6 +105,104 @@ function removeGateEntry(
   socialTaskGate.delete(
     gateKey
   );
+}
+
+// =====================================================
+// Cross-isolate Cloudflare Cache API (positive completion only)
+// =====================================================
+// Cache API may be unavailable under some runtime adapters.
+// In that case, existing Supabase verification works as before.
+// All cache keys use a SHA-256 digest; Telegram IDs are not
+// included in the cache URL. Cache data is never sent to users.
+
+async function completedCacheRequest(
+  telegramId,
+  task,
+  requestUrl
+) {
+  if (
+    !globalThis.caches?.default ||
+    !globalThis.crypto?.subtle ||
+    !requestUrl
+  ) {
+    return null;
+  }
+
+  try {
+    const raw = new TextEncoder().encode(
+      `apxn-social-completed-v3:${telegramId}:${task}`
+    );
+    const digest = await globalThis.crypto.subtle.digest(
+      'SHA-256',
+      raw
+    );
+    const hex = Array.from(new Uint8Array(digest))
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('');
+    const cacheUrl = new URL(
+      `/__apxn_internal_cache/social-completed-v3/${hex}`,
+      requestUrl
+    );
+    return new Request(cacheUrl, { method: 'GET' });
+  } catch {
+    return null;
+  }
+}
+
+async function readCompletedCache(
+  telegramId,
+  task,
+  requestUrl
+) {
+  const key = await completedCacheRequest(
+    telegramId,
+    task,
+    requestUrl
+  );
+  if (!key) return false;
+
+  try {
+    const cached = await globalThis.caches.default.match(key);
+    return Boolean(cached?.ok && (await cached.text()) === 'completed');
+  } catch {
+    return false;
+  }
+}
+
+async function rememberCompletedTask(
+  gateKey,
+  telegramId,
+  task,
+  requestUrl
+) {
+  // First preserve the original per-isolate fast path.
+  setGateEntry(gateKey, {
+    inFlight: false,
+    completed: true,
+    expiresAt: Date.now() + COMPLETED_TASK_TTL_MS,
+  });
+
+  const key = await completedCacheRequest(
+    telegramId,
+    task,
+    requestUrl
+  );
+  if (!key) return;
+
+  try {
+    await globalThis.caches.default.put(
+      key,
+      new Response('completed', {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': `public, max-age=${COMPLETED_TASK_TTL_MS / 1000}`,
+        },
+      })
+    );
+  } catch {
+    // A cache failure must not impact the committed SQL result.
+  }
 }
 
 // =====================================================
@@ -369,6 +474,21 @@ export async function POST(
     activeGateKey =
       gateKey;
 
+    const previousGate =
+      socialTaskGate.get(
+        gateKey
+      );
+
+    // Expire positive local markers so administrator resets are
+    // eventually respected; never make the cache an authority.
+    if (
+      previousGate?.completed === true &&
+      (!previousGate.expiresAt ||
+        previousGate.expiresAt <= Date.now())
+    ) {
+      removeGateEntry(gateKey);
+    }
+
     const existingGate =
       socialTaskGate.get(
         gateKey
@@ -436,6 +556,24 @@ export async function POST(
           false,
       }
     );
+
+    // Fast path across Cloudflare isolates: trust only positive
+    // completions previously confirmed by this endpoint or SQL.
+    // If cache is absent or unavailable, verify using Supabase.
+    if (await readCompletedCache(telegramId, task, request.url)) {
+      setGateEntry(gateKey, {
+        inFlight: false,
+        completed: true,
+        expiresAt: Date.now() + COMPLETED_TASK_TTL_MS,
+      });
+      return response(
+        {
+          error: 'Task already claimed',
+          completed: true,
+        },
+        409
+      );
+    }
 
     // =================================================
     // Fast indexed database pre-check.
@@ -512,15 +650,11 @@ export async function POST(
     if (
       alreadyCompleted
     ) {
-      setGateEntry(
+      await rememberCompletedTask(
         gateKey,
-        {
-          inFlight:
-            false,
-
-          completed:
-            true,
-        }
+        telegramId,
+        task,
+        request.url
       );
 
       return response(
@@ -686,15 +820,11 @@ export async function POST(
         result.error_code ===
         'ALREADY_CLAIMED'
       ) {
-        setGateEntry(
+        await rememberCompletedTask(
           gateKey,
-          {
-            inFlight:
-              false,
-
-            completed:
-              true,
-          }
+          telegramId,
+          task,
+          request.url
         );
 
         return response(
@@ -769,15 +899,11 @@ export async function POST(
     // Never cache balance in server memory.
     // =================================================
 
-    setGateEntry(
+    await rememberCompletedTask(
       gateKey,
-      {
-        inFlight:
-          false,
-
-        completed:
-          true,
-      }
+      telegramId,
+      task,
+      request.url
     );
 
     return response({
@@ -858,3 +984,4 @@ export async function POST(
     );
   }
 }
+
