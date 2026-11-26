@@ -14,6 +14,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: disposable-test-only
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
       NEXT_PUBLIC_SUPABASE_URL: https://example.invalid
       NEXT_PUBLIC_SUPABASE_ANON_KEY: test-placeholder
@@ -43,6 +53,86 @@ jobs:
         run: npm ci
       - name: Check Cloudflare build without production credentials
         run: npm run build:vinext
+      - name: Test rewards on disposable PostgreSQL 17 (no production access)
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE TABLE public.users (
+            telegram_id text PRIMARY KEY,
+            balance numeric NOT NULL DEFAULT 0,
+            last_claim timestamptz,
+            mining_session_ends_at timestamptz
+          );
+          GRANT SELECT, UPDATE ON public.users TO service_role;
+          -- Synthetic mining RPCs: exercise the installer patch at the same integration
+          -- point as production, without using production data or credentials.
+          CREATE FUNCTION public.apex_mining_claim(p_telegram_id bigint)
+          RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+          DECLARE v_last_claim timestamptz; v_accrual_end timestamptz;
+            v_claimed numeric := 100; v_stars_bonus numeric := 0;
+          BEGIN
+            SELECT last_claim, mining_session_ends_at INTO v_last_claim, v_accrual_end
+            FROM public.users WHERE telegram_id=p_telegram_id::text FOR UPDATE;
+            v_claimed := v_claimed + v_stars_bonus;
+            UPDATE public.users SET balance=balance+v_claimed,last_claim=v_accrual_end WHERE telegram_id=p_telegram_id::text;
+            RETURN v_claimed;
+          END $$;
+          CREATE FUNCTION public.apex_restart_mining_session(p_telegram_id bigint)
+          RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+          DECLARE v_last_claim timestamptz; v_accrual_end timestamptz;
+            v_claimed numeric := 100; v_stars_bonus numeric := 0;
+          BEGIN
+            SELECT last_claim, mining_session_ends_at INTO v_last_claim, v_accrual_end
+            FROM public.users WHERE telegram_id=p_telegram_id::text FOR UPDATE;
+            v_claimed := v_claimed + v_stars_bonus;
+            UPDATE public.users SET balance=balance+v_claimed,last_claim=v_accrual_end WHERE telegram_id=p_telegram_id::text;
+            RETURN v_claimed;
+          END $$;
+          INSERT INTO public.users VALUES ('1001',100000,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour'),('1002',100000,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour');
+          SQL
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < apxn-ambassador-migration.sql
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE t timestamptz := clock_timestamp()-interval '60 seconds';
+            s jsonb; earned numeric;
+          BEGIN
+            IF has_function_privilege('anon','public.apxn_ambassador_sync(text,boolean,timestamptz,boolean)','EXECUTE') OR
+               has_function_privilege('authenticated','public.apxn_ambassador_settle(text,timestamptz,timestamptz)','EXECUTE') THEN
+              RAISE EXCEPTION 'Public reward access';
+            END IF;
+            s := public.apxn_ambassador_sync('1001',true,t,true);
+            IF (s->>'balance')::numeric <> 105000 OR (s->>'credited')::numeric <> 5000 OR NOT (s->>'active')::boolean THEN RAISE EXCEPTION 'Activation: %',s; END IF;
+            s := public.apxn_ambassador_sync('1001',true,t+interval '1 second',true);
+            IF (s->>'balance')::numeric <> 105000 THEN RAISE EXCEPTION 'Duplicate reward: %',s; END IF;
+            -- The exact extra reward for 30 seconds is 0.09 points.
+            UPDATE public.users SET last_claim=t, mining_session_ends_at=t+interval '30 seconds' WHERE telegram_id='1001';
+            earned := public.apex_mining_claim(1001);
+            IF earned <> 100.09 THEN RAISE EXCEPTION 'Claim amount: %',earned; END IF;
+            UPDATE public.users SET mining_session_ends_at=t+interval '60 seconds' WHERE telegram_id='1001';
+            earned := public.apex_restart_mining_session(1001);
+            IF earned <> 100.09 THEN RAISE EXCEPTION 'Restart amount: %',earned; END IF;
+            s := public.apxn_ambassador_sync('1001');
+            IF (s->>'credited')::numeric <> 5000.18 OR (s->>'balance')::numeric <> 105200.18 THEN RAISE EXCEPTION 'Accounting: %',s; END IF;
+            s := public.apxn_ambassador_sync('1001',false,t+interval '2 seconds',false);
+            IF (s->>'balance')::numeric <> 100200 OR (s->>'credited')::numeric <> 0 OR (s->>'active')::boolean THEN RAISE EXCEPTION 'Revocation: %',s; END IF;
+            s := public.apxn_ambassador_sync('1001',false,t+interval '3 seconds',false);
+            IF (s->>'balance')::numeric <> 100200 THEN RAISE EXCEPTION 'Duplicate revocation: %',s; END IF;
+            s := public.apxn_ambassador_sync('1001',true,t+interval '1 second',true);
+            IF (s->>'active')::boolean THEN RAISE EXCEPTION 'Stale replay: %',s; END IF;
+            s := public.apxn_ambassador_sync('1001',true,t+interval '4 seconds',true);
+            IF (s->>'balance')::numeric <> 100200 OR NOT (s->>'active')::boolean THEN RAISE EXCEPTION 'Reactivation: %',s; END IF;
+            earned := public.apxn_ambassador_settle('1001',t+interval '25 hours',t+interval '26 hours');
+            IF earned <> 0 THEN RAISE EXCEPTION 'Expired period accrual: %',earned; END IF;
+            earned := public.apex_mining_claim(1002);
+            IF earned <> 100 THEN RAISE EXCEPTION 'Normal mining changed: %',earned; END IF;
+            RAISE NOTICE 'PASS: activation, duplicate, both mining paths, revocation, reactivation, expiration and normal mining';
+          END $$;
+          SET ROLE service_role;
+          SELECT public.apxn_ambassador_sync('1001');
+          RESET ROLE;
+          SQL
       - name: Save generated changes for review
         if: always()
         uses: actions/upload-artifact@v4
