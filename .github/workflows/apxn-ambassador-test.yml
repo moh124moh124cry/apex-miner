@@ -1,0 +1,57 @@
+name: APXN Ambassador Test
+
+on:
+  push:
+    branches: [apxn-ambassador-test]
+    paths:
+      - '.github/workflows/apxn-ambassador-test.yml'
+      - 'scripts/APXN_Ambassador_Update.py'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.invalid
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: test-placeholder
+      BOT_TOKEN: '000000:test-placeholder'
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify installer syntax and source anchors
+        run: |
+          python3 -m py_compile scripts/APXN_Ambassador_Update.py
+          python3 scripts/APXN_Ambassador_Update.py
+      - name: Generate local changes (no commit or deployment)
+        run: |
+          python3 scripts/APXN_Ambassador_Update.py --write
+          git diff --check
+          node --check lib/apxn-ambassador.js
+          node --check app/api/ambassador/route.js
+          node --check app/api/mining/restart/route.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Check Cloudflare build without production credentials
+        run: npm run build:vinext
+      - name: Save generated changes for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apxn-ambassador-review
+          if-no-files-found: ignore
+          path: |
+            app/page.js
+            app/api/mining/restart/route.js
+            app/api/ambassador/route.js
+            lib/apxn-ambassador.js
+            apxn-ambassador-migration.sql
