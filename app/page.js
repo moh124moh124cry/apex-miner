@@ -800,6 +800,58 @@ function YouTubeIcon() {
   );
 }
 
+
+function useAPXNAmbassador(userId, isDataLoaded, onBalance) {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [clock, setClock] = useState(Date.now());
+  const inFlight = useRef(false);
+  const callback = useRef(onBalance);
+  callback.current = onBalance;
+  const load = async (activate = false) => {
+    if (!userId || !isDataLoaded || inFlight.current) return;
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) return;
+    inFlight.current = true;
+    if (activate) { setBusy(true); setMessage(''); }
+    try {
+      const res = await fetch('/api/ambassador', { method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({initData, activate}), cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error('Verification unavailable. Try again later.');
+      setStatus(data);
+      if (data.changed || activate) callback.current(Number(data.balance));
+      if (data.verificationError) setMessage('Telegram is temporarily unavailable. No rewards were removed. Try again.');
+      else if (activate) setMessage(data.nameMatches ? 'APXN Ambassador boost activated!' : 'Add APXN to your Telegram profile name, then verify again.');
+    } catch (err) { if (activate) setMessage(err.message); }
+    finally { inFlight.current = false; setBusy(false); }
+  };
+  useEffect(() => {
+    if (!userId || !isDataLoaded) return;
+    void load();
+    const focus = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', focus);
+    return () => document.removeEventListener('visibilitychange', focus);
+  }, [userId, isDataLoaded]);
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!status?.active || Date.parse(status.verifiedUntil) > Date.now()) return;
+    void load();
+    const timer = setInterval(() => void load(), 300000);
+    return () => clearInterval(timer);
+  }, [userId, isDataLoaded, status?.active, status?.verifiedUntil, Math.floor(clock / 60000)]);
+  const active = Boolean(status?.active && Date.parse(status.verifiedUntil) > clock);
+  const lastClaim = Date.parse(status?.lastClaim || '');
+  const sessionEnd = Date.parse(status?.sessionEnd || '');
+  const pending = status?.active && Number.isFinite(lastClaim) && Number.isFinite(sessionEnd)
+    ? (status.periods || []).reduce((sum,p) => sum + Math.max(0, Math.min(clock,sessionEnd,Date.parse(p.end))-Math.max(lastClaim,Date.parse(p.start)))*0.000003,0) : 0;
+  return {status, busy, message, active, pending, load};
+}
+
 export default function Home() {
   const [balance, setBalance] = useState(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -905,6 +957,12 @@ export default function Home() {
 
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState('');
+  const [showAmbassador, setShowAmbassador] = useState(false);
+  const [ambassadorCopied, setAmbassadorCopied] = useState(false);
+  const ambassador = useAPXNAmbassador(userId, isDataLoaded, (nextBalance) => {
+    if (Number.isFinite(nextBalance)) { setBalance(nextBalance); patchUserCache(userId, { balance: nextBalance }); }
+  });
+
   const [userName, setUserName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -3575,6 +3633,7 @@ export default function Home() {
       );
 
       setMiningDelta(0);
+      void ambassador.load();
 
       const returnedMiningSessionEndsAt =
         data.miningSessionEndsAt ||
@@ -4959,6 +5018,30 @@ export default function Home() {
         </div>
       )}
 
+
+      {showAmbassador && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 p-4" role="dialog" aria-modal="true" aria-label="APXN Ambassador">
+          <div className="w-full max-w-sm rounded-3xl border border-emerald-700 bg-slate-950 p-5 text-white shadow-xl">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-black">💚 Become an APXN Ambassador</h2>
+              <button type="button" onClick={() => setShowAmbassador(false)} className="p-2 text-slate-300" aria-label="Close">✕</button>
+            </div>
+            <p className="mt-2 text-sm text-slate-300">Add 💚 APXN to your Telegram profile name.</p>
+            <div className="my-4 grid grid-cols-2 gap-2 rounded-xl bg-emerald-950/50 p-3 text-center">
+              <div><b className="text-xl text-emerald-400">+5,000</b><p className="text-xs">One-time points</p></div>
+              <div><b className="text-xl text-emerald-400">+0.003</b><p className="text-xs">Points / second</p></div>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-slate-800 p-3">
+              <strong>💚 APXN</strong><button type="button" className="rounded-lg bg-slate-700 px-3 py-2 text-sm" onClick={async () => { try { await navigator.clipboard.writeText('💚 APXN'); setAmbassadorCopied(true); } catch { setAmbassadorCopied(false); } }}>{ambassadorCopied ? 'Copied!' : 'Copy'}</button>
+            </div>
+            <p className="mt-3 text-xs text-slate-300">Edit your Telegram display name, then verify. Keep APXN in your name. Removal revokes the 5,000-point reward, the extra speed and all points earned from this program. The initial reward is not granted a second time.</p>
+            {ambassador.status?.rewardEverGranted && <p className="mt-2 text-xs text-emerald-300">Conditional credited points: {Number(ambassador.status.credited || 0).toFixed(4)}</p>}
+            <button type="button" disabled={ambassador.busy || !isDataLoaded} onClick={() => void ambassador.load(true)} className="mt-4 w-full rounded-xl bg-emerald-700 p-3 font-black disabled:opacity-50">{ambassador.busy ? 'Verifying…' : ambassador.active ? 'Verify APXN Name' : 'Verify & Activate Boost'}</button>
+            {ambassador.message && <p className="mt-2 text-sm text-slate-200" role="status">{ambassador.message}</p>}
+          </div>
+        </div>
+      )}
+
       {showWelcome && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
           <div className="bg-gradient-to-b from-yellow-900/50 to-slate-900 border border-yellow-500/50 rounded-3xl w-full max-w-sm p-6 relative shadow-[0_0_40px_rgba(234,179,8,0.3)] animate-in zoom-in-90 duration-500 overflow-hidden">
@@ -5002,7 +5085,13 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="w-full flex justify-end items-center gap-2 mt-2">
+        <div className="w-full flex justify-between items-center gap-2 mt-2">
+
+          <button type="button" onClick={() => { setShowAmbassador(true); void ambassador.load(); }}
+            className="min-w-0 flex-1 rounded-xl border border-emerald-500/50 bg-gradient-to-r from-emerald-800 to-green-700 px-2 py-2 text-center text-white active:scale-95">
+            <span className="block text-xs font-black">{ambassador.active ? '💚 APXN Ambassador' : '💚 Add APXN'}</span>
+            <span className="block text-[9px] font-bold text-emerald-100">{ambassador.active ? '+0.003/sec ACTIVE' : '+5,000 Points | +0.003/sec'}</span>
+          </button>
           <button
             type="button"
             onClick={handleOpenProfile}
@@ -5066,6 +5155,7 @@ export default function Home() {
                <span className="font-semibold text-yellow-400 text-xs">
                  +{(
                    totalMiningRate +
+                   (ambassador.active ? 0.003 : 0) +
                    (isStarsBoostActive
                      ? activeStarsBoostRate
                      : 0)
@@ -5133,7 +5223,7 @@ export default function Home() {
 
           <div className="mt-8 text-center">
              <h3 className="text-5xl font-black text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)] tabular-nums">
-               +{miningDelta.toFixed(4)}
+               +{(miningDelta + ambassador.pending).toFixed(4)}
              </h3>
              <div className={`mt-2 text-[11px] font-bold ${
                isMiningPaused && !isStarsBoostActive

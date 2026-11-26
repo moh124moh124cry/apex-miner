@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase-admin';
 import { validateTelegramInitData } from '../../../../lib/telegram-auth';
+import { refreshAmbassador } from '../../../../lib/apxn-ambassador';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -155,6 +156,8 @@ export async function POST(
     //
     // The fallback mode only skips the ad requirement when no ad
     // was available. It does not bypass the 24-hour session rules.
+    try { await refreshAmbassador(telegramId); } catch { /* Never block normal mining. */ }
+
     const {
       data,
       error,
