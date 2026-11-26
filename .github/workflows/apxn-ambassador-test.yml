@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   test:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -33,7 +35,7 @@ jobs:
       - name: Checkout test branch
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          persist-credentials: true
       - name: Verify installer syntax and source anchors
         run: |
           python3 -m py_compile scripts/APXN_Ambassador_Update.py
@@ -145,3 +147,15 @@ jobs:
             app/api/ambassador/route.js
             lib/apxn-ambassador.js
             apxn-ambassador-migration.sql
+      - name: Save tested files to the test branch only
+        if: ${{ success() && github.ref == 'refs/heads/apxn-ambassador-test' && github.event_name == 'push' }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/apxn-ambassador-test
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- app/page.js app/api/mining/restart/route.js app/api/ambassador/route.js lib/apxn-ambassador.js apxn-ambassador-migration.sql
+          git diff --cached --check
+          git commit -m 'Prepare tested APXN Ambassador files (test branch only)'
+          git push origin HEAD:refs/heads/apxn-ambassador-test
